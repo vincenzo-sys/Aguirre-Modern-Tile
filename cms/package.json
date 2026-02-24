@@ -1,0 +1,30 @@
+{
+  "name": "aguirre-modern-tile-cms",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "seed": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.ts npx tsx --env-file=.env --require ./patch-next-env.cjs src/seed.ts",
+    "payload": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.ts payload"
+  },
+  "dependencies": {
+    "@payloadcms/db-sqlite": "^3.77.0",
+    "@payloadcms/next": "^3.77.0",
+    "@payloadcms/richtext-lexical": "^3.77.0",
+    "next": "15.4.11",
+    "payload": "^3.77.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "cross-env": "^10.1.0",
+    "sass": "^1.97.3",
+    "typescript": "^5.3.3"
+  }
+}

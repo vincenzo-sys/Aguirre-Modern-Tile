@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { Star, Award, Users, Heart, Shield } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
 export const metadata: Metadata = {
   title: 'About Us | Aguirre Modern Tile',
@@ -34,10 +34,9 @@ export default async function AboutPage() {
   let reviewCount = '150+'
 
   try {
-    const payload = await getPayloadClient()
     const [companyInfo, teamData] = await Promise.all([
-      payload.findGlobal({ slug: 'company-info' }),
-      payload.find({ collection: 'team-members', sort: 'sortOrder', limit: 10 }),
+      getCmsGlobal<any>('company-info'),
+      getCmsCollection<any>('team-members', { sort: 'sortOrder', limit: '10' }),
     ])
 
     if (companyInfo) {
@@ -61,11 +60,11 @@ export default async function AboutPage() {
       }
     }
 
-    if (teamData.docs.length > 0) {
+    if (teamData && teamData.docs.length > 0) {
       team = teamData.docs.map((m: any) => ({ name: m.name, role: m.role, bio: m.bio }))
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   const valueIcons = [

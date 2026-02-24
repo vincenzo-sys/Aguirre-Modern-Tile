@@ -15,7 +15,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import LeadCaptureForm from '@/components/LeadCaptureForm'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
 const iconMap: Record<string, React.ReactNode> = {
   Home: <Home className="w-8 h-8" />,
@@ -61,15 +61,14 @@ export default async function HomePage() {
   ]
 
   try {
-    const payload = await getPayloadClient()
     const [svcData, testimonialData, homepageData, companyInfo] = await Promise.all([
-      payload.find({ collection: 'services', sort: 'sortOrder', limit: 20 }),
-      payload.find({ collection: 'testimonials', where: { featured: { equals: true } }, limit: 10 }),
-      payload.findGlobal({ slug: 'homepage' }),
-      payload.findGlobal({ slug: 'company-info' }),
+      getCmsCollection<any>('services', { sort: 'sortOrder', limit: '20' }),
+      getCmsCollection<any>('testimonials', { 'where[featured][equals]': 'true', limit: '10' }),
+      getCmsGlobal<any>('homepage'),
+      getCmsGlobal<any>('company-info'),
     ])
 
-    if (svcData.docs.length > 0) {
+    if (svcData && svcData.docs.length > 0) {
       services = svcData.docs.map((s: any) => ({
         icon: s.icon || 'Home',
         title: s.title,
@@ -78,7 +77,7 @@ export default async function HomePage() {
       }))
     }
 
-    if (testimonialData.docs.length > 0) {
+    if (testimonialData && testimonialData.docs.length > 0) {
       testimonials = testimonialData.docs.map((t: any) => ({
         name: t.name,
         location: t.location,
@@ -108,7 +107,7 @@ export default async function HomePage() {
       phone = companyInfo.phone || phone
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   const phoneDigits = phone.replace(/\D/g, '')

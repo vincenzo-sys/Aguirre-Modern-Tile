@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Image from 'next/image'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsCollection } from '@/lib/cms'
 
 export const metadata: Metadata = {
   title: 'Gallery | Aguirre Modern Tile',
@@ -60,10 +60,9 @@ export default async function GalleryPage() {
   let projects = defaultProjects
 
   try {
-    const payload = await getPayloadClient()
-    const galleryData = await payload.find({ collection: 'gallery-projects', sort: 'sortOrder', limit: 100 })
+    const galleryData = await getCmsCollection<any>('gallery-projects', { sort: 'sortOrder', limit: '100' })
 
-    if (galleryData.docs.length > 0) {
+    if (galleryData && galleryData.docs.length > 0) {
       projects = galleryData.docs.map((p: any, i: number) => ({
         id: i + 1,
         image: p.image,
@@ -72,7 +71,7 @@ export default async function GalleryPage() {
       }))
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   return (

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Metadata } from 'next'
 import { ArrowRight, Calendar } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsCollection } from '@/lib/cms'
 
 export const metadata: Metadata = {
   title: 'Blog | Aguirre Modern Tile',
@@ -84,15 +84,13 @@ export default async function BlogPage() {
   let posts = defaultPosts
 
   try {
-    const payload = await getPayloadClient()
-    const result = await payload.find({
-      collection: 'blog-posts',
-      where: { status: { equals: 'published' } },
+    const result = await getCmsCollection<any>('blog-posts', {
+      'where[status][equals]': 'published',
       sort: '-publishedAt',
-      limit: 50,
+      limit: '50',
     })
 
-    if (result.docs.length > 0) {
+    if (result && result.docs.length > 0) {
       posts = result.docs.map((p: any) => ({
         title: p.title,
         slug: p.slug,
@@ -104,7 +102,7 @@ export default async function BlogPage() {
       }))
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   return (

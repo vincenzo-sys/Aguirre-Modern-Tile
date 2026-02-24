@@ -39,5 +39,6 @@ export default buildConfig({
       url: `file:${path.resolve(dirname, '..', 'payload.db')}`,
     },
   }),
+  cors: ['http://localhost:3100', 'http://localhost:3000'],
   sharp,
 })

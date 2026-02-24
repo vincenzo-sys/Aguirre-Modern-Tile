@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Phone, Mail, MapPin, Clock, Star } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
 const defaultServices = [
   { name: 'Bathroom Tile Installation', href: '/services/bathroom-tile' },
@@ -36,11 +36,10 @@ export default async function Footer() {
   ]
 
   try {
-    const payload = await getPayloadClient()
     const [companyInfo, nav, svcData] = await Promise.all([
-      payload.findGlobal({ slug: 'company-info' }),
-      payload.findGlobal({ slug: 'navigation' }),
-      payload.find({ collection: 'services', sort: 'sortOrder', limit: 20 }),
+      getCmsGlobal<any>('company-info'),
+      getCmsGlobal<any>('navigation'),
+      getCmsCollection<any>('services', { sort: 'sortOrder', limit: '20' }),
     ])
 
     if (companyInfo) {
@@ -55,7 +54,7 @@ export default async function Footer() {
       reviewCount = companyInfo.stats?.reviewCount || reviewCount
     }
 
-    if (svcData.docs.length > 0) {
+    if (svcData && svcData.docs.length > 0) {
       services = svcData.docs.map((s: any) => ({
         name: s.title,
         href: `/services/${s.slug}`,
@@ -71,7 +70,7 @@ export default async function Footer() {
       }
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   const phoneDigits = phone.replace(/\D/g, '')

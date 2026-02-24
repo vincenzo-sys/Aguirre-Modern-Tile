@@ -1,6 +1,6 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsGlobal } from '@/lib/cms'
 
 export default async function MarketingLayout({
   children,
@@ -18,19 +18,18 @@ export default async function MarketingLayout({
   let phone = '(617) 766-1259'
 
   try {
-    const payload = await getPayloadClient()
     const [nav, companyInfo] = await Promise.all([
-      payload.findGlobal({ slug: 'navigation' }),
-      payload.findGlobal({ slug: 'company-info' }),
+      getCmsGlobal<any>('navigation'),
+      getCmsGlobal<any>('company-info'),
     ])
-    if (nav.mainNav && nav.mainNav.length > 0) {
+    if (nav?.mainNav && nav.mainNav.length > 0) {
       navItems = nav.mainNav as { label: string; href: string }[]
     }
-    if (companyInfo.phone) {
+    if (companyInfo?.phone) {
       phone = companyInfo.phone
     }
   } catch {
-    // Payload not initialized yet (first run) — use defaults
+    // CMS not available — use defaults
   }
 
   return (

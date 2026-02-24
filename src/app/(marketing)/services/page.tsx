@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Metadata } from 'next'
 import { Home, Droplets, Grid3X3, Wrench, Hammer, Sparkles, ArrowRight, CheckCircle } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsCollection } from '@/lib/cms'
 
 export const metadata: Metadata = {
   title: 'Our Services | Aguirre Modern Tile',
@@ -31,10 +31,9 @@ export default async function ServicesPage() {
   let services = defaultServices
 
   try {
-    const payload = await getPayloadClient()
-    const svcData = await payload.find({ collection: 'services', sort: 'sortOrder', limit: 20 })
+    const svcData = await getCmsCollection<any>('services', { sort: 'sortOrder', limit: '20' })
 
-    if (svcData.docs.length > 0) {
+    if (svcData && svcData.docs.length > 0) {
       services = svcData.docs.map((s: any) => ({
         icon: s.icon || 'Home',
         title: s.title,
@@ -46,7 +45,7 @@ export default async function ServicesPage() {
       }))
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   return (

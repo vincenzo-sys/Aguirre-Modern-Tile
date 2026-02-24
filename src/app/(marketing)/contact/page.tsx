@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import { Phone, Mail, MapPin, Clock, MessageCircle } from 'lucide-react'
 import PhotoUploadForm from '@/components/PhotoUploadForm'
 import ServiceAreaMap from '@/components/ServiceAreaMap'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
 export const metadata: Metadata = {
   title: 'Contact Us | Aguirre Modern Tile',
@@ -27,10 +27,9 @@ export default async function ContactPage() {
   let faqs = defaultFAQs
 
   try {
-    const payload = await getPayloadClient()
     const [companyInfo, faqData] = await Promise.all([
-      payload.findGlobal({ slug: 'company-info' }),
-      payload.find({ collection: 'faqs', sort: 'sortOrder', limit: 20 }),
+      getCmsGlobal<any>('company-info'),
+      getCmsCollection<any>('faqs', { sort: 'sortOrder', limit: '20' }),
     ])
 
     if (companyInfo) {
@@ -45,11 +44,11 @@ export default async function ContactPage() {
       }
     }
 
-    if (faqData.docs.length > 0) {
+    if (faqData && faqData.docs.length > 0) {
       faqs = faqData.docs.map((f: any) => ({ question: f.question, answer: f.answer }))
     }
   } catch {
-    // Payload not initialized yet — use defaults
+    // CMS not available — use defaults
   }
 
   const phoneDigits = phone.replace(/\D/g, '')

@@ -2,9 +2,9 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, User, Tag, ArrowRight } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsCollection } from '@/lib/cms'
 import { notFound } from 'next/navigation'
-import { RichText } from '@payloadcms/richtext-lexical/react'
+import RichText from '@/components/blog/RichText'
 
 const categoryLabels: Record<string, string> = {
   tips: 'Tips & Techniques',
@@ -221,14 +221,12 @@ async function getPost(slug: string): Promise<BlogPostData | null> {
   const defaults = defaultPosts[slug]
 
   try {
-    const payload = await getPayloadClient()
-    const result = await payload.find({
-      collection: 'blog-posts',
-      where: { slug: { equals: slug } },
-      limit: 1,
+    const result = await getCmsCollection<any>('blog-posts', {
+      'where[slug][equals]': slug,
+      limit: '1',
     })
 
-    if (result.docs.length > 0) {
+    if (result && result.docs.length > 0) {
       const p: any = result.docs[0]
       return {
         title: p.title,
@@ -245,7 +243,7 @@ async function getPost(slug: string): Promise<BlogPostData | null> {
       }
     }
   } catch {
-    // Payload not initialized yet
+    // CMS not available
   }
 
   return defaults || null
@@ -253,17 +251,15 @@ async function getPost(slug: string): Promise<BlogPostData | null> {
 
 export async function generateStaticParams() {
   try {
-    const payload = await getPayloadClient()
-    const result = await payload.find({
-      collection: 'blog-posts',
-      where: { status: { equals: 'published' } },
-      limit: 100,
+    const result = await getCmsCollection<any>('blog-posts', {
+      'where[status][equals]': 'published',
+      limit: '100',
     })
-    if (result.docs.length > 0) {
+    if (result && result.docs.length > 0) {
       return result.docs.map((p: any) => ({ slug: p.slug }))
     }
   } catch {
-    // Payload not initialized yet
+    // CMS not available
   }
   return validSlugs.map((slug) => ({ slug }))
 }

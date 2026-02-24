@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { CheckCircle, ArrowRight } from 'lucide-react'
-import { getPayloadClient } from '@/lib/payload'
+import { getCmsCollection } from '@/lib/cms'
 import { notFound } from 'next/navigation'
 
 interface ServiceData {
@@ -165,14 +165,12 @@ async function getService(slug: string): Promise<ServiceData | null> {
   if (!defaults) return null
 
   try {
-    const payload = await getPayloadClient()
-    const result = await payload.find({
-      collection: 'services',
-      where: { slug: { equals: slug } },
-      limit: 1,
+    const result = await getCmsCollection<any>('services', {
+      'where[slug][equals]': slug,
+      limit: '1',
     })
 
-    if (result.docs.length > 0) {
+    if (result && result.docs.length > 0) {
       const s: any = result.docs[0]
       return {
         title: s.title || defaults.title,
@@ -189,7 +187,7 @@ async function getService(slug: string): Promise<ServiceData | null> {
       }
     }
   } catch {
-    // Payload not initialized yet
+    // CMS not available
   }
 
   return defaults
@@ -197,13 +195,12 @@ async function getService(slug: string): Promise<ServiceData | null> {
 
 export async function generateStaticParams() {
   try {
-    const payload = await getPayloadClient()
-    const result = await payload.find({ collection: 'services', limit: 50 })
-    if (result.docs.length > 0) {
+    const result = await getCmsCollection<any>('services', { limit: '50' })
+    if (result && result.docs.length > 0) {
       return result.docs.map((s: any) => ({ slug: s.slug }))
     }
   } catch {
-    // Payload not initialized yet
+    // CMS not available
   }
   return validSlugs.map((slug) => ({ slug }))
 }

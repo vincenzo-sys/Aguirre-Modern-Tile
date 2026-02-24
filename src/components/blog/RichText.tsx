@@ -72,8 +72,8 @@ function renderNode(node: LexicalNode, index: number): React.ReactNode {
 
   // Heading
   if (node.type === 'heading') {
-    const Tag = (node.tag || 'h2') as keyof JSX.IntrinsicElements
-    return <Tag key={index}>{children}</Tag>
+    const tag = node.tag || 'h2'
+    return React.createElement(tag, { key: index }, ...children)
   }
 
   // Paragraph

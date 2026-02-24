@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Top-left: gray tile -->
+  <path d="M0,0 L44,0 L44,44 L0,44 Z" fill="#6B7280"/>
+  <!-- Top-right: navy tile -->
+  <path d="M56,0 L100,0 L100,44 L56,44 Z" fill="#0A1E5C"/>
+  <!-- Bottom-left: blue tile -->
+  <path d="M0,56 L44,56 L44,100 L0,100 Z" fill="#1D6FD0"/>
+  <!-- Bottom-right: teal tile -->
+  <path d="M56,56 L100,56 L100,100 L56,100 Z" fill="#0D9488"/>
+  <!-- Center diamond: dark navy -->
+  <path d="M50,15 L85,50 L50,85 L15,50 Z" fill="#0A1A3A"/>
+</svg>

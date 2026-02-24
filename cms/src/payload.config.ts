@@ -1,6 +1,6 @@
 import path from 'path'
 import { buildConfig } from 'payload'
-import { sqliteAdapter } from '@payloadcms/db-sqlite'
+import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
@@ -34,11 +34,16 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: sqliteAdapter({
-    client: {
-      url: `file:${path.resolve(dirname, '..', 'payload.db')}`,
+  db: postgresAdapter({
+    pool: {
+      connectionString: process.env.DATABASE_URI || '',
     },
+    schemaName: 'cms',
   }),
-  cors: ['http://localhost:3100', 'http://localhost:3000'],
+  cors: [
+    'http://localhost:3100',
+    'http://localhost:3000',
+    'https://aguirre-modern-tile.vercel.app',
+  ],
   sharp,
 })

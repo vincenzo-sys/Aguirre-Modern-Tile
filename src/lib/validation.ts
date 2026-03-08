@@ -20,3 +20,33 @@ export function validateContact(fields: { name: string; email: string; phone: st
   if (!isValidPhone(fields.phone)) errors.phone = 'Enter a valid phone number, e.g. (617) 555-1234'
   return errors
 }
+
+// Sanitize string input — strip HTML tags to prevent injection in emails
+export function sanitize(input: string): string {
+  return input.replace(/<[^>]*>/g, '').trim().slice(0, 2000)
+}
+
+// In-memory rate limiter for API routes
+// Tracks requests per IP with a sliding window
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+export function rateLimit(
+  ip: string,
+  { maxRequests = 5, windowMs = 60_000 } = {}
+): { allowed: boolean; remaining: number } {
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs })
+    return { allowed: true, remaining: maxRequests - 1 }
+  }
+
+  entry.count++
+
+  if (entry.count > maxRequests) {
+    return { allowed: false, remaining: 0 }
+  }
+
+  return { allowed: true, remaining: maxRequests - entry.count }
+}

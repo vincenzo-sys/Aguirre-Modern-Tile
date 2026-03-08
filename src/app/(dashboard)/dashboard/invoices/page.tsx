@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
@@ -16,10 +16,41 @@ const tabs: { label: string; value: InvoiceStatus | 'all' }[] = [
   { label: 'Overdue', value: 'overdue' },
 ]
 
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
 export default function InvoicesPage() {
   const [activeTab, setActiveTab] = useState<InvoiceStatus | 'all'>('all')
-  const allInvoices = getAllDemoInvoices()
+  const [allInvoices, setAllInvoices] = useState<InvoiceWithJob[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (isDemoMode) {
+      setAllInvoices(getAllDemoInvoices())
+      setLoading(false)
+      return
+    }
+
+    async function loadInvoices() {
+      try {
+        const res = await fetch('/api/invoices')
+        if (res.ok) {
+          const data = await res.json()
+          setAllInvoices(data)
+        }
+      } catch (err) {
+        console.error('Failed to load invoices:', err)
+      }
+      setLoading(false)
+    }
+
+    loadInvoices()
+  }, [])
+
   const filtered = activeTab === 'all' ? allInvoices : allInvoices.filter((inv) => inv.status === activeTab)
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-500">Loading invoices...</div>
+  }
 
   return (
     <div>
@@ -36,6 +67,14 @@ export default function InvoicesPage() {
           Create Invoice
         </Link>
       </div>
+
+      {isDemoMode && (
+        <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
+          <p className="text-sm text-amber-800">
+            <strong>Demo Mode</strong> — Viewing sample data.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
         {tabs.map((tab) => (
@@ -78,7 +117,7 @@ export default function InvoicesPage() {
                       #{inv.job.job_number} {inv.job.title}
                     </Link>
                   ) : (
-                    <span className="text-sm text-gray-400">—</span>
+                    <span className="text-sm text-gray-400">&mdash;</span>
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm font-semibold text-gray-900">{fmt.format(inv.amount)}</td>

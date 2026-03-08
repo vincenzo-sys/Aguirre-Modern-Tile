@@ -4,11 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X } from 'lucide-react'
+import { ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
 const allNavItems = [
   { label: 'Jobs', href: '/dashboard', icon: ClipboardList, ownerOnly: false },
+  { label: 'Leads', href: '/dashboard/leads', icon: Inbox, ownerOnly: true },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
   { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },

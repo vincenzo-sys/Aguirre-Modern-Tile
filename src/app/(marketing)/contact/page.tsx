@@ -3,6 +3,7 @@ import { Phone, Mail, MapPin, Clock, MessageCircle } from 'lucide-react'
 import PhotoUploadForm from '@/components/PhotoUploadForm'
 import ServiceAreaMap from '@/components/ServiceAreaMap'
 import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
+import JsonLd, { faqJsonLd } from '@/components/JsonLd'
 
 export const metadata: Metadata = {
   title: 'Contact Us | Aguirre Modern Tile',
@@ -61,6 +62,8 @@ export default async function ContactPage() {
 
   return (
     <>
+      <JsonLd data={faqJsonLd(faqs)} />
+
       {/* Hero */}
       <section className="bg-gradient-to-br from-gray-900 to-primary-900 text-white section-padding">
         <div className="container-custom">

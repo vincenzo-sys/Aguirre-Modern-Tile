@@ -80,20 +80,30 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
     setIsSubmitting(true)
 
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: contactInfo.name,
-          email: contactInfo.email,
-          phone: contactInfo.phone,
-          projectType,
-          answers,
-          source: 'quote',
-        }),
-      })
+      const payload = {
+        name: contactInfo.name,
+        email: contactInfo.email,
+        phone: contactInfo.phone,
+        projectType,
+        answers,
+        source: 'quote',
+      }
 
-      if (!res.ok) throw new Error('Failed to send')
+      // Send email notification and save to database in parallel
+      const [emailRes, quoteRes] = await Promise.all([
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+        fetch('/api/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+      ])
+
+      if (!emailRes.ok && !quoteRes.ok) throw new Error('Failed to send')
 
       setIsSubmitting(false)
       setIsSubmitted(true)

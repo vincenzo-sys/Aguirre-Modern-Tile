@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import PhotoUpload from '@/components/dashboard/PhotoUpload'
@@ -21,22 +21,44 @@ const JOB_TYPES = [
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
+function mapProjectTypeToJobType(projectType: string): string {
+  const map: Record<string, string> = {
+    bathroom: 'Bathroom Tile',
+    shower: 'Shower Tile',
+    'kitchen-floor': 'Floor Tile',
+    backsplash: 'Backsplash',
+    other: 'Other',
+  }
+  return map[projectType] || ''
+}
+
 export default function NewJobPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <NewJobForm />
+    </Suspense>
+  )
+}
+
+function NewJobForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [teamMembers, setTeamMembers] = useState<Profile[]>([])
   const [photos, setPhotos] = useState<File[]>([])
+  const fromLeadId = searchParams.get('from_lead') || ''
 
+  // Pre-fill from lead conversion query params
   const [form, setForm] = useState({
     title: '',
-    client_name: '',
-    client_phone: '',
-    client_email: '',
+    client_name: searchParams.get('name') || '',
+    client_phone: searchParams.get('phone') || '',
+    client_email: searchParams.get('email') || '',
     client_address: '',
-    job_type: '',
+    job_type: mapProjectTypeToJobType(searchParams.get('type') || ''),
     square_footage: '',
-    scope_notes: '',
+    scope_notes: searchParams.get('notes') || '',
     scheduled_start: '',
     scheduled_end: '',
     estimated_days: '',
@@ -144,6 +166,14 @@ export default function NewJobPage() {
         .single()
 
       if (jobError) throw jobError
+
+      // Mark lead as converted if this came from a lead
+      if (fromLeadId && job) {
+        await supabase
+          .from('quote_requests')
+          .update({ status: 'converted', converted_job_id: job.id })
+          .eq('id', fromLeadId)
+      }
 
       // Upload photos
       if (photos.length > 0 && job) {

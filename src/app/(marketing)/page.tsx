@@ -15,6 +15,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import LeadCaptureForm from '@/components/LeadCaptureForm'
+import JsonLd, { localBusinessJsonLd } from '@/components/JsonLd'
 import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -114,6 +115,8 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd data={localBusinessJsonLd()} />
+
       {/* Hero Section */}
       <section id="top" className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-primary-900 text-white overflow-hidden">
         {/* Background Pattern */}

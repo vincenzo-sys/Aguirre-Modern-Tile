@@ -1,16 +1,18 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { demoJobs } from '@/lib/demo'
 import { toast } from '@/components/Toast'
-import type { InvoiceLineItem } from '@/lib/supabase/types'
+import type { InvoiceLineItem, Job } from '@/lib/supabase/types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
 
 const emptyLine: InvoiceLineItem = { description: '', quantity: 1, unit_price: 0, amount: 0 }
+
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default function NewInvoicePage() {
   return (
@@ -29,8 +31,33 @@ function NewInvoiceForm() {
   const [dueDate, setDueDate] = useState('')
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([{ ...emptyLine }])
   const [loading, setLoading] = useState(false)
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [jobsLoading, setJobsLoading] = useState(true)
 
-  const selectedJob = demoJobs.find((j) => j.id === jobId)
+  useEffect(() => {
+    if (isDemoMode) {
+      setJobs(demoJobs)
+      setJobsLoading(false)
+      return
+    }
+
+    async function loadJobs() {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      setJobs((data ?? []) as Job[])
+      setJobsLoading(false)
+    }
+
+    loadJobs()
+  }, [])
+
+  const selectedJob = jobs.find((j) => j.id === jobId)
 
   function updateLine(index: number, field: keyof InvoiceLineItem, value: string | number) {
     setLineItems((prev) => {
@@ -61,7 +88,7 @@ function NewInvoiceForm() {
 
   const [error, setError] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
 
@@ -71,9 +98,38 @@ function NewInvoiceForm() {
     }
 
     setLoading(true)
-    toast('Demo mode: Invoice would be created. Connect Supabase to save real data.')
-    setLoading(false)
-    router.push('/dashboard/invoices')
+
+    if (isDemoMode) {
+      toast('Demo mode: Invoice would be created. Connect Supabase to save real data.')
+      setLoading(false)
+      router.push('/dashboard/invoices')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_id: jobId,
+          due_date: dueDate,
+          line_items: lineItems,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to create invoice')
+      }
+
+      toast('Invoice created successfully')
+      router.push('/dashboard/invoices')
+      router.refresh()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create invoice'
+      setError(message)
+      setLoading(false)
+    }
   }
 
   const inputClass =
@@ -92,11 +148,13 @@ function NewInvoiceForm() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Invoice</h1>
 
-      <div className="mb-6 rounded-md bg-amber-50 border border-amber-200 p-3">
-        <p className="text-sm text-amber-800">
-          <strong>Demo Mode</strong> — Form is functional but won't save. Connect Supabase to create real invoices.
-        </p>
-      </div>
+      {isDemoMode && (
+        <div className="mb-6 rounded-md bg-amber-50 border border-amber-200 p-3">
+          <p className="text-sm text-amber-800">
+            <strong>Demo Mode</strong> — Form is functional but won&apos;t save. Connect Supabase to create real invoices.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Job + Due Date */}
@@ -111,9 +169,10 @@ function NewInvoiceForm() {
                 value={jobId}
                 onChange={(e) => setJobId(e.target.value)}
                 className={inputClass}
+                disabled={jobsLoading}
               >
-                <option value="">Select a job...</option>
-                {demoJobs.map((j) => (
+                <option value="">{jobsLoading ? 'Loading jobs...' : 'Select a job...'}</option>
+                {jobs.map((j) => (
                   <option key={j.id} value={j.id}>
                     #{j.job_number} {j.title} — {j.client_name}
                   </option>

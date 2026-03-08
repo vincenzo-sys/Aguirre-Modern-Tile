@@ -1,18 +1,99 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { toast } from '@/components/Toast'
 import { getDemoInvoice } from '@/lib/demo'
+import type { InvoiceWithJob } from '@/lib/supabase/types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
 
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
 export default function InvoiceDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const invoice = getDemoInvoice(params.id as string)
+  const id = params.id as string
+  const [invoice, setInvoice] = useState<InvoiceWithJob | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(false)
+
+  useEffect(() => {
+    if (isDemoMode) {
+      setInvoice(getDemoInvoice(id) ?? null)
+      setLoading(false)
+      return
+    }
+
+    async function loadInvoice() {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: inv, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error || !inv) {
+        setLoading(false)
+        return
+      }
+
+      // Fetch associated job
+      let job = null
+      if (inv.job_id) {
+        const { data: jobData } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('id', inv.job_id)
+          .single()
+        job = jobData
+      }
+
+      setInvoice({ ...inv, job } as InvoiceWithJob)
+      setLoading(false)
+    }
+
+    loadInvoice()
+  }, [id])
+
+  async function handleMarkAs(newStatus: string) {
+    if (isDemoMode) {
+      toast(`Demo mode: Invoice would be marked as "${newStatus}". Connect Supabase to update real data.`)
+      return
+    }
+
+    setUpdating(true)
+
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update')
+      }
+
+      const updated = await res.json()
+      setInvoice((prev) => prev ? { ...prev, status: updated.status } : prev)
+      toast(`Invoice marked as ${newStatus}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update'
+      toast(message, 'error')
+    }
+
+    setUpdating(false)
+  }
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-500">Loading invoice...</div>
+  }
 
   if (!invoice) {
     return (
@@ -23,10 +104,6 @@ export default function InvoiceDetailPage() {
         </Link>
       </div>
     )
-  }
-
-  function handleMarkAs(newStatus: string) {
-    toast(`Demo mode: Invoice would be marked as "${newStatus}". Connect Supabase to update real data.`)
   }
 
   return (
@@ -58,7 +135,8 @@ export default function InvoiceDetailPage() {
             {invoice.status === 'draft' && (
               <button
                 onClick={() => handleMarkAs('sent')}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                disabled={updating}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 Mark as Sent
               </button>
@@ -66,7 +144,8 @@ export default function InvoiceDetailPage() {
             {invoice.status === 'sent' && (
               <button
                 onClick={() => handleMarkAs('paid')}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                disabled={updating}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
                 Mark as Paid
               </button>

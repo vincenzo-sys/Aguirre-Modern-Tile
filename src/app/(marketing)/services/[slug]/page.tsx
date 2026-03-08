@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { CheckCircle, ArrowRight } from 'lucide-react'
 import { getCmsCollection } from '@/lib/cms'
 import { notFound } from 'next/navigation'
+import JsonLd, { serviceJsonLd, breadcrumbJsonLd } from '@/components/JsonLd'
 
 interface ServiceData {
   title: string
@@ -229,6 +230,18 @@ export default async function ServiceDetailPage({ params }: Props) {
 
   return (
     <>
+      <JsonLd data={serviceJsonLd({
+        name: service.title,
+        description: service.description,
+        slug: service.slug,
+        priceRange: service.priceRange,
+      })} />
+      <JsonLd data={breadcrumbJsonLd([
+        { name: 'Home', url: 'https://aguirremoderntile.com' },
+        { name: 'Services', url: 'https://aguirremoderntile.com/services' },
+        { name: service.title, url: `https://aguirremoderntile.com/services/${service.slug}` },
+      ])} />
+
       {/* Hero */}
       <section className="bg-gradient-to-br from-gray-900 to-primary-900 text-white section-padding">
         <div className="container-custom">

@@ -81,6 +81,21 @@ export interface InvoiceWithJob extends Invoice {
   job?: Job | null
 }
 
+export type QuoteRequestStatus = 'new' | 'reviewed' | 'converted' | 'archived'
+
+export interface QuoteRequest {
+  id: string
+  status: QuoteRequestStatus
+  client_name: string
+  client_email: string
+  client_phone: string
+  project_type: string
+  answers: Record<string, string>
+  converted_job_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   public: {
     Tables: {

@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import Image from 'next/image'
 import { Star, Award, Users, Heart, Shield } from 'lucide-react'
 import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
@@ -114,10 +115,13 @@ export default async function AboutPage() {
                 ))}
               </div>
             </div>
-            <div className="bg-gray-200 rounded-2xl aspect-square">
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                [Team Photo Placeholder]
-              </div>
+            <div className="relative rounded-2xl aspect-square overflow-hidden">
+              <Image
+                src="/images/gallery1.jpg"
+                alt="Aguirre Modern Tile team at work on a bathroom project"
+                fill
+                className="object-cover"
+              />
             </div>
           </div>
         </div>

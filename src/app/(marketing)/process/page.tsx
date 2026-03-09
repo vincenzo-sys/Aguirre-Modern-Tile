@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import Image from 'next/image'
 import { Camera, Clock, CheckCircle, Phone, Droplets, Layers, Ruler, Shield, Wrench } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -179,11 +180,13 @@ export default function ProcessPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-gray-200 rounded-2xl aspect-square">
-              {/* Placeholder for image */}
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                [Shower Pan Installation Image]
-              </div>
+            <div className="relative rounded-2xl aspect-square overflow-hidden">
+              <Image
+                src="/images/shower1.jpg"
+                alt="Shower pan and drain installation by Aguirre Modern Tile"
+                fill
+                className="object-cover"
+              />
             </div>
           </div>
         </div>
@@ -227,11 +230,13 @@ export default function ProcessPage() {
                 </li>
               </ul>
             </div>
-            <div className="md:order-1 bg-gray-200 rounded-2xl aspect-square">
-              {/* Placeholder for image */}
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                [Substrate Prep Image]
-              </div>
+            <div className="md:order-1 relative rounded-2xl aspect-square overflow-hidden">
+              <Image
+                src="/images/floor1.jpg"
+                alt="Substrate preparation and floor leveling for tile installation"
+                fill
+                className="object-cover"
+              />
             </div>
           </div>
         </div>

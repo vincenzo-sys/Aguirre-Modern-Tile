@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { getAllDemoInvoices } from '@/lib/demo'
@@ -19,6 +20,7 @@ const tabs: { label: string; value: InvoiceStatus | 'all' }[] = [
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default function InvoicesPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<InvoiceStatus | 'all'>('all')
   const [allInvoices, setAllInvoices] = useState<InvoiceWithJob[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,17 +107,21 @@ export default function InvoicesPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((inv) => (
-              <tr key={inv.id} className="hover:bg-gray-50">
+              <tr
+                key={inv.id}
+                onClick={() => router.push(`/dashboard/invoices/${inv.id}`)}
+                className="hover:bg-gray-50 cursor-pointer"
+              >
                 <td className="px-6 py-4">
-                  <Link href={`/dashboard/invoices/${inv.id}`} className="text-sm font-mono text-primary-600 hover:text-primary-700">
+                  <span className="text-sm font-mono text-primary-600">
                     {inv.invoice_number}
-                  </Link>
+                  </span>
                 </td>
                 <td className="px-6 py-4">
                   {inv.job ? (
-                    <Link href={`/dashboard/jobs/${inv.job.id}`} className="text-sm text-gray-900 hover:text-primary-600">
+                    <span className="text-sm text-gray-900">
                       #{inv.job.job_number} {inv.job.title}
-                    </Link>
+                    </span>
                   ) : (
                     <span className="text-sm text-gray-400">&mdash;</span>
                   )}

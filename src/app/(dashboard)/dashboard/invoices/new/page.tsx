@@ -117,13 +117,14 @@ function NewInvoiceForm() {
         }),
       })
 
+      const data = await res.json()
+
       if (!res.ok) {
-        const data = await res.json()
         throw new Error(data.error || 'Failed to create invoice')
       }
 
-      toast('Invoice created successfully')
-      router.push('/dashboard/invoices')
+      toast('Invoice created — review and send to customer')
+      router.push(`/dashboard/invoices/${data.id}`)
       router.refresh()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create invoice'

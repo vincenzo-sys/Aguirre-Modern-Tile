@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Send, ExternalLink, CreditCard } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { toast } from '@/components/Toast'
 import { getDemoInvoice } from '@/lib/demo'
@@ -19,6 +19,11 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<InvoiceWithJob | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [sendingStripe, setSendingStripe] = useState(false)
+  const [stripeInfo, setStripeInfo] = useState<{
+    hosted_invoice_url?: string | null
+    invoice_pdf?: string | null
+  } | null>(null)
 
   useEffect(() => {
     if (isDemoMode) {
@@ -91,6 +96,47 @@ export default function InvoiceDetailPage() {
     setUpdating(false)
   }
 
+  async function handleSendViaStripe() {
+    if (isDemoMode) {
+      toast('Demo mode: Connect Supabase and configure Stripe to send invoices.', 'error')
+      return
+    }
+
+    setSendingStripe(true)
+
+    try {
+      const res = await fetch('/api/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_id: id }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send via Stripe')
+      }
+
+      setInvoice((prev) => prev ? {
+        ...prev,
+        status: 'sent' as const,
+        stripe_invoice_id: data.stripe_invoice_id,
+      } : prev)
+
+      setStripeInfo({
+        hosted_invoice_url: data.hosted_invoice_url,
+        invoice_pdf: data.invoice_pdf,
+      })
+
+      toast('Invoice sent to customer via Stripe!')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to send'
+      toast(message, 'error')
+    }
+
+    setSendingStripe(false)
+  }
+
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading invoice...</div>
   }
@@ -105,6 +151,8 @@ export default function InvoiceDetailPage() {
       </div>
     )
   }
+
+  const hasStripe = !!invoice.stripe_invoice_id
 
   return (
     <div className="max-w-3xl">
@@ -132,20 +180,47 @@ export default function InvoiceDetailPage() {
           </div>
           <div className="flex items-center gap-3">
             <InvoiceStatusBadge status={invoice.status} />
+
+            {/* Draft invoice: offer "Send via Stripe" as primary, "Mark as Sent" as fallback */}
             {invoice.status === 'draft' && (
-              <button
-                onClick={() => handleMarkAs('sent')}
-                disabled={updating}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-              >
-                Mark as Sent
-              </button>
+              <>
+                <button
+                  onClick={handleSendViaStripe}
+                  disabled={sendingStripe || updating}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {sendingStripe ? 'Sending...' : 'Send via Stripe'}
+                </button>
+                <button
+                  onClick={() => handleMarkAs('sent')}
+                  disabled={updating || sendingStripe}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                >
+                  Mark as Sent
+                </button>
+              </>
             )}
-            {invoice.status === 'sent' && (
+
+            {/* Sent invoice: "Mark as Paid" manually (for cash/check payments) */}
+            {invoice.status === 'sent' && !hasStripe && (
               <button
                 onClick={() => handleMarkAs('paid')}
                 disabled={updating}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Mark as Paid
+              </button>
+            )}
+
+            {/* Sent via Stripe: show payment link and manual override */}
+            {invoice.status === 'sent' && hasStripe && (
+              <button
+                onClick={() => handleMarkAs('paid')}
+                disabled={updating}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
+                title="Use if customer paid outside Stripe (cash, check, etc.)"
               >
                 Mark as Paid
               </button>
@@ -168,9 +243,56 @@ export default function InvoiceDetailPage() {
             <div>
               <p className="text-gray-500">Client</p>
               <p className="font-medium text-gray-900">{invoice.job.client_name}</p>
+              {invoice.job.client_email && (
+                <p className="text-gray-400 text-xs">{invoice.job.client_email}</p>
+              )}
             </div>
           )}
         </div>
+
+        {/* Stripe info banner */}
+        {hasStripe && (
+          <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+            <div className="flex items-center gap-2 text-sm">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="currentColor">
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+              </svg>
+              <span className="font-medium text-indigo-700">Sent via Stripe</span>
+              {invoice.status === 'sent' && (
+                <span className="text-indigo-500">— Waiting for customer payment</span>
+              )}
+              {invoice.status === 'paid' && (
+                <span className="text-green-600">— Payment received</span>
+              )}
+            </div>
+            {(stripeInfo?.hosted_invoice_url || stripeInfo?.invoice_pdf) && (
+              <div className="mt-2 flex items-center gap-4 text-xs">
+                {stripeInfo.hosted_invoice_url && (
+                  <a
+                    href={stripeInfo.hosted_invoice_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Customer payment page
+                  </a>
+                )}
+                {stripeInfo.invoice_pdf && (
+                  <a
+                    href={stripeInfo.invoice_pdf}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Download PDF
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Line Items */}
@@ -207,6 +329,9 @@ export default function InvoiceDetailPage() {
       <div className="mt-6 text-xs text-gray-400 space-y-1">
         <p>Created {new Date(invoice.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
         <p>Updated {new Date(invoice.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        {invoice.stripe_invoice_id && (
+          <p className="text-indigo-400">Stripe ID: {invoice.stripe_invoice_id}</p>
+        )}
       </div>
     </div>
   )

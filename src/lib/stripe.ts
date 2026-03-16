@@ -11,6 +11,8 @@ export function getStripe(): Stripe {
   if (!stripeInstance) {
     stripeInstance = new Stripe(STRIPE_SECRET_KEY, {
       typescript: true,
+      maxNetworkRetries: 3,
+      timeout: 30000,
     })
   }
   return stripeInstance

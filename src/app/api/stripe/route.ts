@@ -138,6 +138,17 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: unknown) {
     console.error('Stripe invoice error:', err)
+
+    // Return detailed error info for debugging
+    if (err && typeof err === 'object' && 'type' in err) {
+      const stripeErr = err as { type: string; message: string; code?: string; statusCode?: number }
+      return NextResponse.json({
+        error: stripeErr.message,
+        stripe_error_type: stripeErr.type,
+        stripe_error_code: stripeErr.code,
+      }, { status: stripeErr.statusCode || 500 })
+    }
+
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

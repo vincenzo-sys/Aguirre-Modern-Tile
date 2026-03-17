@@ -62,7 +62,7 @@ export async function GET() {
     config: {
       timeout: 60000,
       maxNetworkRetries: 2,
-      httpClient: 'NodeHttpClient',
+      httpClient: 'FetchHttpClient',
       telemetry: false,
     },
     timestamp: new Date().toISOString(),

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
 
+export const maxDuration = 30
+
 // POST /api/stripe - send an invoice via Stripe
 export async function POST(req: NextRequest) {
   if (!isStripeConfigured()) {

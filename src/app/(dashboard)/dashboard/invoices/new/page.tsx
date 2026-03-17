@@ -10,7 +10,7 @@ import type { InvoiceLineItem, Job } from '@/lib/supabase/types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
 
-const emptyLine: InvoiceLineItem = { description: '', quantity: 1, unit_price: 0, amount: 0 }
+const emptyLine: InvoiceLineItem = { description: '', quantity: 1, unit_price: 0, amount: 0, type: 'service', unit: '' }
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -65,6 +65,10 @@ function NewInvoiceForm() {
       const line = { ...next[index] }
       if (field === 'description') {
         line.description = value as string
+      } else if (field === 'type') {
+        line.type = value as 'product' | 'service'
+      } else if (field === 'unit') {
+        line.unit = value as string
       } else {
         const num = typeof value === 'string' ? parseFloat(value) || 0 : value
         if (field === 'quantity') line.quantity = num
@@ -204,58 +208,81 @@ function NewInvoiceForm() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Line Items</h2>
           <div className="space-y-3">
             {lineItems.map((line, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-5">
-                  {i === 0 && <label className="text-xs text-gray-500">Description</label>}
-                  <input
-                    type="text"
-                    required
-                    value={line.description}
-                    onChange={(e) => updateLine(i, 'description', e.target.value)}
-                    className={inputClass}
-                    placeholder="Description"
-                  />
-                </div>
-                <div className="col-span-2">
-                  {i === 0 && <label className="text-xs text-gray-500">Qty</label>}
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={line.quantity}
-                    onChange={(e) => updateLine(i, 'quantity', e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div className="col-span-2">
-                  {i === 0 && <label className="text-xs text-gray-500">Unit Price</label>}
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={line.unit_price || ''}
-                    onChange={(e) => updateLine(i, 'unit_price', e.target.value)}
-                    className={inputClass}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="col-span-2">
-                  {i === 0 && <label className="text-xs text-gray-500">Amount</label>}
-                  <p className="mt-1 px-3 py-2 text-sm font-medium text-gray-900">
-                    {fmt.format(line.amount)}
-                  </p>
-                </div>
-                <div className="col-span-1">
-                  {lineItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeLine(i)}
-                      className="mt-1 p-2 text-gray-400 hover:text-red-500"
+              <div key={i} className="space-y-2">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-4">
+                    {i === 0 && <label className="text-xs text-gray-500">Description</label>}
+                    <input
+                      type="text"
+                      required
+                      value={line.description}
+                      onChange={(e) => updateLine(i, 'description', e.target.value)}
+                      className={inputClass}
+                      placeholder="Description"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    {i === 0 && <label className="text-xs text-gray-500">Type</label>}
+                    <select
+                      value={line.type || 'service'}
+                      onChange={(e) => updateLine(i, 'type', e.target.value)}
+                      className={inputClass}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                      <option value="service">Labor</option>
+                      <option value="product">Material</option>
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    {i === 0 && <label className="text-xs text-gray-500">Qty</label>}
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={line.quantity}
+                      onChange={(e) => updateLine(i, 'quantity', e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    {i === 0 && <label className="text-xs text-gray-500">Unit</label>}
+                    <input
+                      type="text"
+                      value={line.unit || ''}
+                      onChange={(e) => updateLine(i, 'unit', e.target.value)}
+                      className={inputClass}
+                      placeholder="hrs"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    {i === 0 && <label className="text-xs text-gray-500">Unit Price</label>}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      value={line.unit_price || ''}
+                      onChange={(e) => updateLine(i, 'unit_price', e.target.value)}
+                      className={inputClass}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    {i === 0 && <label className="text-xs text-gray-500">Amount</label>}
+                    <p className="mt-1 px-2 py-2 text-sm font-medium text-gray-900 truncate">
+                      {fmt.format(line.amount)}
+                    </p>
+                  </div>
+                  <div className="col-span-1">
+                    {lineItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLine(i)}
+                        className="mt-1 p-2 text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

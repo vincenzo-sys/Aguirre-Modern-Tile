@@ -11,9 +11,10 @@ export function getStripe(): Stripe {
   if (!stripeInstance) {
     stripeInstance = new Stripe(STRIPE_SECRET_KEY, {
       typescript: true,
-      maxNetworkRetries: 3,
-      timeout: 30000,
+      maxNetworkRetries: 2,
+      timeout: 60000,
       httpClient: Stripe.createNodeHttpClient(),
+      telemetry: false,
     })
   }
   return stripeInstance

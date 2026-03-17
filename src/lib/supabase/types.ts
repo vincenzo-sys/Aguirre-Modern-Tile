@@ -1,6 +1,6 @@
 export type UserRole = 'owner' | 'lead'
 export type JobStatus = 'lead' | 'quoted' | 'scheduled' | 'in_progress' | 'completed' | 'paid' | 'cancelled'
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
 
 export interface Profile {
   id: string
@@ -35,6 +35,7 @@ export interface Job {
   actual_cost: number | null
   amount_invoiced: number | null
   amount_paid: number | null
+  stripe_customer_id: string | null
   assigned_to: string | null
   notes: string | null
   created_by: string | null
@@ -62,6 +63,8 @@ export interface InvoiceLineItem {
   quantity: number
   unit_price: number
   amount: number
+  type?: 'product' | 'service'
+  unit?: string
 }
 
 export interface Invoice {

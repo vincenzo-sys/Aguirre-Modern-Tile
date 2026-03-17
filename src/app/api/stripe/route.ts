@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
+import { withStripeRetry } from '@/lib/stripe-retry'
 import { createClient } from '@/lib/supabase/server'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 // POST /api/stripe - send an invoice via Stripe
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { invoice_id } = body
+    const { invoice_id, action = 'send' } = body
 
     if (!invoice_id) {
       return NextResponse.json({ error: 'invoice_id is required' }, { status: 400 })
@@ -35,6 +36,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
+    // Handle void action
+    if (action === 'void') {
+      if (!invoice.stripe_invoice_id) {
+        return NextResponse.json(
+          { error: 'No Stripe invoice to void' },
+          { status: 400 }
+        )
+      }
+
+      await withStripeRetry(
+        () => stripe.invoices.voidInvoice(invoice.stripe_invoice_id),
+        { label: 'invoices.voidInvoice' }
+      )
+
+      await supabase
+        .from('invoices')
+        .update({ status: 'void' })
+        .eq('id', invoice_id)
+
+      // Recalculate job.amount_invoiced excluding voided invoices
+      const { data: jobInvoices } = await supabase
+        .from('invoices')
+        .select('amount, status')
+        .eq('job_id', invoice.job_id)
+
+      const totalInvoiced = (jobInvoices ?? [])
+        .filter((inv: { status: string }) => inv.status !== 'void')
+        .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
+
+      await supabase
+        .from('jobs')
+        .update({ amount_invoiced: totalInvoiced })
+        .eq('id', invoice.job_id)
+
+      return NextResponse.json({ success: true, status: 'void' })
+    }
+
+    // Send action — existing flow
     if (invoice.stripe_invoice_id) {
       return NextResponse.json(
         { error: 'Invoice has already been sent via Stripe', stripe_invoice_id: invoice.stripe_invoice_id },
@@ -61,19 +100,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Find or create a Stripe customer by email
-    const existingCustomers = await stripe.customers.list({
-      email: job.client_email,
-      limit: 1,
-    })
+    const existingCustomers = await withStripeRetry(
+      () => stripe.customers.list({ email: job.client_email, limit: 1 }),
+      { label: 'customers.list' }
+    )
 
-    const customer = existingCustomers.data[0] ?? await stripe.customers.create({
-      email: job.client_email,
-      name: job.client_name,
-      phone: job.client_phone ?? undefined,
-      metadata: {
-        supabase_job_id: job.id,
-      },
-    })
+    const customer = existingCustomers.data[0] ?? await withStripeRetry(
+      () => stripe.customers.create({
+        email: job.client_email,
+        name: job.client_name,
+        phone: job.client_phone ?? undefined,
+        metadata: { supabase_job_id: job.id },
+      }),
+      { label: 'customers.create' }
+    )
 
     // 3. Create Stripe invoice
     const daysUntilDue = Math.max(
@@ -81,15 +121,18 @@ export async function POST(req: NextRequest) {
       Math.ceil((new Date(invoice.due_date).getTime() - Date.now()) / 86400000)
     )
 
-    const stripeInvoice = await stripe.invoices.create({
-      customer: customer.id,
-      collection_method: 'send_invoice',
-      days_until_due: daysUntilDue,
-      metadata: {
-        supabase_invoice_id: invoice.id,
-        invoice_number: invoice.invoice_number,
-      },
-    })
+    const stripeInvoice = await withStripeRetry(
+      () => stripe.invoices.create({
+        customer: customer.id,
+        collection_method: 'send_invoice',
+        days_until_due: daysUntilDue,
+        metadata: {
+          supabase_invoice_id: invoice.id,
+          invoice_number: invoice.invoice_number,
+        },
+      }),
+      { label: 'invoices.create' }
+    )
 
     // 4. Add line items from our invoice
     const lineItems = (invoice.line_items as Array<{
@@ -100,24 +143,33 @@ export async function POST(req: NextRequest) {
     }>) ?? []
 
     if (lineItems.length > 0) {
-      await stripe.invoices.addLines(stripeInvoice.id, {
-        lines: lineItems.map((item) => ({
-          description: item.description,
-          quantity: item.quantity,
-          price_data: {
-            currency: 'usd',
-            unit_amount: Math.round(item.unit_price * 100), // Stripe uses cents
-            product_data: {
-              name: item.description,
+      await withStripeRetry(
+        () => stripe.invoices.addLines(stripeInvoice.id, {
+          lines: lineItems.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            price_data: {
+              currency: 'usd',
+              unit_amount: Math.round(item.unit_price * 100), // Stripe uses cents
+              product_data: {
+                name: item.description,
+              },
             },
-          },
-        })),
-      })
+          })),
+        }),
+        { label: 'invoices.addLines' }
+      )
     }
 
     // 5. Finalize and send the invoice
-    const finalizedInvoice = await stripe.invoices.finalizeInvoice(stripeInvoice.id)
-    await stripe.invoices.sendInvoice(finalizedInvoice.id)
+    const finalizedInvoice = await withStripeRetry(
+      () => stripe.invoices.finalizeInvoice(stripeInvoice.id),
+      { label: 'invoices.finalizeInvoice' }
+    )
+    await withStripeRetry(
+      () => stripe.invoices.sendInvoice(finalizedInvoice.id),
+      { label: 'invoices.sendInvoice' }
+    )
 
     // 6. Update our local record with Stripe info
     const { error: updateError } = await supabase

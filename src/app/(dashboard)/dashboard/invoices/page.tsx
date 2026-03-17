@@ -15,6 +15,7 @@ const tabs: { label: string; value: InvoiceStatus | 'all' }[] = [
   { label: 'Sent', value: 'sent' },
   { label: 'Paid', value: 'paid' },
   { label: 'Overdue', value: 'overdue' },
+  { label: 'Void', value: 'void' },
 ]
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL

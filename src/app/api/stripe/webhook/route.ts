@@ -53,6 +53,11 @@ export async function POST(req: NextRequest) {
         await handleInvoiceOverdue(stripeInvoice)
         break
       }
+      case 'invoice.voided': {
+        const stripeInvoice = event.data.object as Stripe.Invoice
+        await handleInvoiceVoided(stripeInvoice)
+        break
+      }
       default:
         // Unhandled event type — acknowledge receipt
         break
@@ -111,12 +116,17 @@ async function handlePaymentFailed(stripeInvoice: Stripe.Invoice) {
 
   const { data: invoice } = await supabase
     .from('invoices')
-    .select('invoice_number')
+    .select('invoice_number, status')
     .eq('stripe_invoice_id', stripeInvoiceId)
     .single()
 
   if (invoice) {
-    console.warn(`Payment failed for invoice ${invoice.invoice_number} (Stripe: ${stripeInvoiceId})`)
+    // Keep status as 'sent' — Stripe will retry automatically.
+    // Only log for visibility; don't change status to avoid confusing the retry flow.
+    console.warn(
+      `Payment failed for invoice ${invoice.invoice_number} (Stripe: ${stripeInvoiceId}). ` +
+      `Current local status: ${invoice.status}. Stripe will retry.`
+    )
   }
 }
 
@@ -131,4 +141,44 @@ async function handleInvoiceOverdue(stripeInvoice: Stripe.Invoice) {
     .eq('stripe_invoice_id', stripeInvoiceId)
 
   console.log(`Invoice marked as overdue via Stripe webhook (Stripe: ${stripeInvoiceId})`)
+}
+
+async function handleInvoiceVoided(stripeInvoice: Stripe.Invoice) {
+  const supabase = createServiceClient()
+  const stripeInvoiceId = stripeInvoice.id
+
+  // Find local invoice
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, invoice_number, job_id, status')
+    .eq('stripe_invoice_id', stripeInvoiceId)
+    .single()
+
+  if (!invoice) {
+    console.warn('Received voided event for unknown Stripe invoice:', stripeInvoiceId)
+    return
+  }
+
+  // Mark as void
+  await supabase
+    .from('invoices')
+    .update({ status: 'void' })
+    .eq('id', invoice.id)
+
+  // Recalculate job.amount_invoiced excluding voided invoices
+  const { data: jobInvoices } = await supabase
+    .from('invoices')
+    .select('amount, status')
+    .eq('job_id', invoice.job_id)
+
+  const totalInvoiced = (jobInvoices ?? [])
+    .filter((inv: { status: string }) => inv.status !== 'void')
+    .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
+
+  await supabase
+    .from('jobs')
+    .update({ amount_invoiced: totalInvoiced })
+    .eq('id', invoice.job_id)
+
+  console.log(`Invoice ${invoice.invoice_number} marked as void via Stripe webhook`)
 }

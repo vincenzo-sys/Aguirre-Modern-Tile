@@ -33,7 +33,7 @@ export async function PATCH(
     const body = await req.json()
     const { status } = body
 
-    const validStatuses = ['draft', 'sent', 'paid', 'overdue']
+    const validStatuses = ['draft', 'sent', 'paid', 'overdue', 'void']
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
@@ -47,20 +47,30 @@ export async function PATCH(
 
     if (error) throw error
 
-    // If marking as paid, update the job's amount_paid
-    if (status === 'paid' && invoice) {
+    // If marking as paid or void, recalculate job financial totals
+    if ((status === 'paid' || status === 'void') && invoice) {
       const { data: jobInvoices } = await supabase
         .from('invoices')
         .select('amount, status')
         .eq('job_id', invoice.job_id)
 
-      const totalPaid = (jobInvoices ?? [])
+      const activeInvoices = (jobInvoices ?? []).filter(
+        (inv: { status: string }) => inv.status !== 'void'
+      )
+
+      const totalPaid = activeInvoices
         .filter((inv: { status: string }) => inv.status === 'paid')
+        .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
+
+      const totalInvoiced = activeInvoices
         .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
 
       await supabase
         .from('jobs')
-        .update({ amount_paid: totalPaid })
+        .update({
+          amount_paid: totalPaid,
+          ...(status === 'void' ? { amount_invoiced: totalInvoiced } : {}),
+        })
         .eq('id', invoice.job_id)
     }
 

@@ -5,6 +5,7 @@ const statusConfig: Record<InvoiceStatus, { label: string; className: string }> 
   sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800' },
   paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800' },
+  void: { label: 'Void', className: 'bg-gray-200 text-gray-600 line-through' },
 }
 
 export default function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {

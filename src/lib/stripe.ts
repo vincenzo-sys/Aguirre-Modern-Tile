@@ -9,15 +9,11 @@ export function getStripe(): Stripe {
     throw new Error('STRIPE_SECRET_KEY is not configured')
   }
   if (!stripeInstance) {
-    // Use Node's native HTTP client instead of fetch to avoid
-    // connection issues in Vercel's serverless environment
-    const { NodeHttpClient } = require('stripe/cjs/net/NodeHttpClient.js')
-
     stripeInstance = new Stripe(STRIPE_SECRET_KEY, {
       typescript: true,
       maxNetworkRetries: 3,
       timeout: 30000,
-      httpClient: new NodeHttpClient(),
+      httpClient: Stripe.createNodeHttpClient(),
     })
   }
   return stripeInstance

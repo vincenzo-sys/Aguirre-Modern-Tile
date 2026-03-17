@@ -13,7 +13,6 @@ export function getStripe(): Stripe {
       typescript: true,
       maxNetworkRetries: 2,
       timeout: 60000,
-      httpClient: Stripe.createNodeHttpClient(),
       telemetry: false,
     })
   }

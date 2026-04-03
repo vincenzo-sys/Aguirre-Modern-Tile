@@ -59,6 +59,30 @@ function NewInvoiceForm() {
 
   const selectedJob = jobs.find((j) => j.id === jobId)
 
+  // Pre-populate line items from job's line_items when a job is selected
+  useEffect(() => {
+    if (!selectedJob || !selectedJob.line_items || selectedJob.line_items.length === 0) return
+    // Only pre-populate if the user hasn't already entered data
+    if (lineItems.length === 1 && !lineItems[0].description) {
+      const converted: InvoiceLineItem[] = selectedJob.line_items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        amount: item.amount,
+        type: item.category === 'materials' ? 'product' as const : 'service' as const,
+        unit: item.unit,
+      }))
+      setLineItems(converted)
+    }
+    // Set default due date to 30 days from now
+    if (!dueDate) {
+      const d = new Date()
+      d.setDate(d.getDate() + 30)
+      setDueDate(d.toISOString().split('T')[0])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJob])
+
   function updateLine(index: number, field: keyof InvoiceLineItem, value: string | number) {
     setLineItems((prev) => {
       const next = [...prev]

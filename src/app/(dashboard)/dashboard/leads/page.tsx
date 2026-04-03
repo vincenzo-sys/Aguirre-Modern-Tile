@@ -170,7 +170,7 @@ export default function LeadsPage() {
                 {(lead.status === 'new' || lead.status === 'reviewed') && (
                   <>
                     <Link
-                      href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}`}
+                      href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}${lead.customer_id ? `&customer_id=${lead.customer_id}` : ''}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                       title="Convert to job"
                     >
@@ -232,6 +232,7 @@ const demoLeads: QuoteRequest[] = [
   {
     id: 'demo-lead-1',
     status: 'new',
+    customer_id: null,
     client_name: 'Sarah Johnson',
     client_email: 'sarah@example.com',
     client_phone: '(617) 555-0142',
@@ -250,6 +251,7 @@ const demoLeads: QuoteRequest[] = [
   {
     id: 'demo-lead-2',
     status: 'reviewed',
+    customer_id: null,
     client_name: 'Michael Torres',
     client_email: 'mtorres@example.com',
     client_phone: '(781) 555-0298',
@@ -267,6 +269,7 @@ const demoLeads: QuoteRequest[] = [
   {
     id: 'demo-lead-3',
     status: 'converted',
+    customer_id: null,
     client_name: 'Lisa Chen',
     client_email: 'lchen@example.com',
     client_phone: '(617) 555-0376',

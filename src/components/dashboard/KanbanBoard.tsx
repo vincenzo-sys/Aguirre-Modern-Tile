@@ -9,6 +9,7 @@ const columns: { status: JobStatus; label: string; color: string }[] = [
   { status: 'quoted', label: 'Quoted', color: 'border-blue-400' },
   { status: 'scheduled', label: 'Scheduled', color: 'border-purple-400' },
   { status: 'in_progress', label: 'In Progress', color: 'border-orange-400' },
+  { status: 'waiting_for_materials', label: 'Waiting for Materials', color: 'border-amber-400' },
   { status: 'completed', label: 'Completed', color: 'border-green-400' },
   { status: 'paid', label: 'Paid', color: 'border-emerald-400' },
 ]

@@ -48,6 +48,7 @@ function NewJobForm() {
   const [teamMembers, setTeamMembers] = useState<Profile[]>([])
   const [photos, setPhotos] = useState<File[]>([])
   const fromLeadId = searchParams.get('from_lead') || ''
+  const customerIdParam = searchParams.get('customer_id') || ''
 
   // Pre-fill from lead conversion query params
   const [form, setForm] = useState({
@@ -142,6 +143,7 @@ function NewJobForm() {
         .from('jobs')
         .insert({
           title: form.title,
+          customer_id: customerIdParam || null,
           client_name: form.client_name,
           client_phone: form.client_phone || null,
           client_email: form.client_email || null,
@@ -157,6 +159,7 @@ function NewJobForm() {
           actual_cost: null,
           amount_invoiced: 0,
           amount_paid: 0,
+          line_items: [],
           assigned_to: form.assigned_to || null,
           notes: form.notes || null,
           created_by: user.id,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import type { Job } from '@/lib/supabase/types'
 
 export const maxDuration = 60
 
@@ -34,16 +35,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    if (!job.client_email) {
+    const typedJob = job as Job
+
+    // Check for customer record (CRM) first
+    type CustomerSlice = { id: string; stripe_customer_id: string | null; name: string; email: string | null; phone: string | null }
+    let customerRecord: CustomerSlice | null = null
+    if (typedJob.customer_id) {
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('id, stripe_customer_id, name, email, phone')
+        .eq('id', typedJob.customer_id)
+        .single()
+      customerRecord = custData as CustomerSlice | null
+    }
+
+    const email = (customerRecord?.email ?? typedJob.client_email)?.toLowerCase()
+    const name = customerRecord?.name ?? typedJob.client_name
+    const phone = customerRecord?.phone ?? typedJob.client_phone
+
+    if (!email) {
       return NextResponse.json(
-        { error: 'Job has no client email. Add a client email before creating a Stripe customer.' },
+        { error: 'No client email found. Add a client email before creating a Stripe customer.' },
         { status: 422 }
       )
     }
 
-    const email = job.client_email.toLowerCase()
+    // If we already have a stripe_customer_id in the customers table, use it
+    if (customerRecord?.stripe_customer_id) {
+      return NextResponse.json({
+        customer_id: customerRecord.stripe_customer_id,
+        name,
+        email,
+        created: false,
+      })
+    }
 
-    // Search for existing customer by email
+    // Search for existing Stripe customer by email
     const existing = await stripe.customers.list({ email, limit: 1 })
     let created = false
     let customer = existing.data[0]
@@ -51,14 +78,20 @@ export async function POST(req: NextRequest) {
     if (!customer) {
       customer = await stripe.customers.create({
         email,
-        name: job.client_name,
-        phone: job.client_phone ?? undefined,
-        metadata: { supabase_job_id: job.id },
+        name,
+        phone: phone ?? undefined,
+        metadata: { supabase_job_id: typedJob.id },
       })
       created = true
     }
 
-    // Save stripe_customer_id back to the job
+    // Save stripe_customer_id to the customers table (preferred) and job (backward compat)
+    if (customerRecord) {
+      await supabase
+        .from('customers')
+        .update({ stripe_customer_id: customer.id })
+        .eq('id', customerRecord.id)
+    }
     await supabase
       .from('jobs')
       .update({ stripe_customer_id: customer.id })

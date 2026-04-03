@@ -1,6 +1,7 @@
 export type UserRole = 'owner' | 'lead'
-export type JobStatus = 'lead' | 'quoted' | 'scheduled' | 'in_progress' | 'completed' | 'paid' | 'cancelled'
+export type JobStatus = 'lead' | 'quoted' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
+export type CustomerSource = 'website' | 'manual' | 'referral' | 'repeat'
 
 export interface Profile {
   id: string
@@ -15,11 +16,43 @@ export interface Profile {
   last_location_updated_at: string | null
 }
 
+export interface Customer {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  notes: string | null
+  source: CustomerSource
+  stripe_customer_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerWithStats extends Customer {
+  job_count: number
+  total_revenue: number
+  last_job_date: string | null
+}
+
+export interface JobLineItem {
+  category: 'materials' | 'labor'
+  description: string
+  quantity: number
+  unit: 'sq ft' | 'hr' | 'ea' | 'ln ft' | 'bag' | 'box'
+  unit_price: number
+  amount: number
+}
+
 export interface Job {
   id: string
   job_number: number
   title: string
   status: JobStatus
+  customer_id: string | null
   client_name: string
   client_phone: string | null
   client_email: string | null
@@ -35,6 +68,7 @@ export interface Job {
   actual_cost: number | null
   amount_invoiced: number | null
   amount_paid: number | null
+  line_items: JobLineItem[]
   stripe_customer_id: string | null
   assigned_to: string | null
   notes: string | null
@@ -44,6 +78,11 @@ export interface Job {
 }
 
 export interface JobWithAssignee extends Job {
+  assignee?: Profile | null
+}
+
+export interface JobWithCustomer extends Job {
+  customer?: Customer | null
   assignee?: Profile | null
 }
 
@@ -70,6 +109,7 @@ export interface InvoiceLineItem {
 export interface Invoice {
   id: string
   job_id: string
+  customer_id: string | null
   invoice_number: string
   amount: number
   status: InvoiceStatus
@@ -89,6 +129,7 @@ export type QuoteRequestStatus = 'new' | 'reviewed' | 'converted' | 'archived'
 export interface QuoteRequest {
   id: string
   status: QuoteRequestStatus
+  customer_id: string | null
   client_name: string
   client_email: string
   client_phone: string
@@ -107,6 +148,11 @@ export interface Database {
         Insert: Omit<Profile, 'created_at'>
         Update: Partial<Omit<Profile, 'id' | 'created_at'>>
       }
+      customers: {
+        Row: Customer
+        Insert: Omit<Customer, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Customer, 'id' | 'created_at' | 'updated_at'>>
+      }
       jobs: {
         Row: Job
         Insert: Omit<Job, 'id' | 'job_number' | 'created_at' | 'updated_at'>
@@ -121,6 +167,11 @@ export interface Database {
         Row: Invoice
         Insert: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Invoice, 'id' | 'created_at' | 'updated_at'>>
+      }
+      quote_requests: {
+        Row: QuoteRequest
+        Insert: Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>>
       }
     }
   }

@@ -89,10 +89,20 @@ export async function POST(req: NextRequest) {
     const num = ((count ?? 0) + 1).toString().padStart(3, '0')
     const invoice_number = `INV-${year}-${num}`
 
+    // Look up customer_id from the job
+    let customer_id: string | null = null
+    const { data: jobData } = await supabase
+      .from('jobs')
+      .select('customer_id')
+      .eq('id', job_id)
+      .single()
+    if (jobData) customer_id = (jobData as { customer_id: string | null }).customer_id
+
     const { data: invoice, error } = await supabase
       .from('invoices')
       .insert({
         job_id,
+        customer_id,
         invoice_number,
         amount,
         status: 'draft',

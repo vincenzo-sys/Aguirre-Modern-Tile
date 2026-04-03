@@ -48,6 +48,50 @@ export async function POST(req: NextRequest) {
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+      // Find or create customer record
+      let customerId: string | null = null
+      try {
+        // Try email match first
+        if (email) {
+          const { data: existing } = await supabase
+            .from('customers')
+            .select('id')
+            .ilike('email', email)
+            .limit(1)
+            .single()
+          if (existing) customerId = existing.id
+        }
+
+        // Try phone match if no email match
+        if (!customerId && phone) {
+          const { data: existing } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('phone', phone)
+            .limit(1)
+            .single()
+          if (existing) customerId = existing.id
+        }
+
+        // Create new customer if no match found
+        if (!customerId) {
+          const { data: newCustomer } = await supabase
+            .from('customers')
+            .insert({
+              name,
+              email: email || null,
+              phone: phone || null,
+              source: 'website',
+            })
+            .select('id')
+            .single()
+          if (newCustomer) customerId = newCustomer.id
+        }
+      } catch (err) {
+        // Non-fatal: quote still saves even if customer creation fails
+        console.error('Customer find-or-create error:', err)
+      }
+
       const { data, error } = await supabase
         .from('quote_requests')
         .insert({
@@ -57,6 +101,7 @@ export async function POST(req: NextRequest) {
           project_type: projectType,
           answers,
           status: 'new',
+          customer_id: customerId,
         })
         .select('id')
         .single()

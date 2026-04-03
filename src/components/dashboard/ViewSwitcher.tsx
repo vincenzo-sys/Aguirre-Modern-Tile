@@ -25,7 +25,7 @@ export default function ViewSwitcher() {
       params.set('view', view)
     }
     const qs = params.toString()
-    router.push(`/dashboard${qs ? `?${qs}` : ''}`)
+    router.push(`/dashboard/jobs${qs ? `?${qs}` : ''}`)
   }
 
   return (

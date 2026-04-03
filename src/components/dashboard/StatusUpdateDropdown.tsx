@@ -7,7 +7,14 @@ import type { JobStatus } from '@/lib/supabase/types'
 
 const allowedTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
   scheduled: [{ label: 'Start Work', next: 'in_progress' }],
-  in_progress: [{ label: 'Mark Complete', next: 'completed' }],
+  in_progress: [
+    { label: 'Waiting for Materials', next: 'waiting_for_materials' },
+    { label: 'Mark Complete', next: 'completed' },
+  ],
+  waiting_for_materials: [
+    { label: 'Resume Work', next: 'in_progress' },
+    { label: 'Mark Complete', next: 'completed' },
+  ],
 }
 
 interface StatusUpdateDropdownProps {

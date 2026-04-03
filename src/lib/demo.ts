@@ -1,4 +1,4 @@
-import type { Profile, Job, JobWithAssignee, Invoice, InvoiceWithJob } from '@/lib/supabase/types'
+import type { Profile, Job, JobWithAssignee, Invoice, InvoiceWithJob, Customer, CustomerWithStats } from '@/lib/supabase/types'
 
 export const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -30,6 +30,104 @@ const demoLead: Profile = {
 
 export const demoTeamMembers: Profile[] = [demoProfile, demoLead]
 
+// Demo customers — the central CRM entities
+export const demoCustomers: Customer[] = [
+  {
+    id: 'demo-cust-1',
+    name: 'Sarah Johnson',
+    email: 'sarah.j@email.com',
+    phone: '(617) 555-1234',
+    address: '45 Beacon St',
+    city: 'Boston',
+    state: 'MA',
+    zip: '02108',
+    notes: 'Prefers morning work hours (8am-2pm). Has a dog.',
+    source: 'website',
+    stripe_customer_id: null,
+    created_at: '2025-01-18T10:00:00Z',
+    updated_at: '2025-01-20T10:00:00Z',
+  },
+  {
+    id: 'demo-cust-2',
+    name: 'Mike Chen',
+    email: 'mike.chen@gmail.com',
+    phone: '(781) 555-8899',
+    address: '12 Oak Ave',
+    city: 'Revere',
+    state: 'MA',
+    zip: '02151',
+    notes: null,
+    source: 'referral',
+    stripe_customer_id: null,
+    created_at: '2025-01-22T09:00:00Z',
+    updated_at: '2025-01-25T09:00:00Z',
+  },
+  {
+    id: 'demo-cust-3',
+    name: 'Emily Rodriguez',
+    email: null,
+    phone: '(617) 555-4567',
+    address: '88 Central St',
+    city: 'Somerville',
+    state: 'MA',
+    zip: '02143',
+    notes: null,
+    source: 'website',
+    stripe_customer_id: null,
+    created_at: '2025-02-01T16:00:00Z',
+    updated_at: '2025-02-05T16:00:00Z',
+  },
+  {
+    id: 'demo-cust-4',
+    name: 'David Park',
+    email: 'dpark@email.com',
+    phone: '(781) 555-3322',
+    address: '220 Main St',
+    city: 'Malden',
+    state: 'MA',
+    zip: '02148',
+    notes: null,
+    source: 'manual',
+    stripe_customer_id: null,
+    created_at: '2025-02-01T13:00:00Z',
+    updated_at: '2025-02-03T13:00:00Z',
+  },
+  {
+    id: 'demo-cust-5',
+    name: 'Lisa Thompson',
+    email: 'lisa.t@outlook.com',
+    phone: '(617) 555-7788',
+    address: '156 Broadway',
+    city: 'Cambridge',
+    state: 'MA',
+    zip: '02139',
+    notes: 'Asked for referral card. Very happy with previous work.',
+    source: 'referral',
+    stripe_customer_id: null,
+    created_at: '2025-01-08T08:00:00Z',
+    updated_at: '2025-01-31T17:00:00Z',
+  },
+  {
+    id: 'demo-cust-6',
+    name: 'Robert Walsh',
+    email: 'rwalsh@email.com',
+    phone: '(617) 555-9090',
+    address: '30 Newbury St',
+    city: 'Boston',
+    state: 'MA',
+    zip: '02116',
+    notes: null,
+    source: 'website',
+    stripe_customer_id: null,
+    created_at: '2024-12-15T10:00:00Z',
+    updated_at: '2025-01-24T16:00:00Z',
+  },
+]
+
+export function getDemoCustomer(id: string): Customer | undefined {
+  return demoCustomers.find((c) => c.id === id)
+}
+
 // Geocoded coordinates for demo job addresses
 export const demoJobCoordinates: Record<string, [number, number]> = {
   'demo-job-1': [42.3554, -71.0640], // 45 Beacon St, Boston
@@ -46,6 +144,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 1,
     title: 'Master Bathroom Remodel',
     status: 'in_progress',
+    customer_id: 'demo-cust-1',
     client_name: 'Sarah Johnson',
     client_phone: '(617) 555-1234',
     client_email: 'sarah.j@email.com',
@@ -61,6 +160,14 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: 6200,
     amount_invoiced: 4250,
     amount_paid: 4250,
+    line_items: [
+      { category: 'materials', description: '12x24 porcelain tile', quantity: 120, unit: 'sq ft', unit_price: 8.50, amount: 1020 },
+      { category: 'materials', description: 'Mosaic accent tile', quantity: 15, unit: 'sq ft', unit_price: 22, amount: 330 },
+      { category: 'materials', description: 'Schluter waterproofing system', quantity: 1, unit: 'ea', unit_price: 450, amount: 450 },
+      { category: 'labor', description: 'Demolition & prep', quantity: 8, unit: 'hr', unit_price: 85, amount: 680 },
+      { category: 'labor', description: 'Tile installation', quantity: 24, unit: 'hr', unit_price: 95, amount: 2280 },
+      { category: 'labor', description: 'Grouting & finishing', quantity: 6, unit: 'hr', unit_price: 85, amount: 510 },
+    ],
     stripe_customer_id: null,
     assigned_to: 'demo-lead-id',
     notes: 'Client prefers morning work hours (8am-2pm). Dog will be gated in bedroom. Materials already on site in garage.',
@@ -74,6 +181,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 2,
     title: 'Kitchen Backsplash Install',
     status: 'scheduled',
+    customer_id: 'demo-cust-2',
     client_name: 'Mike Chen',
     client_phone: '(781) 555-8899',
     client_email: 'mike.chen@gmail.com',
@@ -89,6 +197,12 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: null,
     amount_invoiced: 0,
     amount_paid: 0,
+    line_items: [
+      { category: 'materials', description: 'White 3x6 subway tile', quantity: 35, unit: 'sq ft', unit_price: 12, amount: 420 },
+      { category: 'materials', description: 'Grout & thinset', quantity: 2, unit: 'bag', unit_price: 35, amount: 70 },
+      { category: 'labor', description: 'Surface prep', quantity: 3, unit: 'hr', unit_price: 85, amount: 255 },
+      { category: 'labor', description: 'Herringbone tile installation', quantity: 12, unit: 'hr', unit_price: 95, amount: 1140 },
+    ],
     stripe_customer_id: null,
     assigned_to: 'demo-owner-id',
     notes: 'Countertops were just installed last week. Need to be careful with new granite.',
@@ -102,6 +216,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 3,
     title: 'Shower Tile Repair',
     status: 'lead',
+    customer_id: 'demo-cust-3',
     client_name: 'Emily Rodriguez',
     client_phone: '(617) 555-4567',
     client_email: null,
@@ -117,6 +232,7 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: null,
     amount_invoiced: 0,
     amount_paid: 0,
+    line_items: [],
     stripe_customer_id: null,
     assigned_to: null,
     notes: 'Need to schedule site visit to assess water damage extent.',
@@ -130,6 +246,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 4,
     title: 'Entryway Floor Tile',
     status: 'quoted',
+    customer_id: 'demo-cust-4',
     client_name: 'David Park',
     client_phone: '(781) 555-3322',
     client_email: 'dpark@email.com',
@@ -145,6 +262,13 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: null,
     amount_invoiced: 0,
     amount_paid: 0,
+    line_items: [
+      { category: 'materials', description: '24x24 charcoal porcelain tile', quantity: 65, unit: 'sq ft', unit_price: 11, amount: 715 },
+      { category: 'materials', description: 'Transition strip (tile to hardwood)', quantity: 1, unit: 'ea', unit_price: 300, amount: 300 },
+      { category: 'materials', description: 'Thinset & grout', quantity: 3, unit: 'bag', unit_price: 35, amount: 105 },
+      { category: 'labor', description: 'Vinyl removal & floor prep', quantity: 4, unit: 'hr', unit_price: 85, amount: 340 },
+      { category: 'labor', description: 'Tile installation', quantity: 16, unit: 'hr', unit_price: 95, amount: 1520 },
+    ],
     stripe_customer_id: null,
     assigned_to: 'demo-lead-id',
     notes: null,
@@ -158,6 +282,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 5,
     title: 'Guest Bathroom Complete',
     status: 'completed',
+    customer_id: 'demo-cust-5',
     client_name: 'Lisa Thompson',
     client_phone: '(617) 555-7788',
     client_email: 'lisa.t@outlook.com',
@@ -173,6 +298,13 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: 6400,
     amount_invoiced: 6800,
     amount_paid: 6800,
+    line_items: [
+      { category: 'materials', description: 'Marble-look porcelain 12x24', quantity: 85, unit: 'sq ft', unit_price: 14, amount: 1190 },
+      { category: 'materials', description: '2x2 mosaic floor tile', quantity: 30, unit: 'sq ft', unit_price: 18, amount: 540 },
+      { category: 'materials', description: 'Linear drain', quantity: 1, unit: 'ea', unit_price: 600, amount: 600 },
+      { category: 'labor', description: 'Tile installation', quantity: 32, unit: 'hr', unit_price: 95, amount: 3040 },
+      { category: 'labor', description: 'Grouting & sealing', quantity: 8, unit: 'hr', unit_price: 85, amount: 680 },
+    ],
     stripe_customer_id: null,
     assigned_to: 'demo-lead-id',
     notes: 'Job completed on time. Client very happy. Asked for referral card.',
@@ -186,6 +318,7 @@ export const demoJobs: JobWithAssignee[] = [
     job_number: 6,
     title: 'Luxury Shower Remodel',
     status: 'paid',
+    customer_id: 'demo-cust-6',
     client_name: 'Robert Walsh',
     client_phone: '(617) 555-9090',
     client_email: 'rwalsh@email.com',
@@ -201,6 +334,15 @@ export const demoJobs: JobWithAssignee[] = [
     actual_cost: 13200,
     amount_invoiced: 13200,
     amount_paid: 13200,
+    line_items: [
+      { category: 'materials', description: 'Large-format marble tile (walls)', quantity: 95, unit: 'sq ft', unit_price: 28, amount: 2660 },
+      { category: 'materials', description: 'Pebble mosaic (floor)', quantity: 25, unit: 'sq ft', unit_price: 32, amount: 800 },
+      { category: 'materials', description: 'Bench seat & niche materials', quantity: 1, unit: 'ea', unit_price: 800, amount: 800 },
+      { category: 'materials', description: 'Waterproofing system', quantity: 1, unit: 'ea', unit_price: 550, amount: 550 },
+      { category: 'labor', description: 'Demo & waterproofing', quantity: 16, unit: 'hr', unit_price: 85, amount: 1360 },
+      { category: 'labor', description: 'Tile installation', quantity: 48, unit: 'hr', unit_price: 95, amount: 4560 },
+      { category: 'labor', description: 'Custom bench & niche work', quantity: 12, unit: 'hr', unit_price: 110, amount: 1320 },
+    ],
     stripe_customer_id: null,
     assigned_to: 'demo-owner-id',
     notes: 'Took 1 extra day due to plumbing issue behind wall. Client approved change order for additional waterproofing.',
@@ -215,6 +357,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-1',
     job_id: 'demo-job-1',
+    customer_id: 'demo-cust-1',
     invoice_number: 'INV-2025-001',
     amount: 4250,
     status: 'paid',
@@ -231,6 +374,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-2',
     job_id: 'demo-job-1',
+    customer_id: 'demo-cust-1',
     invoice_number: 'INV-2025-002',
     amount: 4250,
     status: 'draft',
@@ -247,6 +391,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-3',
     job_id: 'demo-job-5',
+    customer_id: 'demo-cust-5',
     invoice_number: 'INV-2025-003',
     amount: 6800,
     status: 'paid',
@@ -263,6 +408,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-4',
     job_id: 'demo-job-6',
+    customer_id: 'demo-cust-6',
     invoice_number: 'INV-2025-004',
     amount: 13200,
     status: 'paid',
@@ -281,6 +427,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-5',
     job_id: 'demo-job-4',
+    customer_id: 'demo-cust-4',
     invoice_number: 'INV-2025-005',
     amount: 4200,
     status: 'sent',
@@ -298,6 +445,7 @@ export const demoInvoices: Invoice[] = [
   {
     id: 'demo-inv-6',
     job_id: 'demo-job-3',
+    customer_id: 'demo-cust-3',
     invoice_number: 'INV-2025-006',
     amount: 1800,
     status: 'void',
@@ -311,6 +459,19 @@ export const demoInvoices: Invoice[] = [
     updated_at: '2025-02-22T09:00:00Z',
   },
 ]
+
+export const demoCustomersWithStats: CustomerWithStats[] = demoCustomers.map((c) => {
+  const customerJobs = demoJobs.filter((j) => j.customer_id === c.id)
+  const paidInvoices = demoInvoices.filter((inv) => inv.customer_id === c.id && inv.status === 'paid')
+  const totalRevenue = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0)
+  const lastJob = customerJobs.sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+  return {
+    ...c,
+    job_count: customerJobs.length,
+    total_revenue: totalRevenue,
+    last_job_date: lastJob?.created_at ?? null,
+  }
+})
 
 export function getDemoJob(id: string): JobWithAssignee | undefined {
   return demoJobs.find((j) => j.id === id)

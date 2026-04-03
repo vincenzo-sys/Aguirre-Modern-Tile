@@ -10,6 +10,7 @@ const statusColors: Record<JobStatus, string> = {
   quoted: 'bg-blue-200 text-blue-900',
   scheduled: 'bg-purple-200 text-purple-900',
   in_progress: 'bg-orange-200 text-orange-900',
+  waiting_for_materials: 'bg-amber-200 text-amber-900',
   completed: 'bg-green-200 text-green-900',
   paid: 'bg-emerald-200 text-emerald-900',
   cancelled: 'bg-gray-200 text-gray-900',

@@ -4,15 +4,17 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
 const allNavItems = [
-  { label: 'Jobs', href: '/dashboard', icon: ClipboardList, ownerOnly: false },
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, ownerOnly: false },
+  { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList, ownerOnly: false },
   { label: 'Leads', href: '/dashboard/leads', icon: Inbox, ownerOnly: true },
+  { label: 'Customers', href: '/dashboard/customers', icon: Users, ownerOnly: true },
+  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
   { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
-  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
 ]
 
 export default function Sidebar({ profile }: { profile: Profile }) {
@@ -33,7 +35,10 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   function isActive(href: string) {
     if (href === '/dashboard') {
-      return pathname === '/dashboard' || pathname.startsWith('/dashboard/jobs')
+      return pathname === '/dashboard'
+    }
+    if (href === '/dashboard/jobs') {
+      return pathname.startsWith('/dashboard/jobs')
     }
     return pathname.startsWith(href)
   }

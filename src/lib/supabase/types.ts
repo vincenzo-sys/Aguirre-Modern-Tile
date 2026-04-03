@@ -143,6 +143,86 @@ export interface QuoteRequest {
   updated_at: string
 }
 
+// Reference tables for estimation engine
+export type MaterialCategory = 'Backer Board' | 'Thinset' | 'Grout' | 'Waterproofing' | 'Shower Pan/Tray' | 'Accessories' | 'Heating' | 'Other'
+export type MaterialUnit = 'sq ft/sheet' | 'sq ft/bag' | 'sq ft/roll' | 'per tube' | 'per box' | 'per piece' | 'sq ft'
+export type TradeType = 'Plumber' | 'Glass Install' | 'Electrician' | 'General Contractor' | 'Supplier' | 'Other'
+
+export interface MaterialPricing {
+  id: string
+  item: string
+  category: MaterialCategory
+  your_cost: number
+  markup_percent: number
+  price_to_customer: number
+  coverage: number
+  unit: MaterialUnit
+  retail_link: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LaborRate {
+  id: string
+  setting: string
+  value: number
+  notes: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OperatingCost {
+  id: string
+  setting: string
+  value: string
+  notes: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AddOn {
+  id: string
+  item: string
+  price_to_customer: number
+  notes: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface JobTemplate {
+  id: string
+  template_name: string
+  job_type: string
+  base_price_low: number | null
+  base_price_high: number | null
+  typical_sqft_low: number | null
+  typical_sqft_high: number | null
+  demo_days: number | null
+  install_days: number | null
+  typical_materials: string | null
+  notes: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TradeContact {
+  id: string
+  name: string
+  company: string | null
+  trade: TradeType
+  phone: string | null
+  email: string | null
+  notes: string | null
+  notion_page_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   public: {
     Tables: {

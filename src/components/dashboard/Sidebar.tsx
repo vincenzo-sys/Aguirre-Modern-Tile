@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users, Settings } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
 const allNavItems = [
@@ -15,6 +15,7 @@ const allNavItems = [
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
   { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
+  { label: 'Settings', href: '/dashboard/settings', icon: Settings, ownerOnly: true },
 ]
 
 export default function Sidebar({ profile }: { profile: Profile }) {

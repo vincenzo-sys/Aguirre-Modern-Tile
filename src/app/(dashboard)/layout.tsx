@@ -16,24 +16,30 @@ export default async function DashboardLayout({
     return <DashboardShell profile={demoProfile}>{children}</DashboardShell>
   }
 
-  const { createClient } = await import('@/lib/supabase/server')
-  const supabase = await createClient()
+  try {
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
+    if (!user) {
+      // No auth — fall back to demo mode so the dashboard is still viewable
+      return <DashboardShell profile={demoProfile}>{children}</DashboardShell>
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return <DashboardShell profile={demoProfile}>{children}</DashboardShell>
+    }
+
+    return <DashboardShell profile={profile as Profile}>{children}</DashboardShell>
+  } catch {
+    // Supabase error — fall back to demo mode
+    return <DashboardShell profile={demoProfile}>{children}</DashboardShell>
   }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  return <DashboardShell profile={profile as Profile}>{children}</DashboardShell>
 }

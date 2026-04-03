@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Plus, DollarSign } from 'lucide-react'
-import { isDemoMode, demoJobs, demoProfile, demoTeamMembers, demoInvoices } from '@/lib/demo'
+import { demoJobs, demoProfile, demoTeamMembers, demoInvoices } from '@/lib/demo'
+import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, JobWithAssignee, Invoice, QuoteRequest } from '@/lib/supabase/types'
 import RevenueCards from '@/components/dashboard/RevenueCards'
 import AlertBanners from '@/components/dashboard/AlertBanners'
@@ -15,7 +16,9 @@ export default async function DashboardOverview() {
   let leads: QuoteRequest[] = []
   let team: Profile[] = []
 
-  if (isDemoMode) {
+  const useDemo = await shouldUseDemoData()
+
+  if (useDemo) {
     jobList = demoJobs
     invoices = demoInvoices.map((inv) => ({ ...inv }))
     team = demoTeamMembers
@@ -126,7 +129,7 @@ export default async function DashboardOverview() {
         </div>
       </div>
 
-      {isDemoMode && (
+      {useDemo && (
         <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
           <p className="text-sm text-amber-800">
             <strong>Demo Mode</strong> — Viewing sample data. Connect Supabase for live data.

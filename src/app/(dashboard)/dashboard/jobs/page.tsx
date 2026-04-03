@@ -1,7 +1,8 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-import { isDemoMode, demoJobs, demoProfile, demoTeamMembers } from '@/lib/demo'
+import { demoJobs, demoProfile, demoTeamMembers } from '@/lib/demo'
+import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, JobWithAssignee } from '@/lib/supabase/types'
 import MetricsCards from '@/components/dashboard/MetricsCards'
 import ViewSwitcher from '@/components/dashboard/ViewSwitcher'
@@ -20,7 +21,9 @@ export default async function JobsPage({
   let jobList: JobWithAssignee[] = []
   let team: Profile[] = []
 
-  if (isDemoMode) {
+  const useDemo = await shouldUseDemoData()
+
+  if (useDemo) {
     jobList = demoJobs
     team = demoTeamMembers
   } else {
@@ -95,7 +98,7 @@ export default async function JobsPage({
         )}
       </div>
 
-      {isDemoMode && (
+      {useDemo && (
         <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
           <p className="text-sm text-amber-800">
             <strong>Demo Mode</strong> — Viewing sample data. Connect Supabase to use real data.

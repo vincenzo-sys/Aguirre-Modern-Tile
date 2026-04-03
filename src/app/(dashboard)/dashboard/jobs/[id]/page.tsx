@@ -6,7 +6,8 @@ import StatusUpdateDropdown from '@/components/dashboard/StatusUpdateDropdown'
 import CustomerCard from '@/components/dashboard/CustomerCard'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
-import { isDemoMode, getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob } from '@/lib/demo'
+import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob } from '@/lib/demo'
+import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
 
 function formatDate(dateStr: string): string {
@@ -41,7 +42,9 @@ export default async function JobDetailPage({
   let profile: Profile = demoProfile
   let invoices: Invoice[] = []
 
-  if (isDemoMode) {
+  const useDemo = await shouldUseDemoData()
+
+  if (useDemo) {
     const demoJob = getDemoJob(id)
     if (!demoJob) notFound()
     job = demoJob
@@ -128,7 +131,7 @@ export default async function JobDetailPage({
         Back to Jobs
       </Link>
 
-      {isDemoMode && (
+      {useDemo && (
         <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
           <p className="text-sm text-amber-800">
             <strong>Demo Mode</strong> — Viewing sample data.

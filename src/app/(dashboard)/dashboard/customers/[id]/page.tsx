@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, FileText, DollarSign, Calendar, Inbox } from 'lucide-react'
-import { isDemoMode, getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
+import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
+import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -41,7 +42,9 @@ export default async function CustomerDetailPage({
   let invoices: Invoice[] = []
   let quotes: QuoteRequest[] = []
 
-  if (isDemoMode) {
+  const useDemo = await shouldUseDemoData()
+
+  if (useDemo) {
     const demoCustomer = getDemoCustomer(id)
     if (!demoCustomer) notFound()
     customer = demoCustomer

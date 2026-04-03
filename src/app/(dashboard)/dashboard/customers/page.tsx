@@ -6,7 +6,8 @@ import { Search, Plus, Phone, Mail, Users } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { CustomerWithStats, CustomerSource } from '@/lib/supabase/types'
 
-const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+// Force demo mode for preview — remove once auth is configured
+const isDemoMode = true
 
 const sourceColors: Record<CustomerSource, string> = {
   website: 'bg-blue-100 text-blue-700',

@@ -19,7 +19,7 @@ const JOB_TYPES = [
   'Other',
 ]
 
-const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+const isDemoMode = true // Force demo mode for preview
 
 function mapProjectTypeToJobType(projectType: string): string {
   const map: Record<string, string> = {

@@ -21,7 +21,8 @@ const tabs: { label: string; value: QuoteRequestStatus | 'all' }[] = [
   { label: 'Archived', value: 'archived' },
 ]
 
-const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+// Force demo mode for preview — remove once auth is configured
+const isDemoMode = true
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<QuoteRequest[]>([])

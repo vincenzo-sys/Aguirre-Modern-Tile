@@ -103,7 +103,15 @@
       "Bash(cd \"C:/Users/vince/OneDrive/Vincenzo/Claude/outputs/aguirre-modern-tile\" && gh repo view --json url,homepageUrl 2>&1)",
       "Bash(cd \"C:/Users/vince/OneDrive/Vincenzo/Claude/outputs/aguirre-modern-tile\" && npx vercel ls 2>&1)",
       "Bash(wc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(/tmp/image_refs.txt:*)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:shop-pilot-rosy.vercel.app)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__claude_ai_Notion__notion-search",
+      "mcp__claude_ai_Notion__notion-fetch"
     ]
   }
 }

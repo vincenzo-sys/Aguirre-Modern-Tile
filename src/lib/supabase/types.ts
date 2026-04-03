@@ -28,6 +28,7 @@ export interface Customer {
   notes: string | null
   source: CustomerSource
   stripe_customer_id: string | null
+  notion_page_id: string | null
   created_at: string
   updated_at: string
 }
@@ -70,6 +71,8 @@ export interface Job {
   amount_paid: number | null
   line_items: JobLineItem[]
   stripe_customer_id: string | null
+  notion_page_id: string | null
+  notion_last_synced_at: string | null
   assigned_to: string | null
   notes: string | null
   created_by: string | null

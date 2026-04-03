@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
+import { updateNotionJobPayment } from '@/lib/notion'
 import type Stripe from 'stripe'
 
 // Stripe sends raw body — we need to disable Next.js body parsing
@@ -106,6 +107,21 @@ async function handleInvoicePaid(stripeInvoice: Stripe.Invoice) {
     .from('jobs')
     .update({ amount_paid: totalPaid })
     .eq('id', invoice.job_id)
+
+  // Sync payment to Notion if the job has a notion_page_id
+  if (process.env.NOTION_API_TOKEN) {
+    const { data: job } = await supabase
+      .from('jobs')
+      .select('notion_page_id')
+      .eq('id', invoice.job_id)
+      .single()
+
+    if (job?.notion_page_id) {
+      updateNotionJobPayment(job.notion_page_id, totalPaid).catch((err) => {
+        console.error('Failed to sync payment to Notion:', err)
+      })
+    }
+  }
 
   console.log(`Invoice ${invoice.invoice_number} marked as paid via Stripe webhook`)
 }

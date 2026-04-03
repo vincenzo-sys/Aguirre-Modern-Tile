@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
+import { createNotionJob } from '@/lib/notion'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -108,6 +109,33 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         console.error('Quote request save error:', error.message)
+      }
+
+      // Create a page in Notion's Tile Jobs Dashboard (non-blocking)
+      if (process.env.NOTION_API_TOKEN) {
+        const notionJobType: Record<string, string> = {
+          bathroom: 'Bathroom',
+          shower: 'Bathroom',
+          'kitchen-floor': 'Kitchen',
+          backsplash: 'Backsplash',
+          other: 'Other',
+        }
+        const answersText = Object.entries(answers)
+          .filter(([, v]) => v)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('\n')
+
+        createNotionJob({
+          jobName: `${name} - ${projectType.replace('-', ' ')} (Website Lead)`,
+          clientName: name,
+          clientEmail: email,
+          clientPhone: phone,
+          jobType: notionJobType[projectType] ?? 'Other',
+          scopeSummary: answersText || undefined,
+          leadSource: 'Other', // Website lead
+        }).catch((err) => {
+          console.error('Notion page creation error:', err)
+        })
       }
 
       return NextResponse.json({ success: true, id: data?.id })

@@ -51,16 +51,22 @@ export default async function CustomerDetailPage({
     jobs = demoJobs.filter((j) => j.customer_id === id)
     invoices = demoInvoices.filter((inv) => inv.customer_id === id)
   } else {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = await createClient()
+    const { createClient: createSupabase } = await import('@supabase/supabase-js')
+    const supabase = createSupabase(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
-    const { data: custData } = await supabase
+    const { data: custData, error: custError } = await supabase
       .from('customers')
       .select('*')
       .eq('id', id)
       .single()
 
-    if (!custData) notFound()
+    if (custError || !custData) {
+      console.error('Customer fetch error:', custError?.message, 'id:', id)
+      notFound()
+    }
     customer = custData as Customer
 
     const { data: jobsData } = await supabase
@@ -77,12 +83,17 @@ export default async function CustomerDetailPage({
       .order('created_at', { ascending: false })
     invoices = (invData ?? []) as Invoice[]
 
-    const { data: quotesData } = await supabase
-      .from('quote_requests')
-      .select('*')
-      .eq('customer_id', id)
-      .order('created_at', { ascending: false })
-    quotes = (quotesData ?? []) as QuoteRequest[]
+    // quote_requests may not have customer_id column yet — don't crash
+    try {
+      const { data: quotesData } = await supabase
+        .from('quote_requests')
+        .select('*')
+        .eq('customer_id', id)
+        .order('created_at', { ascending: false })
+      quotes = (quotesData ?? []) as QuoteRequest[]
+    } catch {
+      quotes = []
+    }
   }
 
   const totalRevenue = invoices

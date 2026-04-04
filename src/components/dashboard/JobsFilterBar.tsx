@@ -118,8 +118,8 @@ export function filterJobs(
   if (searchFilter) {
     const q = searchFilter.toLowerCase()
     filtered = filtered.filter((j) =>
-      j.title.toLowerCase().includes(q) ||
-      j.client_name.toLowerCase().includes(q)
+      (j.title ?? '').toLowerCase().includes(q) ||
+      (j.client_name ?? '').toLowerCase().includes(q)
     )
   }
 

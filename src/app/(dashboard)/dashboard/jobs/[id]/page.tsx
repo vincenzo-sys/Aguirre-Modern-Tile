@@ -62,63 +62,74 @@ export default async function JobDetailPage({
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user!.id)
-      .single()
-    profile = profileData as Profile
-    isOwner = profile.role === 'owner'
+    if (!user) {
+      // Fallback to demo if auth failed between middleware and page render
+      const demoJob = getDemoJob(id)
+      if (!demoJob) notFound()
+      job = demoJob
+      invoices = getDemoInvoicesForJob(id)
+      team = demoTeamMembers
+    } else {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      if (profileData) {
+        profile = profileData as Profile
+        isOwner = profile.role === 'owner'
+      }
 
-    const { data: jobData } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('id', id)
-      .single()
+      const { data: jobData } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-    if (!jobData) notFound()
-    job = jobData as Job
+      if (!jobData) notFound()
+      job = jobData as Job
 
-    // Fetch related data in parallel
-    if (job.assigned_to) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', job.assigned_to).single()
-      assignee = data as Profile | null
+      // Fetch related data in parallel
+      if (job.assigned_to) {
+        const { data } = await supabase.from('profiles').select('*').eq('id', job.assigned_to).single()
+        assignee = data as Profile | null
+      }
+
+      if (job.customer_id) {
+        const { data } = await supabase.from('customers').select('*').eq('id', job.customer_id).single()
+        customer = data as Customer | null
+      }
+
+      const { data: invData } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('job_id', id)
+        .order('created_at', { ascending: true })
+      invoices = (invData ?? []) as Invoice[]
+
+      const { data: teamData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name')
+      team = (teamData ?? []) as Profile[]
+
+      const { data: photos } = await supabase
+        .from('job_photos')
+        .select('*')
+        .eq('job_id', id)
+        .order('created_at', { ascending: true })
+
+      const photoList = (photos ?? []) as JobPhoto[]
+      photosWithUrls = await Promise.all(
+        photoList.map(async (photo) => {
+          const { data: urlData } = await supabase.storage
+            .from('job-photos')
+            .createSignedUrl(photo.storage_path, 3600)
+          return { ...photo, url: urlData?.signedUrl }
+        })
+      )
     }
-
-    if (job.customer_id) {
-      const { data } = await supabase.from('customers').select('*').eq('id', job.customer_id).single()
-      customer = data as Customer | null
-    }
-
-    const { data: invData } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('job_id', id)
-      .order('created_at', { ascending: true })
-    invoices = (invData ?? []) as Invoice[]
-
-    const { data: teamData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('is_active', true)
-      .order('full_name')
-    team = (teamData ?? []) as Profile[]
-
-    const { data: photos } = await supabase
-      .from('job_photos')
-      .select('*')
-      .eq('job_id', id)
-      .order('created_at', { ascending: true })
-
-    const photoList = (photos ?? []) as JobPhoto[]
-    photosWithUrls = await Promise.all(
-      photoList.map(async (photo) => {
-        const { data: urlData } = await supabase.storage
-          .from('job-photos')
-          .createSignedUrl(photo.storage_path, 3600)
-        return { ...photo, url: urlData?.signedUrl }
-      })
-    )
   }
 
   // Calculate payment status

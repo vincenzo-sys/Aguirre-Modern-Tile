@@ -57,14 +57,23 @@ export default async function DashboardOverview() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    if (!user) {
+      // Auth expired between middleware and page render — use demo data
+      jobList = demoJobs
+      invoices = demoInvoices.map((inv) => ({ ...inv }))
+      team = demoTeamMembers
+      leads = []
+    } else {
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user!.id)
+      .eq('id', user.id)
       .single()
 
-    const profile = profileData as Profile
-    isOwner = profile.role === 'owner'
+    if (profileData) {
+      const profile = profileData as Profile
+      isOwner = profile.role === 'owner'
+    }
 
     // Fetch all data in parallel
     const [jobsResult, invoicesResult, leadsResult, teamResult] = await Promise.all([
@@ -109,6 +118,7 @@ export default async function DashboardOverview() {
     invoices = (invoicesResult.data ?? []) as Invoice[]
     leads = (leadsResult.data ?? []) as QuoteRequest[]
     team = (teamResult.data ?? []) as Profile[]
+    }
   }
 
   return (

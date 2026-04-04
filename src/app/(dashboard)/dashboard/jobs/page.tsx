@@ -43,14 +43,21 @@ export default async function JobsPage({
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    if (!user) {
+      // Fallback to demo if auth failed between middleware and page render
+      jobList = demoJobs
+      team = demoTeamMembers
+    } else {
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user!.id)
+      .eq('id', user.id)
       .single()
 
-    profile = profileData as Profile
-    isOwner = profile.role === 'owner'
+    if (profileData) {
+      profile = profileData as Profile
+      isOwner = profile.role === 'owner'
+    }
 
     const { data: jobs } = await supabase
       .from('jobs')
@@ -84,6 +91,7 @@ export default async function JobsPage({
       .eq('is_active', true)
       .order('full_name')
     team = (teamData ?? []) as Profile[]
+    }
   }
 
   const { view: viewParam, status: statusFilter, type: typeFilter, q: searchFilter } = await searchParams

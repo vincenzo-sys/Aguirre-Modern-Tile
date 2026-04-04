@@ -51,15 +51,38 @@ export default async function CustomerDetailPage({
     jobs = demoJobs.filter((j) => j.customer_id === id)
     invoices = demoInvoices.filter((inv) => inv.customer_id === id)
   } else {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL ? '' : 'http://localhost:3100'}/api/customers/${id}`, {
-      cache: 'no-store',
-    })
-    if (!res.ok) notFound()
-    const data = await res.json()
-    customer = data
-    jobs = data.jobs ?? []
-    invoices = data.invoices ?? []
-    quotes = data.quotes ?? []
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = await createClient()
+
+    const { data: custData } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!custData) notFound()
+    customer = custData as Customer
+
+    const { data: jobsData } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false })
+    jobs = (jobsData ?? []) as Job[]
+
+    const { data: invData } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false })
+    invoices = (invData ?? []) as Invoice[]
+
+    const { data: quotesData } = await supabase
+      .from('quote_requests')
+      .select('*')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false })
+    quotes = (quotesData ?? []) as QuoteRequest[]
   }
 
   const totalRevenue = invoices

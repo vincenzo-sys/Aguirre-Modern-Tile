@@ -164,6 +164,14 @@ export default async function JobDetailPage({
             {isOwner && <JobEditForm job={job} teamMembers={team} />}
             {isOwner && (
               <Link
+                href={`/dashboard/jobs/${job.id}/estimate`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+              >
+                Estimate
+              </Link>
+            )}
+            {isOwner && (
+              <Link
                 href={`/dashboard/invoices/new?job=${job.id}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
               >

@@ -15,7 +15,7 @@ const allNavItems = [
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
   { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings, ownerOnly: true },
+  { label: 'Estimating', href: '/dashboard/settings', icon: Settings, ownerOnly: true },
 ]
 
 export default function Sidebar({ profile }: { profile: Profile }) {

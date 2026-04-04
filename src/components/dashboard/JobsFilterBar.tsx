@@ -93,35 +93,3 @@ export default function JobsFilterBar({ jobCount }: { jobCount: number }) {
     </div>
   )
 }
-
-// Helper: filter jobs based on current URL params
-export function filterJobs(
-  jobs: { status: string; job_type: string | null; title: string; client_name: string }[],
-  statusFilter: string,
-  typeFilter: string,
-  searchFilter: string,
-) {
-  let filtered = [...jobs]
-
-  // Status tab filter
-  const tab = statusTabs.find((t) => t.value === statusFilter)
-  if (tab && tab.statuses.length > 0) {
-    filtered = filtered.filter((j) => tab.statuses.includes(j.status as JobStatus))
-  }
-
-  // Job type filter
-  if (typeFilter) {
-    filtered = filtered.filter((j) => j.job_type === typeFilter)
-  }
-
-  // Search filter
-  if (searchFilter) {
-    const q = searchFilter.toLowerCase()
-    filtered = filtered.filter((j) =>
-      (j.title ?? '').toLowerCase().includes(q) ||
-      (j.client_name ?? '').toLowerCase().includes(q)
-    )
-  }
-
-  return filtered
-}

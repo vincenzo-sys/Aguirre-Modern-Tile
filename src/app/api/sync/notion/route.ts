@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchAllNotionJobs, type NotionJobPage } from '@/lib/notion'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Sync secret to prevent unauthorized calls
 const SYNC_SECRET = process.env.SYNC_SECRET || 'dev-sync-secret'
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabaseAdmin = getSupabaseAdmin()
+
     // 1. Fetch all jobs from Notion
     const notionJobs = await fetchAllNotionJobs()
 

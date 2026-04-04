@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Valid table names for the reference data endpoints
 const VALID_TABLES = [
@@ -34,6 +36,7 @@ export async function GET(req: NextRequest) {
     )
   }
 
+  const supabaseAdmin = getSupabaseAdmin()
   const { data, error } = await supabaseAdmin
     .from(table)
     .select('*')
@@ -60,6 +63,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
 
+  const supabaseAdmin = getSupabaseAdmin()
   const { data, error } = await supabaseAdmin
     .from(table)
     .insert(body)
@@ -88,6 +92,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
 
+  const supabaseAdmin = getSupabaseAdmin()
   const { data, error } = await supabaseAdmin
     .from(table)
     .update(body)
@@ -114,6 +119,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'id is required' }, { status: 400 })
   }
 
+  const supabaseAdmin = getSupabaseAdmin()
   const { error } = await supabaseAdmin
     .from(table)
     .delete()

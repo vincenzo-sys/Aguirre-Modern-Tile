@@ -12,7 +12,7 @@ const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 
 const emptyLine: InvoiceLineItem = { description: '', quantity: 1, unit_price: 0, amount: 0, type: 'service', unit: '' }
 
-const isDemoMode = true // Force demo mode for preview
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default function NewInvoicePage() {
   return (

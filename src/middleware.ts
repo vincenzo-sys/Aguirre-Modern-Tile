@@ -49,8 +49,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Dashboard routes: allow through even without auth (falls back to demo data)
-  // This lets the dashboard be viewable for previewing/refining
+  // Protect dashboard routes — require login
+  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
 
   // Redirect logged-in users away from login page
   if (request.nextUrl.pathname === '/login' && user) {

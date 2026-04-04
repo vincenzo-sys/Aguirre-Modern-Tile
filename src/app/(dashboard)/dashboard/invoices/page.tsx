@@ -18,7 +18,7 @@ const tabs: { label: string; value: InvoiceStatus | 'all' }[] = [
   { label: 'Void', value: 'void' },
 ]
 
-const isDemoMode = true // Force demo mode for preview
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default function InvoicesPage() {
   const router = useRouter()

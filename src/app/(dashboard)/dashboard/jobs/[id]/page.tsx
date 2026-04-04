@@ -6,7 +6,8 @@ import StatusUpdateDropdown from '@/components/dashboard/StatusUpdateDropdown'
 import CustomerCard from '@/components/dashboard/CustomerCard'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
-import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob } from '@/lib/demo'
+import JobEditForm from '@/components/dashboard/JobEditForm'
+import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
 
@@ -41,6 +42,7 @@ export default async function JobDetailPage({
   let isOwner = true
   let profile: Profile = demoProfile
   let invoices: Invoice[] = []
+  let team: Profile[] = []
 
   const useDemo = await shouldUseDemoData()
 
@@ -50,6 +52,7 @@ export default async function JobDetailPage({
     job = demoJob
     assignee = demoJob.assignee ?? null
     invoices = getDemoInvoicesForJob(id)
+    team = demoTeamMembers
     if (job.customer_id) {
       customer = getDemoCustomer(job.customer_id) ?? null
     }
@@ -93,6 +96,13 @@ export default async function JobDetailPage({
       .eq('job_id', id)
       .order('created_at', { ascending: true })
     invoices = (invData ?? []) as Invoice[]
+
+    const { data: teamData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('full_name')
+    team = (teamData ?? []) as Profile[]
 
     const { data: photos } = await supabase
       .from('job_photos')
@@ -150,9 +160,8 @@ export default async function JobDetailPage({
             <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
           </div>
           <div className="flex items-center gap-2">
-            {!isOwner && job.assigned_to === profile.id && (
-              <StatusUpdateDropdown jobId={job.id} currentStatus={job.status} />
-            )}
+            <StatusUpdateDropdown jobId={job.id} currentStatus={job.status} isOwner={isOwner} />
+            {isOwner && <JobEditForm job={job} teamMembers={team} />}
             {isOwner && (
               <Link
                 href={`/dashboard/invoices/new?job=${job.id}`}

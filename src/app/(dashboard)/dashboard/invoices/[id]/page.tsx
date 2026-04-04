@@ -11,7 +11,7 @@ import type { InvoiceWithJob, InvoiceLineItem } from '@/lib/supabase/types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
 
-const isDemoMode = true // Force demo mode for preview
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default function InvoiceDetailPage() {
   const params = useParams()

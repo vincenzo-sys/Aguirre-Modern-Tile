@@ -1,11 +1,38 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobStatus } from '@/lib/supabase/types'
 
-const allowedTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
+const ownerTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
+  lead: [
+    { label: 'Mark as Quoted', next: 'quoted' },
+    { label: 'Cancel', next: 'cancelled' },
+  ],
+  quoted: [
+    { label: 'Schedule Job', next: 'scheduled' },
+    { label: 'Cancel', next: 'cancelled' },
+  ],
+  scheduled: [
+    { label: 'Start Work', next: 'in_progress' },
+    { label: 'Cancel', next: 'cancelled' },
+  ],
+  in_progress: [
+    { label: 'Waiting for Materials', next: 'waiting_for_materials' },
+    { label: 'Mark Complete', next: 'completed' },
+  ],
+  waiting_for_materials: [
+    { label: 'Resume Work', next: 'in_progress' },
+    { label: 'Mark Complete', next: 'completed' },
+  ],
+  completed: [
+    { label: 'Mark as Paid', next: 'paid' },
+  ],
+}
+
+const crewTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
   scheduled: [{ label: 'Start Work', next: 'in_progress' }],
   in_progress: [
     { label: 'Waiting for Materials', next: 'waiting_for_materials' },
@@ -20,27 +47,52 @@ const allowedTransitions: Partial<Record<JobStatus, { label: string; next: JobSt
 interface StatusUpdateDropdownProps {
   jobId: string
   currentStatus: JobStatus
+  isOwner?: boolean
 }
 
-export default function StatusUpdateDropdown({ jobId, currentStatus }: StatusUpdateDropdownProps) {
+export default function StatusUpdateDropdown({ jobId, currentStatus, isOwner = false }: StatusUpdateDropdownProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const transitions = allowedTransitions[currentStatus]
+  const [saving, setSaving] = useState(false)
+  const transitions = isOwner ? ownerTransitions[currentStatus] : crewTransitions[currentStatus]
 
   if (!transitions || transitions.length === 0) return null
 
-  function handleUpdate(next: JobStatus, label: string) {
+  async function handleUpdate(next: JobStatus) {
     setOpen(false)
-    toast(`Demo mode: Job would be updated to "${next}". Connect Supabase to save changes.`)
+    setSaving(true)
+
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update status')
+      }
+
+      toast(`Status updated to ${next.replace('_', ' ')}`, 'success')
+      router.refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update', 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+        disabled={saving}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors disabled:opacity-50"
       >
-        Update Status
-        <ChevronDown className="w-4 h-4" />
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+        {saving ? 'Updating...' : 'Update Status'}
+        {!saving && <ChevronDown className="w-4 h-4" />}
       </button>
       {open && (
         <>
@@ -49,8 +101,10 @@ export default function StatusUpdateDropdown({ jobId, currentStatus }: StatusUpd
             {transitions.map((t) => (
               <button
                 key={t.next}
-                onClick={() => handleUpdate(t.next, t.label)}
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => handleUpdate(t.next)}
+                className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
+                  t.next === 'cancelled' ? 'text-red-600' : 'text-gray-700'
+                }`}
               >
                 {t.label}
               </button>

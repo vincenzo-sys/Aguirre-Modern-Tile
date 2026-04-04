@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Trash2, Save, Package, Wrench, Truck, Sparkles, FileText, Users } from 'lucide-react'
 import { toast } from '@/components/Toast'
 
-const isDemoMode = true // Force demo mode for preview
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 type TabKey = 'materials' | 'labor' | 'costs' | 'addons' | 'templates' | 'contacts'
 

@@ -44,15 +44,36 @@ export default function KanbanBoard({ initialJobs, isOwner, profile }: KanbanBoa
     setDragOverCol(null)
   }
 
-  function handleDrop(e: React.DragEvent, newStatus: JobStatus) {
+  async function handleDrop(e: React.DragEvent, newStatus: JobStatus) {
     e.preventDefault()
     setDragOverCol(null)
     const jobId = e.dataTransfer.getData('text/plain')
     if (!jobId) return
 
+    const job = jobs.find((j) => j.id === jobId)
+    if (!job || job.status === newStatus) return
+
+    const prevStatus = job.status
+
+    // Optimistic update
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: newStatus } : j))
     )
+
+    // Persist to API
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      // Rollback on failure
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, status: prevStatus } : j))
+      )
+    }
   }
 
   return (

@@ -80,26 +80,43 @@ export async function GET(req: NextRequest) {
     // Build estimate line items from job's existing line_items
     const items: EstimateLineItem[] = []
 
-    // If job has line items, use them and enrich with cost data from materials_pricing
-    const jobLineItems = (job as any).line_items || []
+    const jobLineItems: Array<{
+      category?: string; description?: string; quantity?: number;
+      unit?: string; unit_price?: number; amount?: number
+    }> = Array.isArray((job as any).line_items) ? (job as any).line_items : []
+
     for (const item of jobLineItems) {
+      const desc = item.description ?? ''
+      const qty = Number(item.quantity) || 0
+      const unitPrice = Number(item.unit_price) || 0
+      const amount = Number(item.amount) || 0
+      const unit = item.unit ?? 'ea'
+
       // Try to match to a material in our pricing table
-      const material = materials.find((m: any) =>
-        item.description.toLowerCase().includes(m.item.toLowerCase().split(' ')[0].toLowerCase()) ||
-        m.item.toLowerCase().includes(item.description.toLowerCase().split(' ')[0].toLowerCase())
-      )
+      let material: any = null
+      try {
+        const descLower = desc.toLowerCase()
+        material = materials.find((m: any) => {
+          const mItem = (m.item ?? '').toLowerCase()
+          const firstWord = mItem.split(' ')[0]
+          return descLower.includes(firstWord) || mItem.includes(descLower.split(' ')[0])
+        })
+      } catch { /* fuzzy match failed, use defaults */ }
 
       if (item.category === 'materials') {
+        const coverage = material?.coverage ? Number(material.coverage) : 1
+        const yourCost = material ? Number(material.your_cost) * qty / coverage : amount * 0.6
+
         items.push({
-          description: item.description,
+          description: desc,
           category: 'materials',
-          quantity: item.quantity,
-          unit: item.unit,
-          your_cost: material ? Number(material.your_cost) * item.quantity / (material.coverage || 1) : item.amount * 0.6,
-          markup_percent: material ? Number(material.markup_percent) : 0.20,
-          price_to_customer: item.unit_price,
-          total_cost: material ? Number(material.your_cost) * item.quantity / (material.coverage || 1) : item.amount * 0.6,
-          total_price: item.amount,
+          quantity: qty,
+          unit,
+          your_cost: yourCost,
+          markup_percent: material ? Number(material.markup_percent) || 0.20 : 0.20,
+          price_to_customer: unitPrice,
+          total_cost: yourCost,
+          total_price: amount,
           retail_link: material?.retail_link || null,
         })
       } else {
@@ -108,23 +125,23 @@ export async function GET(req: NextRequest) {
         const crewSize = laborRates.find((r: any) => r.setting === 'Standard Crew Size')
         const multiplier = laborRates.find((r: any) => r.setting === 'Install Multiplier')
 
-        const costPerHour = dailyRate ? Number(dailyRate.value) / 8 : 31.25  // $250/day / 8hrs
+        const costPerHour = dailyRate ? Number(dailyRate.value) / 8 : 31.25
         const crewCount = crewSize ? Number(crewSize.value) : 2
         const markup = multiplier ? Number(multiplier.value) : 1.9
 
-        const hourlyCount = item.unit === 'hr' ? item.quantity : item.quantity / 8
+        const hourlyCount = unit === 'hr' ? qty : qty / 8
         const laborCost = hourlyCount * costPerHour * crewCount
 
         items.push({
-          description: item.description,
+          description: desc,
           category: 'labor',
-          quantity: item.quantity,
-          unit: item.unit,
+          quantity: qty,
+          unit,
           your_cost: costPerHour * crewCount,
           markup_percent: (markup - 1),
-          price_to_customer: item.unit_price,
+          price_to_customer: unitPrice,
           total_cost: laborCost,
-          total_price: item.amount,
+          total_price: amount,
         })
       }
     }

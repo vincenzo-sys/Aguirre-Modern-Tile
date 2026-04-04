@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Eye, EyeOff, FileText, Share2, Printer } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Printer } from 'lucide-react'
 import { toast } from '@/components/Toast'
 
 interface EstimateLineItem {
@@ -37,11 +37,11 @@ interface EstimateData {
 }
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n ?? 0)
 }
 
 function pct(n: number): string {
-  return `${(n * 100).toFixed(1)}%`
+  return `${((n ?? 0) * 100).toFixed(1)}%`
 }
 
 export default function EstimatePage() {
@@ -49,14 +49,39 @@ export default function EstimatePage() {
   const jobId = params.id as string
   const [data, setData] = useState<EstimateData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'internal' | 'external'>('internal')
+  const [isOwner, setIsOwner] = useState(false)
+  const [view, setView] = useState<'internal' | 'external'>('external')
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/estimates?job_id=${jobId}`)
-        if (!res.ok) throw new Error('Failed to load estimate')
-        setData(await res.json())
+        // Fetch estimate data and user profile in parallel
+        const [estimateRes, profileRes] = await Promise.all([
+          fetch(`/api/estimates?job_id=${jobId}`),
+          (async () => {
+            const { createBrowserClient } = await import('@supabase/ssr')
+            const supabase = createBrowserClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            )
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return null
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .single()
+            return profile
+          })(),
+        ])
+
+        if (!estimateRes.ok) throw new Error('Failed to load estimate')
+        setData(await estimateRes.json())
+
+        if (profileRes?.role === 'owner') {
+          setIsOwner(true)
+          setView('internal')
+        }
       } catch {
         toast('Failed to load estimate', 'error')
       } finally {
@@ -69,8 +94,37 @@ export default function EstimatePage() {
   if (loading) return <div className="text-center py-12 text-gray-500">Loading estimate...</div>
   if (!data) return <div className="text-center py-12 text-gray-500">No estimate data available</div>
 
-  const materialItems = data.items.filter((i) => i.category === 'materials')
-  const laborItems = data.items.filter((i) => i.category === 'labor')
+  const materialItems = (data.items ?? []).filter((i) => i.category === 'materials')
+  const laborItems = (data.items ?? []).filter((i) => i.category === 'labor')
+  const hasData = data.items.length > 0 || data.summary.total_price > 0
+
+  // Empty state — no line items and no estimated_cost
+  if (!hasData) {
+    return (
+      <div className="max-w-4xl">
+        <Link
+          href={`/dashboard/jobs/${jobId}`}
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Job
+        </Link>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <h1 className="text-xl font-bold text-gray-900 mb-2">No Estimate Data</h1>
+          <p className="text-sm text-gray-500 mb-4">{data.job_title} — {data.client_name}</p>
+          <p className="text-gray-600 mb-6">
+            Add line items to this job to generate an estimate with materials and labor breakdown.
+          </p>
+          <Link
+            href={`/dashboard/jobs/${jobId}`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+          >
+            Go to Job Details
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl">
@@ -88,27 +142,29 @@ export default function EstimatePage() {
           <p className="text-sm text-gray-500">{data.job_title} — {data.client_name}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setView('internal')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                view === 'internal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <EyeOff className="w-3.5 h-3.5" />
-              Internal
-            </button>
-            <button
-              onClick={() => setView('external')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                view === 'external' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Customer
-            </button>
-          </div>
+          {/* View toggle — only show if owner */}
+          {isOwner && (
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setView('internal')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  view === 'internal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+                Internal
+              </button>
+              <button
+                onClick={() => setView('external')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  view === 'external' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Customer
+              </button>
+            </div>
+          )}
           <button
             onClick={() => window.print()}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
@@ -119,8 +175,8 @@ export default function EstimatePage() {
         </div>
       </div>
 
-      {/* Internal View */}
-      {view === 'internal' && (
+      {/* Internal View — owner only */}
+      {view === 'internal' && isOwner && (
         <div className="space-y-6">
           {/* Profit summary banner */}
           <div className={`rounded-xl p-4 ${data.summary.profit_percent >= 0.4 ? 'bg-green-50 border border-green-200' : data.summary.profit_percent >= 0.25 ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}`}>
@@ -182,7 +238,7 @@ export default function EstimatePage() {
                           {item.retail_link ? (
                             <a href={item.retail_link} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700 text-xs">Link</a>
                           ) : (
-                            <span className="text-gray-300">—</span>
+                            <span className="text-gray-300">&mdash;</span>
                           )}
                         </td>
                       </tr>
@@ -272,7 +328,7 @@ export default function EstimatePage() {
         </div>
       )}
 
-      {/* External (Customer-Facing) View */}
+      {/* External (Customer-Facing) View — visible to all roles */}
       {view === 'external' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print:shadow-none print:border-0">
           {/* Company header */}

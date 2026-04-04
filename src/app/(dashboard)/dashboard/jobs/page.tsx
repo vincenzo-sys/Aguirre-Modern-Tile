@@ -82,6 +82,7 @@ export default async function JobsPage({
 
     jobList = rawJobs.map((job) => ({
       ...job,
+      line_items: job.line_items ?? [],
       assignee: job.assigned_to ? assigneeMap[job.assigned_to] ?? null : null,
     }))
 

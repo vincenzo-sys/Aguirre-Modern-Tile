@@ -87,7 +87,7 @@ export default async function JobDetailPage({
         .single()
 
       if (!jobData) notFound()
-      job = jobData as Job
+      job = { ...jobData, line_items: jobData.line_items ?? [] } as Job
 
       // Fetch related data in parallel
       if (job.assigned_to) {
@@ -121,14 +121,18 @@ export default async function JobDetailPage({
         .order('created_at', { ascending: true })
 
       const photoList = (photos ?? []) as JobPhoto[]
-      photosWithUrls = await Promise.all(
-        photoList.map(async (photo) => {
-          const { data: urlData } = await supabase.storage
-            .from('job-photos')
-            .createSignedUrl(photo.storage_path, 3600)
-          return { ...photo, url: urlData?.signedUrl }
-        })
-      )
+      try {
+        photosWithUrls = await Promise.all(
+          photoList.map(async (photo) => {
+            const { data: urlData } = await supabase.storage
+              .from('job-photos')
+              .createSignedUrl(photo.storage_path, 3600)
+            return { ...photo, url: urlData?.signedUrl }
+          })
+        )
+      } catch {
+        photosWithUrls = photoList.map((photo) => ({ ...photo, url: undefined }))
+      }
     }
   }
 

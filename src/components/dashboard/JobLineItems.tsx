@@ -5,14 +5,15 @@ function formatCurrency(amount: number): string {
 }
 
 export default function JobLineItems({ items }: { items: JobLineItem[] }) {
-  const materials = items.filter((i) => i.category === 'materials')
-  const labor = items.filter((i) => i.category === 'labor')
+  const safeItems = items ?? []
+  const materials = safeItems.filter((i) => i.category === 'materials')
+  const labor = safeItems.filter((i) => i.category === 'labor')
 
-  const materialsTotal = materials.reduce((sum, i) => sum + i.amount, 0)
-  const laborTotal = labor.reduce((sum, i) => sum + i.amount, 0)
+  const materialsTotal = materials.reduce((sum, i) => sum + (i.amount ?? 0), 0)
+  const laborTotal = labor.reduce((sum, i) => sum + (i.amount ?? 0), 0)
   const grandTotal = materialsTotal + laborTotal
 
-  if (items.length === 0) {
+  if (safeItems.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-800">

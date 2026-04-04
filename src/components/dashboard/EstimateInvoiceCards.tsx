@@ -21,8 +21,9 @@ export default function EstimateInvoiceCards({
   job: Job
   invoices: Invoice[]
 }) {
-  const hasEstimate = (job.estimated_cost ?? 0) > 0 || job.line_items.length > 0
-  const lineItemsTotal = job.line_items.reduce((sum, item) => sum + item.amount, 0)
+  const lineItems = job.line_items ?? []
+  const hasEstimate = (job.estimated_cost ?? 0) > 0 || lineItems.length > 0
+  const lineItemsTotal = lineItems.reduce((sum, item) => sum + (item.amount ?? 0), 0)
   const estimateAmount = lineItemsTotal > 0 ? lineItemsTotal : (job.estimated_cost ?? 0)
 
   return (

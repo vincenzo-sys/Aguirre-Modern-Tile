@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -80,6 +82,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
+    // Get the old status before updating
+    const { data: oldJob } = await supabase
+      .from('jobs')
+      .select('status, client_phone, client_address, scheduled_start, customer_id')
+      .eq('id', id)
+      .single()
+
     const { data: job, error } = await supabase
       .from('jobs')
       .update(updates)
@@ -89,6 +98,45 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Auto-message on status change (non-blocking)
+    if (updates.status && oldJob && updates.status !== oldJob.status && process.env.OPENPHONE_API_KEY) {
+      const phone = (job as any).client_phone || oldJob.client_phone
+      if (phone) {
+        const newStatus = updates.status as string
+        const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+        let message: string | null = null
+        let triggerType: string | null = null
+
+        if (newStatus === 'scheduled') {
+          const date = (job as any).scheduled_start
+          message = AUTO_MESSAGES.status_scheduled(date ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'soon')
+          triggerType = 'status_scheduled'
+        } else if (newStatus === 'in_progress') {
+          message = AUTO_MESSAGES.status_in_progress((job as any).client_address || '')
+          triggerType = 'status_in_progress'
+        } else if (newStatus === 'completed') {
+          message = AUTO_MESSAGES.status_completed
+          triggerType = 'status_completed'
+        }
+
+        if (message && triggerType) {
+          sendSMS(phone, message).then(async (result) => {
+            await supabaseAdmin.from('message_log').insert({
+              customer_id: (job as any).customer_id || oldJob.customer_id,
+              job_id: id,
+              phone_number: phone,
+              direction: 'outbound',
+              message,
+              trigger_type: triggerType,
+              openphone_message_id: result.messageId || null,
+              status: result.success ? 'sent' : 'failed',
+            })
+          }).catch(console.error)
+        }
+      }
     }
 
     return NextResponse.json(job)

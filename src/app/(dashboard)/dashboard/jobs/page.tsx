@@ -3,18 +3,29 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { demoJobs, demoProfile, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
-import type { Job, Profile, JobWithAssignee } from '@/lib/supabase/types'
+import type { Job, Profile, JobWithAssignee, JobStatus } from '@/lib/supabase/types'
 import MetricsCards from '@/components/dashboard/MetricsCards'
 import ViewSwitcher from '@/components/dashboard/ViewSwitcher'
+import JobsFilterBar, { filterJobs } from '@/components/dashboard/JobsFilterBar'
 import JobListView from '@/components/dashboard/JobListView'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import CalendarView from '@/components/dashboard/CalendarView'
 import TimelineView from '@/components/dashboard/TimelineView'
 
+const statusTabMap: Record<string, JobStatus[]> = {
+  leads: ['lead'],
+  quoted: ['quoted'],
+  scheduled: ['scheduled'],
+  active: ['in_progress', 'waiting_for_materials'],
+  completed: ['completed'],
+  paid: ['paid'],
+  cancelled: ['cancelled'],
+}
+
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; status?: string; type?: string; q?: string }>
 }) {
   let isOwner = true
   let profile: Profile = demoProfile
@@ -75,8 +86,16 @@ export default async function JobsPage({
     team = (teamData ?? []) as Profile[]
   }
 
-  const { view: viewParam } = await searchParams
+  const { view: viewParam, status: statusFilter, type: typeFilter, q: searchFilter } = await searchParams
   const view = viewParam || 'list'
+
+  // Apply filters
+  const filtered = filterJobs(
+    jobList,
+    statusFilter || 'all',
+    typeFilter || '',
+    searchFilter || '',
+  ) as JobWithAssignee[]
 
   return (
     <div>
@@ -84,7 +103,7 @@ export default async function JobsPage({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {jobList.length} {jobList.length === 1 ? 'job' : 'jobs'} total
+            {filtered.length} of {jobList.length} job{jobList.length !== 1 ? 's' : ''}
           </p>
         </div>
         {isOwner && (
@@ -98,17 +117,13 @@ export default async function JobsPage({
         )}
       </div>
 
-      {useDemo && (
-        <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
-          <p className="text-sm text-amber-800">
-            <strong>Demo Mode</strong> — Viewing sample data. Connect Supabase to use real data.
-          </p>
-        </div>
-      )}
-
       <div className="mb-6">
         <MetricsCards jobs={jobList} />
       </div>
+
+      <Suspense fallback={null}>
+        <JobsFilterBar jobCount={jobList.length} />
+      </Suspense>
 
       <div className="mb-4">
         <Suspense fallback={null}>
@@ -117,12 +132,12 @@ export default async function JobsPage({
       </div>
 
       {view === 'kanban' && (
-        <KanbanBoard initialJobs={jobList} isOwner={isOwner} profile={profile} />
+        <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />
       )}
-      {view === 'calendar' && <CalendarView jobs={jobList} />}
-      {view === 'timeline' && <TimelineView jobs={jobList} team={team} />}
+      {view === 'calendar' && <CalendarView jobs={filtered} />}
+      {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
       {(view === 'list' || !['kanban', 'calendar', 'timeline'].includes(view)) && (
-        <JobListView jobs={jobList} isOwner={isOwner} profile={profile} />
+        <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />
       )}
     </div>
   )

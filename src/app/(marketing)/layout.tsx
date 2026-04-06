@@ -13,6 +13,7 @@ export default async function MarketingLayout({
     { label: 'Our Process', href: '/process' },
     { label: 'Gallery', href: '/gallery' },
     { label: 'About', href: '/about' },
+    { label: 'Blog', href: '/blog' },
     { label: 'Contact', href: '/contact' },
   ]
   let phone = '(617) 766-1259'

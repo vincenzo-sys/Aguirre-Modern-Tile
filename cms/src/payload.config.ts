@@ -13,6 +13,9 @@ import { GalleryProjects } from './collections/GalleryProjects'
 import { TeamMembers } from './collections/TeamMembers'
 import { FAQs } from './collections/FAQs'
 import { BlogPosts } from './collections/BlogPosts'
+import { Categories } from './collections/Categories'
+import { Tags } from './collections/Tags'
+import { ContentQueue } from './collections/ContentQueue'
 import { CompanyInfo } from './globals/CompanyInfo'
 import { Homepage } from './globals/Homepage'
 import { Navigation } from './globals/Navigation'
@@ -27,7 +30,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, Services, Testimonials, GalleryProjects, TeamMembers, FAQs, BlogPosts],
+  collections: [Users, Media, Services, Testimonials, GalleryProjects, TeamMembers, FAQs, BlogPosts, Categories, Tags, ContentQueue],
   globals: [CompanyInfo, Homepage, Navigation],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
@@ -45,6 +48,8 @@ export default buildConfig({
     'http://localhost:3100',
     'http://localhost:3000',
     'https://aguirre-modern-tile.vercel.app',
+    'https://aguirremoderntile.com',
+    'https://www.aguirremoderntile.com',
   ],
   sharp,
 })

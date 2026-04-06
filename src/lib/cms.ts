@@ -42,3 +42,60 @@ export function resolveCmsImageUrl(url: string | undefined | null): string {
   if (url.startsWith('/')) return url
   return `${CMS_URL}${url.startsWith('/') ? '' : '/'}${url}`
 }
+
+// --- Blog helpers ---
+
+function resolvePostImages(post: any): any {
+  if (post?.featuredImage?.url) {
+    post.featuredImage.url = resolveCmsImageUrl(post.featuredImage.url)
+  }
+  // Resolve images inside Lexical rich text content
+  if (post?.content?.root?.children) {
+    const walk = (nodes: any[]) => {
+      for (const node of nodes) {
+        if (node.type === 'upload' && node.value?.url) {
+          node.value.url = resolveCmsImageUrl(node.value.url)
+        }
+        if (node.children) walk(node.children)
+      }
+    }
+    walk(post.content.root.children)
+  }
+  return post
+}
+
+export async function getPublishedPosts(
+  extraFilters: Record<string, string> = {},
+  page = 1,
+  limit = 12
+) {
+  const params: Record<string, string> = {
+    'where[status][equals]': 'published',
+    sort: '-publishedAt',
+    depth: '2',
+    page: String(page),
+    limit: String(limit),
+    ...extraFilters,
+  }
+
+  const data = await fetchFromCms<any>('/blog-posts', params)
+  if (!data) return { docs: [], totalPages: 0, totalDocs: 0, page: 1 }
+
+  return {
+    docs: (data.docs || []).map(resolvePostImages),
+    totalPages: data.totalPages || 1,
+    totalDocs: data.totalDocs || 0,
+    page: data.page || 1,
+  }
+}
+
+export async function getPostBySlug(slug: string) {
+  const data = await fetchFromCms<any>('/blog-posts', {
+    'where[slug][equals]': slug,
+    'where[status][equals]': 'published',
+    depth: '2',
+  })
+
+  const post = data?.docs?.[0] || null
+  return post ? resolvePostImages(post) : null
+}

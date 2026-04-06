@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next'
 import { locationSlugs } from '@/data/locations'
+import { getPublishedPosts } from '@/lib/cms'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://aguirremoderntile.com'
 
   // Core marketing pages
@@ -28,19 +29,35 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }))
 
-  // Blog posts (defaults — CMS posts would need dynamic fetch)
-  const blogSlugs = [
-    'shower-waterproofing-signs',
-    'kerdi-board-vs-go-board',
-    'cambridge-master-bath-transformation',
-    '2024-tile-trends-boston',
-  ]
-  const blogPages: MetadataRoute.Sitemap = blogSlugs.map((slug) => ({
-    url: `${baseUrl}/blog/${slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.6,
-  }))
+  // Blog posts from Payload CMS (with fallback defaults)
+  let blogPages: MetadataRoute.Sitemap = []
+  try {
+    const { docs } = await getPublishedPosts({}, 1, 100)
+    if (docs.length > 0) {
+      blogPages = docs.map((post: any) => ({
+        url: `${baseUrl}/blog/${post.slug}`,
+        lastModified: new Date(post.updatedAt || post.publishedAt),
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      }))
+    }
+  } catch {
+    // CMS not available — use default slugs
+  }
+  if (blogPages.length === 0) {
+    const defaultBlogSlugs = [
+      'shower-waterproofing-signs',
+      'kerdi-board-vs-go-board',
+      'cambridge-master-bath-transformation',
+      '2024-tile-trends-boston',
+    ]
+    blogPages = defaultBlogSlugs.map((slug) => ({
+      url: `${baseUrl}/blog/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    }))
+  }
 
   // Quote pages
   const quoteTypes = ['bathroom', 'shower', 'kitchen-floor', 'backsplash', 'other']

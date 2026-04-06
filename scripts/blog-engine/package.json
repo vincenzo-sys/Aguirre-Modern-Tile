@@ -1,0 +1,31 @@
+{
+  "name": "aguirre-blog-engine",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Automated SEO blog content generator for Aguirre Modern Tile",
+  "scripts": {
+    "generate": "tsx src/index.ts generate",
+    "report": "tsx src/index.ts report",
+    "score": "tsx src/index.ts score",
+    "publish": "tsx src/index.ts publish",
+    "bootstrap": "tsx src/index.ts bootstrap",
+    "update-links": "tsx src/update-links.ts",
+    "import-queue": "tsx src/import-queue.ts",
+    "dev": "tsx src/index.ts",
+    "migrate-tables": "tsx src/migrate-tables.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "cheerio": "^1.0.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "node-html-parser": "^7.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

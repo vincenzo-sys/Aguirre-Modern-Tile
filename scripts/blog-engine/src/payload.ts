@@ -1,0 +1,249 @@
+import { env } from './config.js'
+
+const headers = {
+  'Content-Type': 'application/json',
+  Authorization: `users API-Key ${env.PAYLOAD_API_KEY}`,
+}
+
+async function payloadFetch(path: string, options: RequestInit = {}) {
+  const url = `${env.PAYLOAD_CMS_URL}/api${path}`
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload API error ${res.status} on ${path}: ${body}`)
+  }
+
+  return res.json()
+}
+
+// Blog Posts
+export async function createPost(data: Record<string, unknown>) {
+  return payloadFetch('/blog-posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updatePost(id: string, data: Record<string, unknown>) {
+  return payloadFetch(`/blog-posts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function findPostBySlug(slug: string) {
+  const result = await payloadFetch(`/blog-posts?where[slug][equals]=${encodeURIComponent(slug)}&limit=1`)
+  return result.docs?.[0] || null
+}
+
+export async function findPublishedPostBySlug(slug: string) {
+  const result = await payloadFetch(
+    `/blog-posts?where[slug][equals]=${encodeURIComponent(slug)}&where[status][equals]=published&limit=1`
+  )
+  return result.docs?.[0] || null
+}
+
+// Media
+export async function uploadMedia(file: Buffer, filename: string, alt: string) {
+  const ext = filename.split('.').pop()?.toLowerCase() || 'jpg'
+  const mimeTypes: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    avif: 'image/avif',
+  }
+  const mimeType = mimeTypes[ext] || 'image/jpeg'
+
+  const formData = new FormData()
+  // Use File (not Blob) so the Vercel Blob storage adapter gets proper filename/type metadata
+  const fileObj = new File([new Uint8Array(file)], filename, { type: mimeType })
+  formData.append('file', fileObj)
+  formData.append('_payload', JSON.stringify({ alt: alt || 'Tile installation' }))
+
+  const url = `${env.PAYLOAD_CMS_URL}/api/media`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `users API-Key ${env.PAYLOAD_API_KEY}`,
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Media upload error ${res.status}: ${body}`)
+  }
+
+  return res.json()
+}
+
+// Categories
+export async function findOrCreateCategory(name: string) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  const result = await payloadFetch(`/categories?where[slug][equals]=${encodeURIComponent(slug)}&limit=1`)
+
+  if (result.docs?.[0]) return result.docs[0]
+
+  return payloadFetch('/categories', {
+    method: 'POST',
+    body: JSON.stringify({ name, slug }),
+  })
+}
+
+// Tags
+export async function findOrCreateTag(name: string) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  const result = await payloadFetch(`/tags?where[slug][equals]=${encodeURIComponent(slug)}&limit=1`)
+
+  if (result.docs?.[0]) return result.docs[0]
+
+  return payloadFetch('/tags', {
+    method: 'POST',
+    body: JSON.stringify({ name, slug }),
+  })
+}
+
+// Users (for author field — uses the authenticated API key user)
+export async function getApiUser() {
+  const result = await payloadFetch('/users/me')
+  return result.user || null
+}
+
+// Published posts (for internal link intelligence)
+export interface PublishedPost {
+  slug: string
+  title: string
+  articleType: string
+  serviceType: string
+}
+
+export async function getAllPublishedSlugs(serviceType?: string): Promise<PublishedPost[]> {
+  const params = new URLSearchParams({
+    'where[status][equals]': 'published',
+    limit: '500',
+    'select[slug]': 'true',
+    'select[title]': 'true',
+    'select[articleType]': 'true',
+    'select[serviceType]': 'true',
+  })
+  if (serviceType) {
+    params.set('where[serviceType][equals]', serviceType)
+  }
+
+  const result = await payloadFetch(`/blog-posts?${params.toString()}`)
+  return (result.docs || []).map((doc: Record<string, unknown>) => ({
+    slug: doc.slug as string,
+    title: doc.title as string,
+    articleType: (doc.articleType as string) || 'spoke',
+    serviceType: (doc.serviceType as string) || '',
+  }))
+}
+
+// Cluster context — fetch hub + sibling article headings for cross-article awareness
+export interface ClusterArticle {
+  slug: string
+  title: string
+  articleType: string
+  keyword?: string
+  headings: { level: number; text: string }[]
+  excerpt: string
+}
+
+export async function getClusterContext(item: { serviceType: string; articleType: string; hubSlug?: string; parentSlug?: string; slug: string }): Promise<ClusterArticle[]> {
+  // Dynamically import to avoid circular deps
+  const { extractHeadingsFromLexical } = await import('./lexical-to-html.js')
+
+  const params = new URLSearchParams({
+    'where[status][equals]': 'published',
+    'where[serviceType][equals]': item.serviceType,
+    limit: '20',
+  })
+
+  const result = await payloadFetch(`/blog-posts?${params.toString()}`)
+  const docs = result.docs || []
+
+  const siblings = docs
+    .filter((doc: Record<string, unknown>) => doc.slug !== item.slug)
+    .map((doc: Record<string, unknown>) => ({
+      slug: doc.slug as string,
+      title: doc.title as string,
+      articleType: (doc.articleType as string) || 'spoke',
+      headings: extractHeadingsFromLexical(doc.content as Parameters<typeof extractHeadingsFromLexical>[0]),
+      excerpt: ((doc.excerpt as string) || '').slice(0, 200),
+    }))
+    .slice(0, 10)
+
+  // Enrich with keywords from content queue (for cross-link anchor text)
+  if (siblings.length > 0) {
+    try {
+      const queueParams = new URLSearchParams({ limit: '50' })
+      const queueResult = await payloadFetch(`/content-queue?${queueParams.toString()}`)
+      const queueDocs = (queueResult.docs || []) as Record<string, unknown>[]
+      const slugToKeyword = new Map<string, string>()
+      for (const q of queueDocs) {
+        if (q.slug && q.keyword) slugToKeyword.set(q.slug as string, q.keyword as string)
+      }
+      for (const sibling of siblings) {
+        const kw = slugToKeyword.get(sibling.slug)
+        if (kw) (sibling as ClusterArticle & { keyword?: string }).keyword = kw
+      }
+    } catch { /* keyword enrichment is optional */ }
+  }
+
+  return siblings
+}
+
+/**
+ * Get Unsplash photo IDs already used as featured images by published posts
+ * in the same service cluster. Used to avoid duplicate hero images.
+ */
+export async function getClusterUsedPhotoIds(serviceType: string): Promise<string[]> {
+  const params = new URLSearchParams({
+    'where[status][equals]': 'published',
+    'where[serviceType][equals]': serviceType,
+    limit: '50',
+    depth: '1', // resolve featuredImage to get filename
+  })
+
+  const result = await payloadFetch(`/blog-posts?${params.toString()}`)
+  const docs = result.docs || []
+
+  const photoIds: string[] = []
+  for (const doc of docs) {
+    const img = doc.featuredImage as Record<string, unknown> | undefined
+    if (!img) continue
+    // Filename is the Unsplash photo ID (e.g., "0XV65AZ1hmY.jpg")
+    const filename = (img.filename as string) || ''
+    const photoId = filename.replace(/\.\w+$/, '') // strip extension
+    if (photoId) photoIds.push(photoId)
+  }
+
+  return photoIds
+}
+
+// Content Queue
+export async function getQueueItems(filters: Record<string, string> = {}) {
+  const params = new URLSearchParams({ sort: 'priority' })
+  for (const [key, value] of Object.entries(filters)) {
+    params.set(key, value)
+  }
+  if (!params.has('limit')) params.set('limit', '200')
+  return payloadFetch(`/content-queue?${params.toString()}`)
+}
+
+export async function getQueueItem(id: string) {
+  return payloadFetch(`/content-queue/${id}`)
+}
+
+export async function updateQueueItem(id: string, data: Record<string, unknown>) {
+  return payloadFetch(`/content-queue/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}

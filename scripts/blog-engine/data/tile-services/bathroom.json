@@ -1,0 +1,146 @@
+{
+  "serviceType": "bathroom",
+  "displayName": "Bathroom Tile Installation",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Complete bathroom tile installation including floors, walls, showers, and tub surrounds. Includes waterproofing, substrate prep, tile setting, and grouting.",
+    "avgCostPerSqFt": { "low": 12, "high": 35 },
+    "typicalProjectSize": "50-150 sq ft",
+    "installationTime": "3-7 days depending on scope",
+    "popularIn": ["master bathrooms", "guest bathrooms", "powder rooms", "en-suites"]
+  },
+  "materials": [
+    {
+      "name": "Large Format Porcelain (24x48)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 8,
+      "durability": "Excellent — nearly impervious to water, stains, and scratches",
+      "bestFor": ["shower walls", "bathroom floors", "feature walls"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Ceramic Wall Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 4,
+      "durability": "Good — suitable for walls, less ideal for high-traffic floors",
+      "bestFor": ["tub surrounds", "bathroom walls", "backsplashes"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Marble (Carrara, Calacatta)",
+      "type": "natural-stone",
+      "avgCostPerSqFt": 15,
+      "durability": "Good with proper sealing — susceptible to etching from acids",
+      "bestFor": ["vanity tops", "accent walls", "shower floors"],
+      "maintenanceLevel": "High — requires annual sealing"
+    },
+    {
+      "name": "Zellige / Handmade-Look Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 18,
+      "durability": "Good — variations in glaze are part of the aesthetic",
+      "bestFor": ["shower walls", "accent niches", "feature walls"],
+      "maintenanceLevel": "Medium"
+    },
+    {
+      "name": "Glass Mosaic",
+      "type": "glass",
+      "avgCostPerSqFt": 20,
+      "durability": "Excellent water resistance, fragile on impact",
+      "bestFor": ["shower niches", "accent bands", "decorative borders"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Penny Tile / Hex Mosaic",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — mesh-mounted for easy installation",
+      "bestFor": ["shower floors", "bathroom floors", "vintage-style bathrooms"],
+      "maintenanceLevel": "Medium — more grout lines to maintain"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "KERDI-BOARD Waterproofing",
+      "description": "Schluter KERDI-BOARD foam panels provide a complete waterproof envelope behind tile. Used for shower walls and wet areas.",
+      "bestFor": ["showers", "tub surrounds", "steam rooms"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "GO-BOARD Waterproofing",
+      "description": "Johns Manville GO-BOARD with cementitious coating. Works with any modified thin-set — no proprietary requirements.",
+      "bestFor": ["showers", "tub surrounds", "wet areas"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Curbless Shower Build",
+      "description": "Linear drain with sloped mortar bed for barrier-free shower entry. Requires precise slope (1/4 inch per foot).",
+      "bestFor": ["accessible bathrooms", "modern open showers", "ADA compliance"],
+      "difficultyLevel": "Expert"
+    },
+    {
+      "name": "Heated Floor System (DITRA-HEAT)",
+      "description": "Schluter DITRA-HEAT electric radiant heating under tile. Provides warm floors in cold Boston winters.",
+      "bestFor": ["bathroom floors", "master bath", "cold climate homes"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Large Format Tile Installation",
+      "description": "Tiles 24x48 or larger require perfectly level substrate, back-buttering, and tile leveling systems for flat, consistent results.",
+      "bestFor": ["modern bathrooms", "shower walls", "feature walls"],
+      "difficultyLevel": "Expert"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Subway (Running Bond)",
+      "description": "Classic 3x6 or 4x8 brick pattern. Timeless, works with any style from traditional to modern.",
+      "popularWith": ["tub surrounds", "shower walls", "wainscoting"]
+    },
+    {
+      "name": "Herringbone",
+      "description": "V-shaped zigzag pattern. Adds visual interest and makes spaces feel larger.",
+      "popularWith": ["shower floors", "accent walls", "bathroom floors"]
+    },
+    {
+      "name": "Stacked / Straight Lay",
+      "description": "Tiles aligned in a perfect grid. Clean, modern look — requires precise substrate.",
+      "popularWith": ["large format tiles", "modern bathrooms", "shower walls"]
+    },
+    {
+      "name": "Basketweave",
+      "description": "Woven pattern alternating horizontal and vertical pairs. Classic, works well on floors.",
+      "popularWith": ["bathroom floors", "entryway", "traditional bathrooms"]
+    },
+    {
+      "name": "Hexagon",
+      "description": "Six-sided tiles in various sizes. Popular for vintage or eclectic bathrooms.",
+      "popularWith": ["bathroom floors", "shower floors", "feature walls"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Freeze-thaw cycles can damage improperly waterproofed installations",
+      "Heated floors are popular due to cold winters (October-April)",
+      "Humidity fluctuations between seasons affect grout and natural stone",
+      "Radiant heat systems common in older Boston homes with cold tile floors"
+    ],
+    "popularStyles": [
+      "Modern spa-like retreats with large format porcelain",
+      "Classic subway tile in brownstone renovations",
+      "Zellige and handmade-look tiles in Cambridge/Somerville",
+      "Marble accents in luxury Back Bay and Beacon Hill homes"
+    ],
+    "avgLaborRate": { "low": 8, "high": 18 }
+  },
+  "brands": [
+    { "name": "Schluter Systems", "specialty": "Waterproofing, DITRA-HEAT, KERDI-BOARD", "priceRange": "Premium" },
+    { "name": "Daltile", "specialty": "Full range porcelain, ceramic, natural stone", "priceRange": "Mid-range" },
+    { "name": "MSI (MS International)", "specialty": "Natural stone, porcelain slabs", "priceRange": "Mid to Premium" },
+    { "name": "Bedrosians", "specialty": "Design-forward tile, zellige, handmade looks", "priceRange": "Mid to Premium" },
+    { "name": "Mapei", "specialty": "Thin-set, grout, waterproofing compounds", "priceRange": "Professional" },
+    { "name": "Laticrete", "specialty": "Thin-set, grout, STRATA_MAT uncoupling", "priceRange": "Professional" },
+    { "name": "Custom Building Products", "specialty": "RedGard waterproofing, thin-set, grout", "priceRange": "Standard" }
+  ]
+}

@@ -99,3 +99,20 @@ export async function getPostBySlug(slug: string) {
   const post = data?.docs?.[0] || null
   return post ? resolvePostImages(post) : null
 }
+
+export async function getRelatedPosts(
+  serviceType: string,
+  excludeSlug: string,
+  limit = 3
+) {
+  const data = await fetchFromCms<any>('/blog-posts', {
+    'where[status][equals]': 'published',
+    'where[serviceType][equals]': serviceType,
+    'where[slug][not_equals]': excludeSlug,
+    sort: '-publishedAt',
+    depth: '1',
+    limit: String(limit),
+  })
+
+  return (data?.docs || []).map(resolvePostImages)
+}

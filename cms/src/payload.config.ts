@@ -40,9 +40,12 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',
-      ssl: process.env.DATABASE_URI?.includes('supabase') ? { rejectUnauthorized: false } : false,
+      ssl: (process.env.DATABASE_URI?.includes('supabase') || process.env.DATABASE_URI?.includes('pooler'))
+        ? { rejectUnauthorized: false }
+        : false,
     },
     schemaName: 'cms',
+    push: process.env.NODE_ENV === 'development',
   }),
   cors: [
     'http://localhost:3100',
@@ -50,6 +53,7 @@ export default buildConfig({
     'https://aguirre-modern-tile.vercel.app',
     'https://aguirremoderntile.com',
     'https://www.aguirremoderntile.com',
+    'https://cms-azure-one.vercel.app',
   ],
   sharp,
 })

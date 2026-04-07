@@ -25,3 +25,8 @@ next-env.d.ts
 .playwright-mcp/
 
 .vercel
+
+# Blog engine
+scripts/blog-engine/logs/
+scripts/blog-engine/node_modules/
+scripts/blog-engine/.env

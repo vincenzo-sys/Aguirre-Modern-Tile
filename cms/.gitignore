@@ -5,3 +5,7 @@ payload.db
 .env
 .env.local
 .env.*.local
+
+.vercel
+logs/
+media/

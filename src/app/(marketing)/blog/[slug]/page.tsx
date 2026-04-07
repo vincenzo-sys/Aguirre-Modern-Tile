@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, User, ArrowLeft } from 'lucide-react'
-import { getPostBySlug, getPublishedPosts } from '@/lib/cms'
+import { getPostBySlug, getPublishedPosts, getRelatedPosts } from '@/lib/cms'
 import { notFound } from 'next/navigation'
 import RichText from '@/components/blog/RichText'
 
@@ -321,6 +321,11 @@ export default async function BlogDetailPage({ params }: Props) {
   const catSlug = getCategorySlug(post.category)
   const serviceLink = post.serviceType ? serviceCtaMap[post.serviceType] : null
 
+  // Related posts (only meaningful when coming from CMS — fallback posts are static)
+  const relatedPosts: any[] = post.isRichText && post.serviceType
+    ? await getRelatedPosts(post.serviceType, slug, 3).catch(() => [])
+    : []
+
   return (
     <>
       <ArticleJsonLd post={post} slug={slug} />
@@ -426,6 +431,44 @@ export default async function BlogDetailPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {/* Related Posts */}
+      {relatedPosts.length > 0 && (
+        <section className="section-padding bg-gray-50">
+          <div className="container-custom">
+            <h2 className="heading-secondary text-center mb-10">Related Articles</h2>
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {relatedPosts.map((related: any) => (
+                <Link
+                  key={related.slug}
+                  href={`/blog/${related.slug}`}
+                  className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow group"
+                >
+                  <div className="relative aspect-[16/9]">
+                    <Image
+                      src={getImageUrl(related.featuredImage)}
+                      alt={getImageAlt(related.featuredImage, related.title)}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="p-5">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${categoryColors[getCategorySlug(related.category)] || 'bg-gray-100 text-gray-800'}`}>
+                      {getCategoryName(related.category)}
+                    </span>
+                    <h3 className="font-bold text-gray-900 mt-2 group-hover:text-primary-600 transition-colors line-clamp-2">
+                      {related.title}
+                    </h3>
+                    {related.publishedAt && (
+                      <p className="text-sm text-gray-500 mt-2">{formatDate(related.publishedAt)}</p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA */}
       <section className="section-padding bg-primary-600 text-white">

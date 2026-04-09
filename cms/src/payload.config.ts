@@ -1,7 +1,8 @@
 import path from 'path'
 import { buildConfig } from 'payload'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { lexicalEditor, EXPERIMENTAL_TableFeature } from '@payloadcms/richtext-lexical'
+import { vercelBlobStorage } from '@payloadcms/storage-vercel-blob'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
@@ -23,16 +24,32 @@ import { Navigation } from './globals/Navigation'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+const corsOrigins = [
+  'http://localhost:3100',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://aguirre-modern-tile.vercel.app',
+  'https://aguirremoderntile.com',
+  'https://www.aguirremoderntile.com',
+  'https://cms.aguirremoderntile.com',
+  'https://cms-azure-one.vercel.app',
+]
+
 export default buildConfig({
   admin: {
     user: Users.slug,
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    meta: {
+      titleSuffix: ' - Aguirre Modern Tile CMS',
+    },
   },
   collections: [Users, Media, Services, Testimonials, GalleryProjects, TeamMembers, FAQs, BlogPosts, Categories, Tags, ContentQueue],
   globals: [CompanyInfo, Homepage, Navigation],
-  editor: lexicalEditor(),
+  editor: lexicalEditor({
+    features: ({ defaultFeatures }) => [...defaultFeatures, EXPERIMENTAL_TableFeature()],
+  }),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
@@ -47,13 +64,16 @@ export default buildConfig({
     schemaName: 'cms',
     push: process.env.NODE_ENV === 'development',
   }),
-  cors: [
-    'http://localhost:3100',
-    'http://localhost:3000',
-    'https://aguirre-modern-tile.vercel.app',
-    'https://aguirremoderntile.com',
-    'https://www.aguirremoderntile.com',
-    'https://cms-azure-one.vercel.app',
-  ],
+  cors: corsOrigins,
+  csrf: corsOrigins,
   sharp,
+  plugins: [
+    vercelBlobStorage({
+      enabled: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+      collections: {
+        media: true,
+      },
+      token: process.env.BLOB_READ_WRITE_TOKEN || '',
+    }),
+  ],
 })

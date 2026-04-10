@@ -39,7 +39,6 @@ export async function getCmsCollection<T = any>(
 export function resolveCmsImageUrl(url: string | undefined | null): string {
   if (!url) return ''
   if (url.startsWith('http')) return url
-  if (url.startsWith('/')) return url
   return `${CMS_URL}${url.startsWith('/') ? '' : '/'}${url}`
 }
 

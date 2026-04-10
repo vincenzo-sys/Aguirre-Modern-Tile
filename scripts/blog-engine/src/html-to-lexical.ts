@@ -85,6 +85,8 @@ interface LexicalTableRowNode extends LexicalElementNode {
 interface LexicalTableCellNode extends LexicalElementNode {
   type: 'tablecell'
   headerState: 0 | 1
+  colSpan: number
+  rowSpan: number
 }
 
 interface LexicalRootNode {
@@ -248,10 +250,12 @@ function makeTableRowNode(children: LexicalNode[]): LexicalTableRowNode {
   }
 }
 
-function makeTableCellNode(children: LexicalNode[], headerState: 0 | 1 = 0): LexicalTableCellNode {
+function makeTableCellNode(children: LexicalNode[], headerState: 0 | 1 = 0, colSpan = 1, rowSpan = 1): LexicalTableCellNode {
   return {
     type: 'tablecell',
     headerState,
+    colSpan,
+    rowSpan,
     children,
     direction: 'ltr',
     format: '',
@@ -447,9 +451,11 @@ function convertBlockElement(el: HTMLElement): LexicalNode[] {
           const cellTag = cellEl.tagName?.toLowerCase()
           if (cellTag === 'th' || cellTag === 'td') {
             const isHeader = cellTag === 'th' ? 1 : 0
+            const colSpan = parseInt(cellEl.getAttribute('colspan') || '1', 10) || 1
+            const rowSpan = parseInt(cellEl.getAttribute('rowspan') || '1', 10) || 1
             const cellContent = convertInlineChildren(cellEl)
             if (cellContent.length === 0) cellContent.push(makeTextNode(''))
-            cells.push(makeTableCellNode([makeParagraphNode(cellContent)], isHeader as 0 | 1))
+            cells.push(makeTableCellNode([makeParagraphNode(cellContent)], isHeader as 0 | 1, colSpan, rowSpan))
           }
         }
         if (cells.length > 0) {

@@ -7,8 +7,8 @@ export interface QueueItem {
   keyword: string
   serviceType: ServiceType
   slug: string
-  articleType: 'hub' | 'sub-pillar' | 'spoke'
-  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison'
+  articleType: 'hub' | 'pillar' | 'spoke'
+  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to'
   parentSlug?: string
   hubSlug?: string
   searchVolume?: number
@@ -46,7 +46,7 @@ export async function validatePrerequisites(item: QueueItem): Promise<string | n
   if (item.articleType === 'hub') return null
 
   // Sub-pillars need their hub published
-  if (item.articleType === 'sub-pillar') {
+  if (item.articleType === 'pillar') {
     if (!item.hubSlug) return 'Missing hubSlug — cannot validate hub prerequisite'
     const hub = await findPublishedPostBySlug(item.hubSlug)
     if (!hub) return `Hub article "${item.hubSlug}" must be published before generating sub-pillars`

@@ -32,8 +32,8 @@ interface ScorerInput {
   metaDescription: string
   excerpt: string
   faqItems: { question: string; answer: string }[]
-  articleType: 'hub' | 'sub-pillar' | 'spoke'
-  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison'
+  articleType: 'hub' | 'pillar' | 'spoke'
+  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to'
   targetWords: number
   hasImage: boolean
   imageAlt: string | null
@@ -183,15 +183,17 @@ const EEAT_PHRASES = [
   'according to',
   'based on current',
   'based on published',
-  'travelers report',
-  'travelers typically',
-  'travelers frequently',
+  'based on our',
   'we compared',
   'we analyzed',
-  'based on our',
-  'the port authority',
-  'the tsa',
-  'airport authority',
+  'we installed',
+  'we recommend',
+  'in our experience',
+  'industry standard',
+  'manufacturer specification',
+  'tile council',
+  'ansi a108',
+  'licensed installer',
   'official',
   'published rates',
   'as of 20',
@@ -215,16 +217,16 @@ const GENERIC_ANCHORS = [
 // ── CTA patterns ────────────────────────────────────────────────────────────
 
 const CTA_PATTERNS = [
-  /book\s*(now|your|a\s+spot|parking|today)/i,
-  /reserve\s*(now|your|a\s+spot|parking|today)/i,
-  /compare\s*prices/i,
-  /check\s*availability/i,
-  /find\s*parking/i,
-  /get\s*(a\s+)?quote/i,
-  /save\s*(on|up\s+to|\$)/i,
-  /search\s*(for\s+)?parking/i,
-  /view\s*(all\s+)?lots/i,
-  /see\s*(current\s+)?rates/i,
+  /get\s*(a\s+)?(free\s+)?quote/i,
+  /get\s*(a\s+)?(free\s+)?estimate/i,
+  /request\s*(a\s+)?(free\s+)?estimate/i,
+  /schedule\s*(a\s+)?(free\s+)?consultation/i,
+  /contact\s*us/i,
+  /call\s*(us\s+)?today/i,
+  /book\s*(a\s+)?(free\s+)?consultation/i,
+  /view\s*(our\s+)?gallery/i,
+  /see\s*(our\s+)?work/i,
+  /start\s*(your\s+)?project/i,
 ]
 
 // ── Scoring Functions ───────────────────────────────────────────────────────
@@ -364,7 +366,7 @@ function scoreContentStructure(input: ScorerInput, root: HTMLElement, fullText: 
   const links = getAllElements(root, 'a')
   const internalLinks = links.filter((a) => {
     const href = a.getAttribute('href') || ''
-    return href.includes('triplypro.com') || href.startsWith('/blog/')
+    return href.includes('aguirremoderntile.com') || href.startsWith('/blog/')
   })
   const intLinkPass = internalLinks.length >= 2
   checks.push({
@@ -378,7 +380,7 @@ function scoreContentStructure(input: ScorerInput, root: HTMLElement, fullText: 
   // 5. External links present (3 pts) — Rank Math + Yoast
   const externalLinks = links.filter((a) => {
     const href = a.getAttribute('href') || ''
-    return href.startsWith('http') && !href.includes('triplypro.com')
+    return href.startsWith('http') && !href.includes('aguirremoderntile.com')
   })
   const extLinkPass = externalLinks.length >= 1
   checks.push({
@@ -433,7 +435,7 @@ function scoreContentStructure(input: ScorerInput, root: HTMLElement, fullText: 
     const text = getTextContent(a).toLowerCase()
     const href = a.getAttribute('href') || ''
     return CTA_PATTERNS.some((p) => p.test(text)) ||
-      href.includes('/search') || href.includes('/checkout') || href.includes('book')
+      href.includes('/contact') || href.includes('/services') || href.includes('/gallery')
   })
   const ctaPoints = (ctaInFirst500 ? 2 : 0) + (ctaInClosing || ctaLinks.length > 0 ? 2 : 0)
   checks.push({
@@ -649,31 +651,31 @@ function scoreContentQuality(input: ScorerInput, root: HTMLElement, fullText: st
   })
 
   // 3. Entity coverage — named entities (4 pts) — Surfer NLP terms
-  // Use airport-specific data if available, otherwise fall back to hardcoded NYC patterns
+  // Use tile service data if available, otherwise fall back to generic tile patterns
   let entityPatterns: RegExp[]
   if (input.serviceType) {
-    const airportData = loadTileServiceData(input.serviceType)
-    if (airportData) {
-      entityPatterns = getEntityPatterns(airportData)
+    const tileData = loadTileServiceData(input.serviceType)
+    if (tileData) {
+      entityPatterns = getEntityPatterns(tileData)
     } else {
-      // Fallback: generic patterns for unknown airports
+      // Fallback: generic tile installation patterns
       entityPatterns = [
-        /terminal\s*\d/i,
-        /terminal\s*[a-f]/i,
-        /(jetblue|delta|american airlines|united|southwest|spirit|frontier)/i,
-        /(van wyck|belt parkway|grand central|lefferts|howard beach|jamaica|queens)/i,
-        /(airtrain|shuttle|jitney)/i,
-        /(port authority|tsa|faa)/i,
+        /(porcelain|ceramic|natural stone|marble|travertine|slate|glass)/i,
+        /(grout|mortar|thinset|substrate|backer board|cement board|kerdi)/i,
+        /(bathroom|shower|kitchen|floor|backsplash|countertop)/i,
+        /(sq\.? ?ft|square feet|linear feet|per foot)/i,
+        /(installer|contractor|licensed|permit|building code)/i,
+        /(waterproof|seal|caulk|expansion joint|membrane)/i,
       ]
     }
   } else {
     entityPatterns = [
-      /terminal\s*\d/i,
-      /terminal\s*[a-f]/i,
-      /(jetblue|delta|american airlines|united|southwest|spirit|frontier)/i,
-      /(van wyck|belt parkway|grand central|lefferts|howard beach|jamaica|queens)/i,
-      /(airtrain|shuttle|jitney)/i,
-      /(port authority|tsa|faa)/i,
+      /(porcelain|ceramic|natural stone|marble|travertine|slate|glass)/i,
+      /(grout|mortar|thinset|substrate|backer board|cement board|kerdi)/i,
+      /(bathroom|shower|kitchen|floor|backsplash|countertop)/i,
+      /(sq\.? ?ft|square feet|linear feet|per foot)/i,
+      /(installer|contractor|licensed|permit|building code)/i,
+      /(waterproof|seal|caulk|expansion joint|membrane)/i,
     ]
   }
   const entityCount = entityPatterns.filter((p) => p.test(fullText)).length
@@ -813,13 +815,13 @@ function scoreStyleAdherence(input: ScorerInput, root: HTMLElement, fullText: st
       })
       const firstP = root.querySelector('p')
       const firstPText = firstP ? getTextContent(firstP).toLowerCase() : ''
-      const hasScenario = /imagine|picture this|you're|you just|after a long|stepping off/i.test(firstPText)
+      const hasScenario = /imagine|picture this|you're|you just|after a long|walking into|looking at|standing in/i.test(firstPText)
       checks.push({
-        name: 'Narrative: traveler scenario opening',
+        name: 'Narrative: homeowner scenario opening',
         passed: hasScenario,
         points: hasScenario ? 2 : 0,
         maxPoints: 2,
-        detail: hasScenario ? 'Opens with traveler scenario' : 'Missing traveler scenario opening',
+        detail: hasScenario ? 'Opens with homeowner scenario' : 'Missing homeowner scenario opening',
       })
       break
     }
@@ -862,6 +864,26 @@ function scoreStyleAdherence(input: ScorerInput, root: HTMLElement, fullText: st
       })
       break
     }
+    case 'how-to': {
+      const stepH2s = h2Texts.filter(t => /^step\s+\d/i.test(t))
+      const stepPass = stepH2s.length >= 3
+      checks.push({
+        name: 'How-to: step-by-step H2s',
+        passed: stepPass,
+        points: stepPass ? 3 : stepH2s.length >= 1 ? 1 : 0,
+        maxPoints: 3,
+        detail: `${stepH2s.length} step headings found (target: 3+)`,
+      })
+      const hasProTip = /pro tip|expert tip|insider tip/i.test(fullText)
+      checks.push({
+        name: 'How-to: Pro Tip callouts',
+        passed: hasProTip,
+        points: hasProTip ? 2 : 0,
+        maxPoints: 2,
+        detail: hasProTip ? 'Contains Pro Tip callout(s)' : 'Missing Pro Tip callouts',
+      })
+      break
+    }
     case 'standard':
     default: {
       // Match the same patterns as the AI search optimization Key Takeaways check:
@@ -901,7 +923,7 @@ function scoreExternalLinkValidation(input: ScorerInput, root: HTMLElement): Cat
   const links = getAllElements(root, 'a')
   const externalLinks = links.filter(a => {
     const href = a.getAttribute('href') || ''
-    return href.startsWith('http') && !href.includes('triplypro.com')
+    return href.startsWith('http') && !href.includes('aguirremoderntile.com')
   })
 
   if (input.serviceType && externalLinks.length > 0) {
@@ -1014,11 +1036,13 @@ export function scoreArticle(input: ScorerInput): SeoScore {
     scoreCtaRelevance(input),
   ]
 
-  const total = categories.reduce((sum, c) => sum + c.points, 0)
+  const rawTotal = categories.reduce((sum, c) => sum + c.points, 0)
   const maxTotal = categories.reduce((sum, c) => sum + c.maxPoints, 0)
+  // Normalize to 0-100 scale so grades are consistent regardless of maxTotal
+  const total = maxTotal > 0 ? Math.round((rawTotal / maxTotal) * 100) : 0
   const grade = gradeFromScore(total)
 
-  return { total, maxTotal, grade, categories }
+  return { total, maxTotal: 100, grade, categories }
 }
 
 // ── Pretty Print ────────────────────────────────────────────────────────────

@@ -148,8 +148,8 @@ export async function scrapeArticle(url: string): Promise<ScrapedArticle | null>
     const ctaPatterns: string[] = []
     article.find('a, button').each((_, el) => {
       const text = $(el).text().trim().toLowerCase()
-      if (/book\s*(now|your|today|parking)/i.test(text)) ctaPatterns.push(text.slice(0, 60))
-      else if (/reserve|compare|check.*availab|find.*parking|get.*quote/i.test(text)) ctaPatterns.push(text.slice(0, 60))
+      if (/get\s*(a\s+)?(free\s+)?(quote|estimate)|schedule.*consultation|contact\s*us/i.test(text)) ctaPatterns.push(text.slice(0, 60))
+      else if (/call.*today|start.*project|view.*gallery|see.*work|book.*consultation/i.test(text)) ctaPatterns.push(text.slice(0, 60))
     })
 
     return { url, title, content, headings, wordCount, linkCount, faqCount, tableCount, listCount, h2Count, schemaTypes, outboundLinks, imageAlts, ctaPatterns: ctaPatterns.slice(0, 5) }

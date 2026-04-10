@@ -1,0 +1,195 @@
+{
+  "serviceType": "general",
+  "displayName": "Tile Installation (All Services)",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Comprehensive tile installation services covering bathrooms, showers, floors, backsplashes, outdoor areas, and specialty applications. Includes demolition, substrate preparation, waterproofing, tile setting, grouting, and sealing across residential and commercial projects.",
+    "avgCostPerSqFt": { "low": 8, "high": 25 },
+    "typicalProjectSize": "30-500 sq ft",
+    "installationTime": "1-10 days depending on scope and complexity",
+    "popularIn": ["bathrooms", "kitchens", "entryways", "mudrooms", "laundry rooms", "patios", "pool surrounds", "fireplaces"]
+  },
+  "materials": [
+    {
+      "name": "Ceramic Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 4,
+      "durability": "Good — suitable for walls and light-traffic floors; wide variety of colors and sizes",
+      "bestFor": ["backsplashes", "bathroom walls", "tub surrounds", "accent walls"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Porcelain Tile",
+      "type": "porcelain",
+      "avgCostPerSqFt": 7,
+      "durability": "Excellent — low water absorption (<0.5%), frost-resistant, scratch-resistant",
+      "bestFor": ["bathroom floors", "kitchen floors", "entryways", "outdoor patios", "shower walls"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Large Format Porcelain (24x48+)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — fewer grout lines, seamless modern appearance",
+      "bestFor": ["shower walls", "feature walls", "open-plan floors", "commercial spaces"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Natural Stone (Marble, Travertine, Slate)",
+      "type": "natural-stone",
+      "avgCostPerSqFt": 16,
+      "durability": "Good with proper sealing — marble is softer and etches; slate and granite are harder-wearing",
+      "bestFor": ["vanity tops", "accent walls", "entryway floors", "fireplace surrounds", "luxury bathrooms"],
+      "maintenanceLevel": "High — requires sealing every 1-2 years"
+    },
+    {
+      "name": "Glass Mosaic",
+      "type": "glass",
+      "avgCostPerSqFt": 22,
+      "durability": "Excellent water resistance; fragile on impact; best for vertical surfaces and accents",
+      "bestFor": ["backsplashes", "shower niches", "accent bands", "pool waterline tile"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Subway Tile (3x6 / 4x8 Ceramic or Porcelain)",
+      "type": "ceramic",
+      "avgCostPerSqFt": 5,
+      "durability": "Good — timeless profile, widely available, easy to replace individual tiles",
+      "bestFor": ["kitchen backsplashes", "tub surrounds", "shower walls", "wainscoting"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Cement / Encaustic Tile",
+      "type": "cement",
+      "avgCostPerSqFt": 14,
+      "durability": "Good — porous, requires sealing; develops patina over time",
+      "bestFor": ["entryway floors", "mudrooms", "kitchen floors", "decorative accents"],
+      "maintenanceLevel": "High — seal before grouting and annually thereafter"
+    },
+    {
+      "name": "Penny Tile / Hex Mosaic",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — mesh-mounted sheets for consistent spacing",
+      "bestFor": ["shower floors", "bathroom floors", "vintage-style renovations"],
+      "maintenanceLevel": "Medium — more grout lines to clean and maintain"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Modified Thin-Set Mortar",
+      "description": "Polymer-modified cement mortar providing superior bond strength and flexibility. The industry standard for most tile installations on cement board, plywood, and concrete substrates.",
+      "bestFor": ["floors", "walls", "showers", "exterior applications"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Mastic (Type 1 Adhesive)",
+      "description": "Pre-mixed organic adhesive with fast grab. Suitable only for dry interior walls — not rated for wet areas or floors subject to movement.",
+      "bestFor": ["kitchen backsplashes", "dry wall tile", "fireplace surrounds"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Mud-Set (Mortar Bed)",
+      "description": "Traditional sand-cement mortar bed floated to precise slope and flatness. Required for shower pans and curbless entries, and preferred when substrate is significantly out of level.",
+      "bestFor": ["shower pans", "curbless showers", "uneven substrates", "historic renovations"],
+      "difficultyLevel": "Expert"
+    },
+    {
+      "name": "Dry-Lay / Test Layout",
+      "description": "Full tile layout without adhesive to plan cuts, verify pattern alignment, and minimize waste before committing. Essential for complex patterns and expensive materials.",
+      "bestFor": ["herringbone patterns", "large rooms", "natural stone with veining", "mosaic designs"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Back-Buttering",
+      "description": "Applying thin-set to both the substrate and the back of each tile to achieve 95%+ coverage. Required for large format tiles, natural stone, and all wet-area installations.",
+      "bestFor": ["large format tile", "natural stone", "shower walls", "exterior tile"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "KERDI / Liquid Membrane Waterproofing",
+      "description": "Sheet membrane (Schluter KERDI) or liquid-applied membrane (RedGard, Hydroban) creates a continuous waterproof envelope behind tile in wet areas.",
+      "bestFor": ["showers", "tub surrounds", "steam rooms", "outdoor installations"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Uncoupling Membrane (DITRA / STRATA_MAT)",
+      "description": "Polyethylene membrane installed between substrate and tile to prevent crack transmission, provide waterproofing, and allow vapor management.",
+      "bestFor": ["over concrete slabs", "radiant heat systems", "crack-prone substrates", "large-format floors"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Tile Leveling System",
+      "description": "Clips and wedges used during installation to ensure lippage-free results. Critical for large format tiles and rectified edges where any unevenness is highly visible.",
+      "bestFor": ["large format tile", "rectified porcelain", "open floor plans"],
+      "difficultyLevel": "Intermediate"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Subway / Running Bond",
+      "description": "Classic offset brick pattern with each row shifted 50%. Timeless and versatile — works in every room from bathrooms to kitchens.",
+      "popularWith": ["backsplashes", "shower walls", "tub surrounds", "wainscoting"]
+    },
+    {
+      "name": "Herringbone",
+      "description": "Rectangular tiles arranged in a V-shaped zigzag at 45 degrees. Adds movement and visual interest; makes narrow spaces feel wider.",
+      "popularWith": ["kitchen backsplashes", "entryway floors", "shower accent walls", "bathroom floors"]
+    },
+    {
+      "name": "Stacked / Straight Lay",
+      "description": "Tiles aligned in a perfect grid with no offset. Clean, contemporary look that requires exceptionally flat substrate and precise tile sizing.",
+      "popularWith": ["large format tiles", "modern bathrooms", "shower walls", "commercial spaces"]
+    },
+    {
+      "name": "Diagonal (45-Degree)",
+      "description": "Square tiles rotated 45 degrees to the wall. Makes small rooms feel larger and disguises walls that are not perfectly square.",
+      "popularWith": ["small bathrooms", "kitchen floors", "entryways", "laundry rooms"]
+    },
+    {
+      "name": "Basketweave",
+      "description": "Pairs of rectangular tiles alternating horizontal and vertical to create a woven appearance. Classic pattern common in traditional and transitional homes.",
+      "popularWith": ["bathroom floors", "entryways", "mudrooms", "traditional kitchens"]
+    },
+    {
+      "name": "Chevron",
+      "description": "Tiles cut at an angle to form a continuous V-shape pointing in one direction. More dynamic than herringbone with a modern edge.",
+      "popularWith": ["feature walls", "modern kitchens", "accent floors"]
+    },
+    {
+      "name": "1/3 Offset (Brick Lay)",
+      "description": "Similar to running bond but with a 33% offset instead of 50%. Reduces lippage risk with large format tiles while maintaining a classic look.",
+      "popularWith": ["large format floor tile", "plank-style porcelain", "hallways"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Freeze-thaw cycles (Nov-Mar) can crack improperly waterproofed or exterior installations — use frost-resistant porcelain rated for outdoor use",
+      "Heated tile floors (radiant heat) are popular due to harsh winters — DITRA-HEAT and Nuheat systems common in renovations",
+      "High humidity fluctuations between summer and winter require flexible thin-set and proper expansion joints",
+      "Salt and sand tracked in during winter months make durable, low-maintenance floor tile essential for entryways",
+      "Older Boston-area homes (pre-1950) often have uneven subfloors requiring leveling compounds or mud-set installations"
+    ],
+    "popularStyles": [
+      "Classic subway tile in brownstone and triple-decker renovations",
+      "Large format porcelain in modern condo builds (Seaport, Assembly Row)",
+      "Handmade zellige and artisan tile in Cambridge/Somerville remodels",
+      "Marble accents in luxury Back Bay and Beacon Hill bathrooms",
+      "Wood-look porcelain plank tile for open-plan living areas",
+      "Encaustic cement tile in Victorian-era home restorations"
+    ],
+    "avgLaborRate": { "low": 8, "high": 18 }
+  },
+  "brands": [
+    { "name": "Daltile", "specialty": "Full-range porcelain, ceramic, and natural stone; largest US tile manufacturer", "priceRange": "Mid-range" },
+    { "name": "MSI (MS International)", "specialty": "Natural stone, porcelain slabs, quartz; extensive large-format options", "priceRange": "Mid to Premium" },
+    { "name": "Schluter Systems", "specialty": "DITRA uncoupling, KERDI waterproofing, DITRA-HEAT radiant floors, profiles and trim", "priceRange": "Premium" },
+    { "name": "Marazzi", "specialty": "Italian-designed porcelain and ceramic; wood-look and stone-look collections", "priceRange": "Mid-range" },
+    { "name": "American Olean", "specialty": "Ceramic, porcelain, glass mosaics; wide retail availability", "priceRange": "Budget to Mid-range" },
+    { "name": "Crossville", "specialty": "US-manufactured porcelain; commercial-grade and gauged porcelain panels", "priceRange": "Mid to Premium" },
+    { "name": "Mapei", "specialty": "Thin-set mortars, grout, waterproofing, leveling compounds — industry-leading setting materials", "priceRange": "Professional" },
+    { "name": "Laticrete", "specialty": "Thin-set, grout, STRATA_MAT uncoupling membrane, Hydro Ban waterproofing", "priceRange": "Professional" },
+    { "name": "Custom Building Products", "specialty": "RedGard waterproofing, Prism grout, Versabond thin-set; widely available at big-box stores", "priceRange": "Standard" }
+  ]
+}

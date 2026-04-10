@@ -477,9 +477,9 @@ export async function writeArticle(
 
   // Multi-block system prompt for caching:
   // Block 1: Role (tiny, always cached)
-  // Block 2: Writing rules (static per airport, cached across articles in cluster)
-  // Block 3: Airport data (static per airport, cached across articles)
-  // Block 4: External links (static per airport+type, cached across articles)
+  // Block 2: Writing rules (static, cached across articles in cluster)
+  // Block 3: Tile service data (static per service type, cached across articles)
+  // Block 4: External links (static per service+type, cached across articles)
   const systemBlocks: Anthropic.MessageCreateParams['system'] = [
     {
       type: 'text' as const,
@@ -511,7 +511,7 @@ export async function editArticle(
 ): Promise<EditResult> {
   console.log(failedChecks ? '  Step 3b/3: Re-editing with failed checks...' : '  Step 3/3: Editing & QA...')
   setCurrentStep(failedChecks ? 'revision' : 'edit')
-  const prompt = buildEditPrompt(html, keyword, articleType, articleStyle as 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | undefined, publishedPosts, failedChecks, analysis)
+  const prompt = buildEditPrompt(html, keyword, articleType, articleStyle as 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | undefined, publishedPosts, failedChecks, analysis)
   const systemBlocks: Anthropic.MessageCreateParams['system'] = [
     {
       type: 'text' as const,
@@ -593,7 +593,7 @@ export async function generateArticle(
   }
 
   // Step 3: Score the raw write output BEFORE editing
-  const targetWords = item.targetWords || (item.articleType === 'hub' ? 2500 : item.articleType === 'sub-pillar' ? 1500 : 1000)
+  const targetWords = item.targetWords || (item.articleType === 'hub' ? 2500 : item.articleType === 'pillar' ? 1500 : 1000)
   const scorerBase = {
     keyword: item.keyword,
     slug: item.slug,
@@ -601,7 +601,7 @@ export async function generateArticle(
     metaDescription: writeResult.metaDescription,
     excerpt: writeResult.excerpt,
     faqItems: writeResult.faqItems,
-    articleType: item.articleType as 'hub' | 'sub-pillar' | 'spoke',
+    articleType: item.articleType as 'hub' | 'pillar' | 'spoke',
     articleStyle: item.articleStyle,
     targetWords,
     hasImage: false,

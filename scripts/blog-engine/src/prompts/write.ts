@@ -36,7 +36,7 @@ function getArticleTypeInstructions(item: QueueItem): string {
 - Example: "Complete Guide to Bathroom Tile Installation in Boston"
 - Target length: ${item.targetWords ? `${item.targetWords}-${item.targetWords + 500} words` : '3000-3500 words'}`
 
-    case 'sub-pillar':
+    case 'pillar':
       return `This is a SUB-PILLAR (pillar) article — a detailed guide on a specific aspect of tile installation.
 - Start the introduction with a link back to the hub: <a href="${BLOG_BASE_URL}/${item.hubSlug}">${item.keyword} Complete Guide</a>
 - Go deep on this specific topic — more detail than the hub provides

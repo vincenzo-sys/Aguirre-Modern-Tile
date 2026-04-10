@@ -83,7 +83,14 @@ function renderBlockNode(node: LexicalNode): string {
     }
 
     case 'listitem': {
-      const inner = children.map(renderInlineNode).join('')
+      // List items can contain both inline nodes (text, links) and block nodes (nested lists).
+      // Use renderBlockNode for block children and renderInlineNode for inline children.
+      const inner = children.map(child => {
+        if (child.type === 'list' || child.type === 'paragraph') {
+          return renderBlockNode(child)
+        }
+        return renderInlineNode(child)
+      }).join('')
       return `<li>${inner}</li>`
     }
 
@@ -107,12 +114,16 @@ function renderBlockNode(node: LexicalNode): string {
     }
 
     case 'tablecell': {
-      const cellNode = node as { headerState?: number }
+      const cellNode = node as { headerState?: number; colSpan?: number; rowSpan?: number }
       const tag = cellNode.headerState === 1 ? 'th' : 'td'
+      const attrs: string[] = []
+      if (cellNode.colSpan && cellNode.colSpan > 1) attrs.push(`colspan="${cellNode.colSpan}"`)
+      if (cellNode.rowSpan && cellNode.rowSpan > 1) attrs.push(`rowspan="${cellNode.rowSpan}"`)
+      const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : ''
       const inner = children.map(renderBlockNode).join('')
       // Strip wrapping <p> tags inside cells for cleaner HTML
       const cleaned = inner.replace(/^<p>(.*)<\/p>$/s, '$1')
-      return `<${tag}>${cleaned}</${tag}>`
+      return `<${tag}${attrStr}>${cleaned}</${tag}>`
     }
 
     case 'upload': {

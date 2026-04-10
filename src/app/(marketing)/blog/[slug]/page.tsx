@@ -383,11 +383,11 @@ export default async function BlogDetailPage({ params }: Props) {
         <div className="container-custom">
           <div className="max-w-3xl mx-auto">
             {post.isRichText && post.content ? (
-              <div className="prose prose-lg prose-gray max-w-none prose-headings:text-gray-900 prose-a:text-primary-600">
+              <div className="text-lg">
                 <RichText data={post.content} />
               </div>
             ) : post.plainContent ? (
-              <div className="prose prose-lg prose-gray max-w-none prose-headings:text-gray-900 whitespace-pre-line">
+              <div className="text-lg text-gray-700 leading-relaxed whitespace-pre-line">
                 {post.plainContent}
               </div>
             ) : null}

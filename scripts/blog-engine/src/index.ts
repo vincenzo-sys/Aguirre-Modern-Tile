@@ -256,7 +256,7 @@ const program = new Command()
 program
   .command('generate')
   .description('Generate blog articles from the content queue')
-  .option('-t, --type <type>', 'Article type filter: hub, sub-pillar, spoke')
+  .option('-t, --type <type>', 'Article type filter: hub, pillar, spoke')
   .option('-s, --service <type>', 'Service type filter (e.g., bathroom, shower, floor)')
   .option('-n, --limit <number>', 'Max articles to generate', '1')
   .option('--dry-run', 'Preview what would be generated without creating posts')
@@ -475,8 +475,8 @@ program
               metaDescription: result.metaDescription,
               excerpt: result.excerpt,
               faqItems: result.faqItems,
-              articleType: item.articleType as 'hub' | 'sub-pillar' | 'spoke',
-              targetWords: item.targetWords || (item.articleType === 'hub' ? 2500 : item.articleType === 'sub-pillar' ? 1500 : 1000),
+              articleType: item.articleType as 'hub' | 'pillar' | 'spoke',
+              targetWords: item.targetWords || (item.articleType === 'hub' ? 2500 : item.articleType === 'pillar' ? 1500 : 1000),
               hasImage: report.image.found,
               imageAlt: report.image.alt,
               serviceType: item.serviceType,
@@ -796,7 +796,7 @@ program
         // Determine target words based on article type
         const articleType = post.articleType || 'spoke'
         const targetWords = queueItem?.targetWords
-          || (articleType === 'hub' ? 2500 : articleType === 'sub-pillar' ? 1500 : 1000)
+          || (articleType === 'hub' ? 2500 : articleType === 'pillar' ? 1500 : 1000)
 
         // Check for featured image
         const hasImage = !!post.featuredImage
@@ -810,7 +810,7 @@ program
           metaDescription: post.seo?.metaDescription || post.excerpt || '',
           excerpt: post.excerpt || '',
           faqItems: post.faqItems || [],
-          articleType: articleType as 'hub' | 'sub-pillar' | 'spoke',
+          articleType: articleType as 'hub' | 'pillar' | 'spoke',
           targetWords,
           hasImage,
           imageAlt,

@@ -45,7 +45,7 @@ export async function downloadPhoto(photo: UnsplashPhoto): Promise<{
 
     const buffer = Buffer.from(await res.arrayBuffer())
     const filename = `${photo.id}.jpg`
-    const alt = `${photo.alt_description || 'Airport parking'} — Photo by ${photo.user.name} on Unsplash`
+    const alt = `${photo.alt_description || 'Tile installation'} — Photo by ${photo.user.name} on Unsplash`
 
     // Trigger Unsplash download endpoint (required by API guidelines)
     if (env.UNSPLASH_ACCESS_KEY) {

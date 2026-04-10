@@ -1,0 +1,161 @@
+{
+  "serviceType": "shower",
+  "displayName": "Shower Tile Installation",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Custom shower tile installation including waterproofing, mortar bed, wall and floor tile, niches, benches, and curbless entries. Covers walk-in showers, tub surrounds, and steam showers.",
+    "avgCostPerSqFt": { "low": 15, "high": 40 },
+    "typicalProjectSize": "40-120 sq ft",
+    "installationTime": "4-8 days depending on complexity",
+    "popularIn": ["walk-in showers", "tub surrounds", "master bath showers", "steam showers", "curbless showers"]
+  },
+  "materials": [
+    {
+      "name": "Large Format Porcelain (12x24, 24x48)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 8,
+      "durability": "Excellent — less than 0.5% water absorption, impervious per ASTM standards",
+      "bestFor": ["shower walls", "feature walls", "modern walk-in showers"],
+      "maintenanceLevel": "Low — fewer grout lines to maintain"
+    },
+    {
+      "name": "Ceramic Subway Tile (3x6, 4x12)",
+      "type": "ceramic",
+      "avgCostPerSqFt": 4,
+      "durability": "Good — suitable for shower walls with proper waterproofing behind",
+      "bestFor": ["tub surrounds", "shower walls", "classic bathroom styles"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Marble (Carrara, Calacatta, Statuario)",
+      "type": "natural-stone",
+      "avgCostPerSqFt": 18,
+      "durability": "Good with sealing — porous, susceptible to etching from acidic products",
+      "bestFor": ["luxury showers", "accent walls", "shower benches"],
+      "maintenanceLevel": "High — requires sealing before grouting and annually thereafter"
+    },
+    {
+      "name": "Marble-Look Porcelain",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — marble aesthetic with porcelain water resistance",
+      "bestFor": ["full shower enclosures", "shower walls", "homeowners wanting marble look without maintenance"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Glass Mosaic (1x1, 2x2 sheets)",
+      "type": "glass",
+      "avgCostPerSqFt": 22,
+      "durability": "Excellent water resistance — near-zero absorption, fragile on impact",
+      "bestFor": ["shower niches", "accent bands", "shower floor borders"],
+      "maintenanceLevel": "Low — use unsanded grout and white thin-set only"
+    },
+    {
+      "name": "Penny Tile / Hex Mosaic (porcelain)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — mesh-mounted sheets for curved surfaces",
+      "bestFor": ["shower floors", "curbless shower pans", "wet-area floors"],
+      "maintenanceLevel": "Medium — many grout joints require more maintenance"
+    },
+    {
+      "name": "Zellige / Handmade-Look Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 20,
+      "durability": "Good — glaze variations are intentional, adds character",
+      "bestFor": ["shower accent walls", "niches", "design-forward bathrooms"],
+      "maintenanceLevel": "Medium"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Schluter KERDI Waterproofing System",
+      "description": "Pliable polyethylene membrane bonded to substrate with thin-set. Industry standard for custom showers. Requires 2-inch overlaps at seams. Integrates with KERDI-DRAIN, KERDI-BOARD, and KERDI-BAND.",
+      "bestFor": ["custom showers", "tub surrounds", "steam showers"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Wedi Board System",
+      "description": "Foam-core, glass-fiber-reinforced panels that are inherently waterproof. No separate membrane needed. Excellent for shower walls, niches, and benches.",
+      "bestFor": ["shower walls", "custom niches", "bench construction"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Laticrete Hydro Ban Liquid Membrane",
+      "description": "Thin liquid-applied waterproofing membrane that cures to a flexible, crack-bridging layer. Ideal for complex geometries where sheet membranes are difficult to apply.",
+      "bestFor": ["shower floors", "curbs", "complex geometries"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Mortar Bed Shower Pan",
+      "description": "Traditional mud-set shower floor with 1/4 inch per foot slope toward drain. Provides custom slope and shape. Used with KERDI-DRAIN or PVC liner system.",
+      "bestFor": ["custom shower floors", "curbless entries", "non-standard drain locations"],
+      "difficultyLevel": "Expert"
+    },
+    {
+      "name": "Curbless / Zero-Entry Shower Build",
+      "description": "Linear drain with continuous slope from bathroom floor into shower. Requires precise leveling, linear drain system, and waterproofing across the transition. ADA-compliant.",
+      "bestFor": ["accessible bathrooms", "modern open showers", "aging-in-place renovations"],
+      "difficultyLevel": "Expert"
+    },
+    {
+      "name": "Niche and Bench Construction",
+      "description": "Recessed niches and bench seats built with waterproof foam board (KERDI-BOARD or Wedi). Must slope niche sill outward to drain water. Pre-formed niche kits available.",
+      "bestFor": ["storage niches", "shaving ledges", "shower benches", "corner seats"],
+      "difficultyLevel": "Professional"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Subway / Running Bond",
+      "description": "Classic offset brick pattern. Timeless, works in any shower from traditional to modern. 3x6, 4x8, or 4x12 formats.",
+      "popularWith": ["tub surrounds", "shower walls", "wainscoting"]
+    },
+    {
+      "name": "Stacked / Straight Lay",
+      "description": "Tiles aligned in a perfect grid with aligned joints. Clean modern look, requires perfectly flat substrate.",
+      "popularWith": ["large format tiles", "modern showers", "minimalist design"]
+    },
+    {
+      "name": "Herringbone",
+      "description": "V-shaped zigzag pattern. Adds visual interest and movement. Uses more material (10-15% waste factor).",
+      "popularWith": ["accent walls", "shower floors", "niche interiors"]
+    },
+    {
+      "name": "Vertical Stack",
+      "description": "Subway tiles laid vertically instead of horizontally. Creates height illusion, modern aesthetic.",
+      "popularWith": ["walk-in showers", "small bathrooms", "contemporary design"]
+    },
+    {
+      "name": "Chevron",
+      "description": "Arrow-shaped tiles that form a V pattern. More complex than herringbone, requires mitered tile cuts.",
+      "popularWith": ["accent walls", "feature areas", "high-end showers"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Freeze-thaw cycles in exterior walls can stress shower waterproofing at exterior-facing showers",
+      "Cold winters drive demand for heated shower floors (Schluter DITRA-HEAT)",
+      "Humidity swings between seasons stress grout joints — flexible grout recommended at change-of-plane",
+      "Older Boston homes often have non-standard framing requiring custom waterproofing solutions"
+    ],
+    "popularStyles": [
+      "Full slab-look porcelain in modern Seaport and South End condos",
+      "Classic white subway tile in brownstone renovations",
+      "Zellige and artisan tiles in Cambridge and Somerville homes",
+      "Marble and marble-look porcelain in luxury Back Bay and Beacon Hill bathrooms",
+      "Curbless walk-in showers for aging-in-place renovations"
+    ],
+    "avgLaborRate": { "low": 10, "high": 22 }
+  },
+  "brands": [
+    { "name": "Schluter Systems", "specialty": "KERDI waterproofing, DITRA-HEAT, shower kits, drains", "priceRange": "Premium" },
+    { "name": "Wedi", "specialty": "Waterproof foam board panels, shower systems, niches", "priceRange": "Premium" },
+    { "name": "Daltile", "specialty": "Full range porcelain, ceramic, mosaics", "priceRange": "Mid-range" },
+    { "name": "MSI (MS International)", "specialty": "Marble-look porcelain, natural stone, quartz", "priceRange": "Mid to Premium" },
+    { "name": "Laticrete", "specialty": "Hydro Ban waterproofing, thin-set, grout", "priceRange": "Professional" },
+    { "name": "Mapei", "specialty": "Kerabond thin-set, Keracolor grout, waterproofing", "priceRange": "Professional" },
+    { "name": "Bedrosians", "specialty": "Design-forward tile, zellige, handmade looks", "priceRange": "Mid to Premium" }
+  ]
+}

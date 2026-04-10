@@ -1,0 +1,159 @@
+{
+  "serviceType": "floor",
+  "displayName": "Floor Tile Installation",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Floor tile installation for kitchens, bathrooms, entryways, mudrooms, and living areas. Includes subfloor preparation, leveling, uncoupling membranes, tile setting, and grouting.",
+    "avgCostPerSqFt": { "low": 10, "high": 30 },
+    "typicalProjectSize": "80-500 sq ft",
+    "installationTime": "2-7 days depending on area and prep work",
+    "popularIn": ["kitchens", "bathrooms", "entryways", "mudrooms", "basements", "laundry rooms"]
+  },
+  "materials": [
+    {
+      "name": "Porcelain Floor Tile (12x12, 12x24)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 6,
+      "durability": "Excellent — impervious to water, scratch-resistant, high PEI rating for foot traffic",
+      "bestFor": ["kitchen floors", "bathroom floors", "high-traffic entryways"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Wood-Look Porcelain Plank (6x36, 8x48)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 8,
+      "durability": "Excellent — hardwood aesthetic with porcelain durability and water resistance",
+      "bestFor": ["living rooms", "kitchens", "open-plan floors", "basements"],
+      "maintenanceLevel": "Low — requires polymer-modified thin-set and back-buttering"
+    },
+    {
+      "name": "Ceramic Floor Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 3,
+      "durability": "Good — suitable for light to moderate traffic areas",
+      "bestFor": ["laundry rooms", "guest bathrooms", "low-traffic areas"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Large Format Porcelain (24x24, 24x48)",
+      "type": "porcelain",
+      "avgCostPerSqFt": 10,
+      "durability": "Excellent — seamless modern look with minimal grout lines",
+      "bestFor": ["open-plan living", "modern kitchens", "commercial-look residential"],
+      "maintenanceLevel": "Low — requires precise leveling and tile leveling clips"
+    },
+    {
+      "name": "Natural Stone (Slate, Travertine, Limestone)",
+      "type": "natural-stone",
+      "avgCostPerSqFt": 14,
+      "durability": "Good with sealing — varies by stone type, slate is most durable",
+      "bestFor": ["entryways", "mudrooms", "rustic kitchens", "luxury homes"],
+      "maintenanceLevel": "High — requires sealing and periodic re-sealing"
+    },
+    {
+      "name": "Cement / Encaustic Tile",
+      "type": "cement",
+      "avgCostPerSqFt": 16,
+      "durability": "Good — develops patina over time, adds character",
+      "bestFor": ["entryways", "mudrooms", "accent areas", "Mediterranean-style homes"],
+      "maintenanceLevel": "High — requires penetrating sealer before and after grouting"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Schluter DITRA Uncoupling Membrane",
+      "description": "Polyethylene mat with square cavities that isolates tile from subfloor movement. Prevents cracked tile over wood subfloors. Also provides waterproofing and vapor management. 1/8 inch thick.",
+      "bestFor": ["wood subfloors", "plywood over joists", "heated floors", "basements"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Self-Leveling Compound",
+      "description": "Pourable cementitious compound that flows to create a flat, level surface. Used over concrete slabs with high/low spots, old adhesive residue, or minor imperfections. Adds $2-5 per square foot.",
+      "bestFor": ["uneven concrete slabs", "old homes", "basement floors"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Cement Board Underlayment",
+      "description": "HardieBacker or USG Durock cement board over plywood subfloor. Combined subfloor + underlayment must be minimum 1-1/8 inches thick per TCNA guidelines. Seams taped and thin-set.",
+      "bestFor": ["bathroom floors", "kitchen floors", "wet areas over wood subfloors"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "DITRA-HEAT Radiant Floor System",
+      "description": "Electric heating cables set into Schluter DITRA-HEAT mat. Provides warm tile floors in cold climates. Programmable thermostat controls. Adds approximately $10-15 per square foot.",
+      "bestFor": ["bathroom floors", "kitchen floors", "cold-climate homes", "basement conversions"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Tile Leveling System (Spin Doctors, Raimondi)",
+      "description": "Wedge-and-clip systems that hold tile edges flush during thin-set cure. Essential for large-format tiles to prevent lippage. Clips are single-use, wedges reusable.",
+      "bestFor": ["large format tiles", "rectified tile", "open floor plans where lippage is visible"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Crack Isolation Membrane",
+      "description": "Fabric or liquid membrane applied over concrete cracks before tiling. Prevents existing slab cracks from telegraphing through to tile. DITRA also serves this function.",
+      "bestFor": ["cracked concrete slabs", "control joints", "existing crack repair"],
+      "difficultyLevel": "Intermediate"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "1/3 Offset (Running Bond)",
+      "description": "Each row offset by one-third the tile length. Most popular floor pattern. Natural, balanced look that hides subfloor imperfections.",
+      "popularWith": ["wood-look planks", "12x24 porcelain", "kitchen floors"]
+    },
+    {
+      "name": "Straight Lay (Grid)",
+      "description": "Tiles aligned in a square grid. Clean, modern, simple. Requires very flat substrate — shows imperfections more than offset.",
+      "popularWith": ["large format tiles", "modern spaces", "commercial-look residential"]
+    },
+    {
+      "name": "Herringbone",
+      "description": "V-shaped zigzag pattern. Adds visual interest and movement. Popular with wood-look planks. Increases material waste by 15-20%.",
+      "popularWith": ["entryways", "mudrooms", "wood-look plank tile"]
+    },
+    {
+      "name": "Diagonal (45-degree)",
+      "description": "Square tiles rotated 45 degrees. Makes rooms feel larger. More cuts at walls, increases waste by 10-15%.",
+      "popularWith": ["small rooms", "foyers", "traditional homes"]
+    },
+    {
+      "name": "Basketweave",
+      "description": "Pairs of rectangular tiles alternating horizontal and vertical. Classic, historic look. Works best with smaller format tiles.",
+      "popularWith": ["entryways", "bathroom floors", "traditional New England homes"]
+    },
+    {
+      "name": "Versailles / French Pattern",
+      "description": "Random-looking pattern using 4 tile sizes in a repeating set. Elegant, European aesthetic. Requires careful layout planning.",
+      "popularWith": ["travertine floors", "luxury entryways", "formal dining rooms"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Radiant heated floors highly popular due to cold winters (October-April)",
+      "Freeze-thaw cycles affect unheated mudrooms and entryways — porcelain rated for freeze-thaw required",
+      "Older Boston homes often have uneven wood subfloors requiring extensive leveling",
+      "Basement moisture common — vapor management (DITRA) essential for below-grade tile",
+      "Salt and sand tracked in during winter — durable, textured tile preferred for entryways"
+    ],
+    "popularStyles": [
+      "Wood-look porcelain plank throughout open-concept renovations",
+      "Large format porcelain in modern Seaport and South End condos",
+      "Encaustic cement tile in Cambridge and Somerville brownstone entryways",
+      "Heated porcelain floors in master bathroom renovations",
+      "Slate and natural stone in Lexington and Wellesley colonial homes"
+    ],
+    "avgLaborRate": { "low": 7, "high": 18 }
+  },
+  "brands": [
+    { "name": "Schluter Systems", "specialty": "DITRA uncoupling, DITRA-HEAT, leveling profiles", "priceRange": "Premium" },
+    { "name": "Daltile", "specialty": "Porcelain, ceramic, wood-look planks, natural stone", "priceRange": "Mid-range" },
+    { "name": "MSI (MS International)", "specialty": "Wood-look porcelain, natural stone, large format", "priceRange": "Mid to Premium" },
+    { "name": "Marazzi", "specialty": "Wood-look porcelain, ColorBody technology", "priceRange": "Mid-range" },
+    { "name": "Mapei", "specialty": "Self-leveling compounds, thin-set, grout", "priceRange": "Professional" },
+    { "name": "Laticrete", "specialty": "STRATA_MAT uncoupling, thin-set, grout", "priceRange": "Professional" },
+    { "name": "Custom Building Products", "specialty": "LevelQuik self-leveler, RedGard, thin-set, grout", "priceRange": "Standard" }
+  ]
+}

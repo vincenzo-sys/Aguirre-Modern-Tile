@@ -1,0 +1,120 @@
+{
+  "serviceType": "reglazing",
+  "displayName": "Tile & Bathtub Reglazing",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Professional reglazing and refinishing of bathroom tile, bathtubs, and showers. Includes surface preparation, repair, priming, epoxy or urethane coating, and curing. A cost-effective alternative to full tile replacement.",
+    "avgCostPerSqFt": { "low": 4, "high": 12 },
+    "typicalProjectSize": "30-100 sq ft (or per-fixture pricing)",
+    "installationTime": "1-2 days application + 24-48 hours cure time",
+    "popularIn": ["bathtub reglazing", "shower tile refinishing", "bathroom tile color change", "rental property updates", "vintage tub restoration"]
+  },
+  "materials": [
+    {
+      "name": "Professional Epoxy Coating",
+      "type": "coating",
+      "avgCostPerSqFt": 8,
+      "durability": "Good — lasts 10-15 years with proper care, resistant to water and mild chemicals",
+      "bestFor": ["bathtubs", "tile walls", "sinks"],
+      "maintenanceLevel": "Low — avoid abrasive cleaners, use non-slip mats in tubs"
+    },
+    {
+      "name": "Urethane Topcoat System",
+      "type": "coating",
+      "avgCostPerSqFt": 10,
+      "durability": "Very Good — harder finish than epoxy, better scratch resistance",
+      "bestFor": ["high-use tubs", "shower floors", "commercial applications"],
+      "maintenanceLevel": "Low — more durable than epoxy, same care requirements"
+    },
+    {
+      "name": "Acid-Etch Primer",
+      "type": "primer",
+      "avgCostPerSqFt": 1,
+      "durability": "N/A — preparation step that ensures coating adhesion",
+      "bestFor": ["porcelain surfaces", "ceramic tile", "fiberglass"],
+      "maintenanceLevel": "N/A"
+    },
+    {
+      "name": "Fiberglass Repair Compound",
+      "type": "repair",
+      "avgCostPerSqFt": 3,
+      "durability": "Good — fills chips, cracks, and surface damage before coating",
+      "bestFor": ["chipped tubs", "cracked tile", "surface damage repair"],
+      "maintenanceLevel": "N/A — covered by topcoat"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Professional Spray-On Reglazing",
+      "description": "Full surface preparation (acid etch, sand, prime) followed by HVLP spray application of 3-4 coats of epoxy or urethane. Professional equipment ensures even coverage and smooth finish. Cures in 24-48 hours.",
+      "bestFor": ["bathtubs", "tile walls", "full bathroom refinishing"],
+      "difficultyLevel": "Professional only — requires ventilation and specialized equipment"
+    },
+    {
+      "name": "Bathtub-Only Reglazing",
+      "description": "Standard bathtub refinishing. Strip old finish, repair chips/cracks with fiberglass compound, acid-etch surface, apply bonding agent and 3-4 topcoats. Takes ~4 hours application. Costs $350-$600 for standard tub, $400-$1,400 for clawfoot.",
+      "bestFor": ["stained tubs", "chipped tubs", "color changes", "vintage tub restoration"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Tub + Surround Reglazing",
+      "description": "Combined bathtub and surrounding tile wall refinishing. Both surfaces prepped, primed, and coated to match. Costs $800-$1,200 for tub and tile surround together.",
+      "bestFor": ["full bathroom refresh", "dated tile color", "rental turnovers"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Tile-Only Refinishing",
+      "description": "Reglaze wall or floor tile without replacing. Works on ceramic, porcelain, and some natural stone. Changes color and seals surface. Costs $4-$12 per square foot.",
+      "bestFor": ["dated tile color", "cosmetic refresh", "budget-friendly updates"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Grout Line Refinishing",
+      "description": "Clean, repair, and seal grout lines as part of tile reglazing. Grout can be color-matched to new tile coating or contrasted for design effect.",
+      "bestFor": ["stained grout", "mismatched grout", "complete bathroom refresh"],
+      "difficultyLevel": "Professional"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Solid Color Refresh",
+      "description": "Single uniform color across all reglazed surfaces. White is most popular (90% of reglazing jobs), followed by almond, bisque, and gray.",
+      "popularWith": ["bathtubs", "tile surrounds", "rental properties"]
+    },
+    {
+      "name": "Two-Tone (Tub + Tile Contrast)",
+      "description": "Different but coordinating colors for tub and tile surround. Creates visual interest without full renovation.",
+      "popularWith": ["design-conscious homeowners", "bathroom updates"]
+    },
+    {
+      "name": "Vintage Restoration",
+      "description": "Match original period colors for clawfoot tubs and vintage tile. Custom color matching available from most professional services.",
+      "popularWith": ["historic home preservation", "clawfoot tub restoration", "period-correct bathrooms"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Ventilation requirements during reglazing — coatings require well-ventilated space during cure",
+      "Winter reglazing may require supplemental heating for proper epoxy cure (minimum 70°F)",
+      "Humidity affects cure time — summer reglazing may need dehumidifier during curing",
+      "Boston-area rental market drives demand for quick-turnaround bathroom refreshes"
+    ],
+    "popularStyles": [
+      "White reglazing of vintage clawfoot tubs in Cambridge and Somerville triple-deckers",
+      "Tile wall refinishing in Beacon Hill and Back Bay pre-war apartment buildings",
+      "Budget bathroom refresh for Boston-area rental property turnovers",
+      "Vintage hex floor restoration with color-matched reglazing",
+      "Tub and surround packages for condo bathroom updates"
+    ],
+    "avgLaborRate": { "low": 350, "high": 1200 }
+  },
+  "brands": [
+    { "name": "Bay State Refinishing", "specialty": "Full-service Boston-area bathtub and tile reglazing", "priceRange": "Standard" },
+    { "name": "NuFinishPro", "specialty": "Bathtub, tile, and countertop refinishing — Boston and suburbs", "priceRange": "Standard" },
+    { "name": "Preferred Reglazing", "specialty": "Fiberglass and porcelain tub reglazing — Massachusetts", "priceRange": "Standard" },
+    { "name": "Rust-Oleum (Tub & Tile)", "specialty": "DIY epoxy refinishing kits — not recommended for professional results", "priceRange": "Budget" },
+    { "name": "Topkote", "specialty": "Professional-grade refinishing coatings for contractors", "priceRange": "Professional" },
+    { "name": "ArmoGlaze", "specialty": "Odorless epoxy tub and tile refinishing system", "priceRange": "Professional" }
+  ]
+}

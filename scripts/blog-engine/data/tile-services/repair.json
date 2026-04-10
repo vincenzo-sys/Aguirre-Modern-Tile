@@ -1,0 +1,151 @@
+{
+  "serviceType": "repair",
+  "displayName": "Tile Repair",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Tile and grout repair including cracked tile replacement, regrouting, grout sealing, loose tile reattachment, and water damage remediation. Covers floors, walls, showers, and countertops.",
+    "avgCostPerSqFt": { "low": 10, "high": 50 },
+    "typicalProjectSize": "1-80 sq ft",
+    "installationTime": "1-3 days depending on scope",
+    "popularIn": ["bathroom tile repair", "shower regrouting", "kitchen floor repair", "cracked tile replacement", "grout restoration"]
+  },
+  "materials": [
+    {
+      "name": "Replacement Ceramic Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 4,
+      "durability": "Good — must match existing tile color, size, and thickness",
+      "bestFor": ["cracked wall tile", "chipped floor tile", "damaged backsplash tiles"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Replacement Porcelain Tile",
+      "type": "porcelain",
+      "avgCostPerSqFt": 7,
+      "durability": "Excellent — harder to cut than ceramic, requires diamond blade",
+      "bestFor": ["cracked floor tile", "damaged shower tile", "high-traffic areas"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Sanded Grout (for joints 1/8 inch and wider)",
+      "type": "grout",
+      "avgCostPerSqFt": 2,
+      "durability": "Good — sand filler prevents cracking in wider joints",
+      "bestFor": ["floor tile regrouting", "wide-joint repairs", "outdoor tile"],
+      "maintenanceLevel": "Medium — seal after curing"
+    },
+    {
+      "name": "Unsanded Grout (for joints under 1/8 inch)",
+      "type": "grout",
+      "avgCostPerSqFt": 2,
+      "durability": "Good — smooth finish for narrow joints",
+      "bestFor": ["wall tile regrouting", "glass tile", "polished stone"],
+      "maintenanceLevel": "Medium — seal after curing"
+    },
+    {
+      "name": "Epoxy Grout (Spectralock, Kerapoxy)",
+      "type": "grout",
+      "avgCostPerSqFt": 5,
+      "durability": "Excellent — stain-proof, waterproof, chemical-resistant, no sealing needed",
+      "bestFor": ["shower floors", "kitchen counters", "high-moisture areas", "permanent repairs"],
+      "maintenanceLevel": "Very Low — never needs sealing"
+    },
+    {
+      "name": "Grout Sealer (penetrating)",
+      "type": "sealer",
+      "avgCostPerSqFt": 1.5,
+      "durability": "Protects grout from stains and moisture for 1-3 years",
+      "bestFor": ["all cement-based grout", "bathroom floors", "kitchen floors"],
+      "maintenanceLevel": "Reapply every 1-3 years"
+    },
+    {
+      "name": "Tile Repair Adhesive / Thin-Set",
+      "type": "adhesive",
+      "avgCostPerSqFt": 1,
+      "durability": "Good — modified thin-set for reattaching loose tiles",
+      "bestFor": ["loose tiles", "tenting tiles", "reattachment"],
+      "maintenanceLevel": "Low"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Single Tile Replacement",
+      "description": "Remove cracked tile with oscillating tool and chisel without damaging surrounding tiles. Clean adhesive bed, apply fresh thin-set, set matching tile, regrout. Most contractors charge $130-$500 minimum for single tile work.",
+      "bestFor": ["cracked tiles", "chipped tiles", "individual damaged tiles"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Full Regrouting",
+      "description": "Remove old grout with oscillating tool or grout saw to depth of at least 2/3 the tile thickness. Clean joints, apply new grout, seal after curing. Costs $5-$24 per square foot depending on location and tile size.",
+      "bestFor": ["stained grout", "crumbling grout", "mold in grout lines", "color change"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Grout Color Seal (Topical)",
+      "description": "Apply pigmented sealer over existing grout to change color and seal in one step. Faster and cheaper than full regrouting. Lasts 3-7 years.",
+      "bestFor": ["cosmetic grout refresh", "stained grout", "color matching"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Loose Tile Reattachment",
+      "description": "Lift loose tiles, scrape old adhesive, apply fresh thin-set, and reset. Often indicates underlying moisture or substrate failure that must be addressed.",
+      "bestFor": ["tenting floor tiles", "popped wall tiles", "debonded tiles"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Shower Grout and Caulk Restoration",
+      "description": "Remove failing caulk and grout at change-of-plane joints (floor-to-wall, wall-to-wall corners). Replace with matching silicone caulk (not grout) at movement joints. Critical for preventing water intrusion.",
+      "bestFor": ["shower corners", "tub-to-tile joints", "floor-to-wall transitions"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Water Damage Assessment and Remediation",
+      "description": "Inspect behind failed tile for moisture damage, mold, or structural deterioration. May require demo, drying, mold treatment, substrate replacement, and re-waterproofing before new tile.",
+      "bestFor": ["shower leaks", "bathroom floor water damage", "mold behind tile"],
+      "difficultyLevel": "Expert"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Match Existing Pattern",
+      "description": "The primary goal in tile repair is seamlessly matching the existing layout, grout color, and tile appearance.",
+      "popularWith": ["all repair projects"]
+    },
+    {
+      "name": "Accent Tile Replacement",
+      "description": "When exact tile match is impossible, use a complementary accent tile or decorative insert to make the repair look intentional.",
+      "popularWith": ["older homes", "discontinued tiles", "creative repairs"]
+    },
+    {
+      "name": "Partial Wall / Floor Section",
+      "description": "Replace a defined section of tile from corner to corner or wall to wall. Cleaner than patching random tiles throughout.",
+      "popularWith": ["shower floors", "damaged sections", "water damage areas"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Freeze-thaw cycles cause grout deterioration in unheated spaces (porches, mudrooms)",
+      "Winter temperature swings stress caulk joints — annual inspection recommended before winter",
+      "High humidity in summer accelerates mold growth in failing grout — ventilation critical",
+      "Older Boston homes often have multiple layers of tile requiring careful demo",
+      "Road salt tracked indoors degrades grout sealant — reseal entryway grout annually"
+    ],
+    "popularStyles": [
+      "Grout color-matching in brownstone bathroom restorations",
+      "Shower regrouting with epoxy grout in high-use family bathrooms",
+      "Tile replacement in vintage hex floor restoration (Cambridge, Somerville)",
+      "Water damage repair behind shower tile in pre-war Beacon Hill buildings",
+      "Kitchen floor repair after appliance removal in renovation projects"
+    ],
+    "avgLaborRate": { "low": 10, "high": 25 }
+  },
+  "brands": [
+    { "name": "Laticrete", "specialty": "SpectraLOCK epoxy grout, STRATA_MAT, repair products", "priceRange": "Professional" },
+    { "name": "Mapei", "specialty": "Keracolor grout, Ultracolor Plus FA, repair thin-set", "priceRange": "Professional" },
+    { "name": "Custom Building Products", "specialty": "Polyblend grout, SimpleGrout, repair adhesive", "priceRange": "Standard" },
+    { "name": "Miracle Sealants", "specialty": "511 Impregnator sealer, grout colorant", "priceRange": "Standard" },
+    { "name": "StoneTech (Laticrete)", "specialty": "Stone and grout sealers, heavy-duty cleaners", "priceRange": "Professional" },
+    { "name": "Fein / Dremel", "specialty": "Oscillating tools for grout removal", "priceRange": "Standard" }
+  ]
+}

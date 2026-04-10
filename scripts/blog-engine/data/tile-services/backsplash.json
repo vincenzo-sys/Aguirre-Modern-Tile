@@ -1,0 +1,152 @@
+{
+  "serviceType": "backsplash",
+  "displayName": "Backsplash Tile Installation",
+  "lastVerified": "2026-04-01",
+  "overview": {
+    "description": "Kitchen and bathroom backsplash tile installation including surface prep, tile setting, grouting, and caulking. Covers standard backsplashes, full-wall installations, and accent areas.",
+    "avgCostPerSqFt": { "low": 10, "high": 35 },
+    "typicalProjectSize": "15-50 sq ft",
+    "installationTime": "1-3 days depending on complexity",
+    "popularIn": ["kitchen backsplashes", "bathroom vanity backsplashes", "wet bar areas", "laundry rooms"]
+  },
+  "materials": [
+    {
+      "name": "Ceramic Subway Tile (3x6, 3x12, 4x12)",
+      "type": "ceramic",
+      "avgCostPerSqFt": 4,
+      "durability": "Good — easy to clean, resistant to kitchen heat and moisture",
+      "bestFor": ["classic kitchens", "budget renovations", "rental properties"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Glass Tile / Glass Mosaic",
+      "type": "glass",
+      "avgCostPerSqFt": 18,
+      "durability": "Excellent stain resistance — non-porous, easy to wipe clean",
+      "bestFor": ["modern kitchens", "accent areas", "behind ranges"],
+      "maintenanceLevel": "Low — use white thin-set (gray bleeds through glass)"
+    },
+    {
+      "name": "Porcelain Tile",
+      "type": "porcelain",
+      "avgCostPerSqFt": 7,
+      "durability": "Excellent — heat resistant, stain resistant, low absorption",
+      "bestFor": ["behind cooktops", "full-wall backsplashes", "modern kitchens"],
+      "maintenanceLevel": "Low"
+    },
+    {
+      "name": "Natural Stone (Marble, Travertine)",
+      "type": "natural-stone",
+      "avgCostPerSqFt": 20,
+      "durability": "Good with sealing — susceptible to etching from lemon juice, vinegar, wine",
+      "bestFor": ["luxury kitchens", "bar areas", "accent walls"],
+      "maintenanceLevel": "High — must seal before grouting, re-seal annually in kitchen"
+    },
+    {
+      "name": "Zellige / Handmade-Look Tile",
+      "type": "ceramic",
+      "avgCostPerSqFt": 22,
+      "durability": "Good — intentional glaze variation adds artisan character",
+      "bestFor": ["design-forward kitchens", "accent areas", "eclectic styles"],
+      "maintenanceLevel": "Medium"
+    },
+    {
+      "name": "Peel-and-Stick Mosaic (not recommended)",
+      "type": "composite",
+      "avgCostPerSqFt": 8,
+      "durability": "Poor — adhesive degrades near heat and moisture within 1-3 years",
+      "bestFor": ["temporary solutions only"],
+      "maintenanceLevel": "Low initially, replacement needed within 1-3 years"
+    }
+  ],
+  "techniques": [
+    {
+      "name": "Mastic (Type 1 Adhesive)",
+      "description": "Pre-mixed adhesive for wall tile in dry areas. Easier to work with than thin-set for vertical applications. Not suitable for areas with direct water exposure or behind ranges in some applications.",
+      "bestFor": ["standard backsplashes", "dry wall areas", "DIY-friendly installs"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Modified Thin-Set Mortar",
+      "description": "Polymer-modified thin-set for superior bond strength. Required for glass tile, natural stone, and porcelain. Better heat resistance than mastic.",
+      "bestFor": ["behind ranges", "glass tile", "natural stone", "porcelain"],
+      "difficultyLevel": "Professional"
+    },
+    {
+      "name": "Cutting Around Outlets and Switches",
+      "description": "Precise cuts around electrical boxes using a wet saw or angle grinder with diamond blade. Outlet covers should overlap tile edges. GFCI outlets required within 6 feet of sink.",
+      "bestFor": ["all backsplash installations"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Schluter Jolly / Rondec Edge Trim",
+      "description": "Metal or PVC edge trim profiles for finished edges where tile meets painted drywall. Creates clean, professional transition. Available in chrome, brushed nickel, and matte black.",
+      "bestFor": ["open-ended backsplashes", "window returns", "exposed tile edges"],
+      "difficultyLevel": "Intermediate"
+    },
+    {
+      "name": "Full-Wall Backsplash (Counter to Ceiling)",
+      "description": "Tile from countertop to upper cabinets or ceiling. Creates dramatic impact, requires more material and careful layout around windows, outlets, and cabinet openings.",
+      "bestFor": ["modern kitchens", "open shelving areas", "statement walls"],
+      "difficultyLevel": "Professional"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Subway / Running Bond",
+      "description": "Classic offset brick pattern. The most popular backsplash layout. Works in 3x6, 3x12, or 4x12 format.",
+      "popularWith": ["classic kitchens", "transitional style", "budget renovations"]
+    },
+    {
+      "name": "Herringbone",
+      "description": "V-shaped zigzag pattern. Adds visual movement and texture to the backsplash. Uses more material and labor.",
+      "popularWith": ["accent areas", "behind ranges", "modern farmhouse kitchens"]
+    },
+    {
+      "name": "Stacked / Straight Lay",
+      "description": "Tiles aligned in a grid with no offset. Clean, contemporary look. Vertical or horizontal orientation.",
+      "popularWith": ["modern kitchens", "minimalist design", "large format tiles"]
+    },
+    {
+      "name": "Chevron",
+      "description": "Arrow-shaped tiles forming V pattern. More complex than herringbone — requires mitered cuts.",
+      "popularWith": ["high-end kitchens", "feature walls", "design statements"]
+    },
+    {
+      "name": "Basketweave",
+      "description": "Alternating horizontal and vertical tile pairs. Vintage, classic look.",
+      "popularWith": ["traditional kitchens", "period-appropriate renovations"]
+    },
+    {
+      "name": "Mosaic / Penny Round",
+      "description": "Small tiles on mesh backing creating intricate patterns. Available in glass, porcelain, and natural stone.",
+      "popularWith": ["accent bands", "niche interiors", "eclectic kitchens"]
+    }
+  ],
+  "localContext": {
+    "region": "Greater Boston, MA",
+    "climateConsiderations": [
+      "Kitchen renovations are the most popular home improvement project in Greater Boston",
+      "Older Boston homes often have plaster walls requiring skim-coating before tile",
+      "Brownstone kitchens typically have limited counter space, making backsplash design impactful",
+      "Gas ranges common in older homes — heat-resistant tile and adhesive recommended behind cooktop"
+    ],
+    "popularStyles": [
+      "White subway tile with dark grout in brownstone kitchen renovations",
+      "Zellige and handmade tiles in Cambridge and Somerville kitchens",
+      "Full-wall marble-look porcelain in modern Seaport condos",
+      "Glass mosaic accents in contemporary Newton and Brookline homes",
+      "Patterned cement tile in South End and Jamaica Plain restaurants and kitchens"
+    ],
+    "avgLaborRate": { "low": 8, "high": 18 }
+  },
+  "brands": [
+    { "name": "Daltile", "specialty": "Subway tile, mosaics, ceramic, porcelain", "priceRange": "Mid-range" },
+    { "name": "MSI (MS International)", "specialty": "Natural stone, glass mosaics, porcelain", "priceRange": "Mid to Premium" },
+    { "name": "Bedrosians", "specialty": "Zellige, handmade-look, design-forward tile", "priceRange": "Mid to Premium" },
+    { "name": "Crossville", "specialty": "Glass tile, porcelain, recycled content", "priceRange": "Mid to Premium" },
+    { "name": "Schluter Systems", "specialty": "Edge trim profiles (Jolly, Rondec, Quadec)", "priceRange": "Premium" },
+    { "name": "Custom Building Products", "specialty": "SimpleSet mastic, grout, caulk", "priceRange": "Standard" },
+    { "name": "Mapei", "specialty": "Thin-set, grout, caulk for kitchen applications", "priceRange": "Professional" }
+  ]
+}

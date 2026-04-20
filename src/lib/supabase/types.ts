@@ -81,6 +81,10 @@ export interface Job {
   crew_instructions: string | null
   crew_log: string | null
   customer_provides: string | null
+  estimate_token: string | null
+  estimate_sent_at: string | null
+  estimate_viewed_at: string | null
+  estimate_accepted_at: string | null
   created_by: string | null
   created_at: string
   updated_at: string

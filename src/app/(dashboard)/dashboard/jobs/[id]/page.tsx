@@ -10,6 +10,7 @@ import JobEditForm from '@/components/dashboard/JobEditForm'
 import CrewLog from '@/components/dashboard/CrewLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
+import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -323,6 +324,13 @@ export default async function JobDetailPage({
           )}
         </div>
       </div>
+
+      {/* Estimate share link (owner only) */}
+      {isOwner && (
+        <div className="mb-6">
+          <EstimateShareLink job={job} />
+        </div>
+      )}
 
       {/* Line Items */}
       <div className="mb-6">

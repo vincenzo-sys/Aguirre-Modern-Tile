@@ -59,6 +59,11 @@ export async function POST(req: NextRequest) {
         await handleInvoiceVoided(stripeInvoice)
         break
       }
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        await handleCheckoutCompleted(session)
+        break
+      }
       default:
         // Unhandled event type — acknowledge receipt
         break
@@ -69,6 +74,55 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ received: true })
+}
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // Only handle estimate-deposit checkout sessions
+  if (session.metadata?.type !== 'estimate_deposit') return
+  if (session.payment_status !== 'paid') return
+
+  const jobId = session.metadata.job_id
+  if (!jobId) {
+    console.warn('Estimate deposit checkout completed without job_id metadata')
+    return
+  }
+
+  const depositDollars = Number(session.amount_total ?? 0) / 100
+  if (depositDollars <= 0) return
+
+  const supabase = createServiceClient()
+
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('status, scheduled_start, amount_paid')
+    .eq('id', jobId)
+    .single()
+
+  if (!job) {
+    console.warn(`Received estimate deposit for unknown job ${jobId}`)
+    return
+  }
+
+  const newAmountPaid = Number(job.amount_paid ?? 0) + depositDollars
+  const updates: Record<string, unknown> = {
+    amount_paid: newAmountPaid,
+    estimate_accepted_at: new Date().toISOString(),
+  }
+
+  // If the job already has a start date, flip status to 'scheduled' so it
+  // reaches Christian's view. Otherwise stay in current state — owner picks
+  // a date next and can advance manually.
+  if (job.scheduled_start && (job.status === 'lead' || job.status === 'quoted')) {
+    updates.status = 'scheduled'
+  } else if (job.status === 'lead') {
+    updates.status = 'quoted'
+  }
+
+  await supabase.from('jobs').update(updates).eq('id', jobId)
+
+  console.log(
+    `Estimate deposit $${depositDollars} recorded for job ${jobId} (session ${session.id})`
+  )
 }
 
 async function handleInvoicePaid(stripeInvoice: Stripe.Invoice) {

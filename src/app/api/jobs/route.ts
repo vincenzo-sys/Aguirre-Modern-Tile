@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       assigned_to,
       notes,
       crew_instructions,
+      customer_provides,
       status = 'lead',
       from_lead_id,
     } = body as {
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
       assigned_to?: string
       notes?: string
       crew_instructions?: string
+      customer_provides?: string
       status?: JobStatus
       from_lead_id?: string
     }
@@ -177,6 +179,7 @@ export async function POST(request: NextRequest) {
         assigned_to: assigned_to || null,
         notes: notes || null,
         crew_instructions: crew_instructions || null,
+        customer_provides: customer_provides || null,
       })
       .select()
       .single()

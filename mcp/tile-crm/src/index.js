@@ -63,6 +63,14 @@ const tools = [
           type: 'string',
           description: 'YYYY-MM-DD date when to follow up',
         },
+        site_visit_at: {
+          type: 'string',
+          description: 'ISO 8601 datetime for scheduled in-person estimate visit',
+        },
+        site_visit_notes: {
+          type: 'string',
+          description: 'Gate code, parking, what to bring to the site visit',
+        },
         answers: {
           type: 'object',
           description: 'Optional structured answers (key/value pairs)',
@@ -74,7 +82,7 @@ const tools = [
   {
     name: 'update_lead',
     description:
-      'Update an existing lead: change status, add notes, set follow-up, record lost reason. Pass only the fields you want to change.',
+      'Update an existing lead: change status, add notes, set follow-up, record lost reason, schedule a site visit. Pass only the fields you want to change.',
     inputSchema: {
       type: 'object',
       required: ['id'],
@@ -93,6 +101,15 @@ const tools = [
         client_phone: { type: 'string' },
         client_email: { type: 'string' },
         project_type: { type: 'string' },
+        site_visit_at: {
+          type: 'string',
+          description: 'ISO 8601 datetime for scheduled in-person estimate visit',
+        },
+        site_visit_notes: { type: 'string' },
+        answers: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+        },
       },
     },
   },
@@ -177,7 +194,20 @@ const tools = [
         estimated_days: { type: 'number' },
         estimated_cost: { type: 'number' },
         assigned_to: { type: 'string', description: 'Team member UUID' },
-        notes: { type: 'string' },
+        notes: {
+          type: 'string',
+          description: 'Internal notes — sales-side only, NOT visible to the installer.',
+        },
+        crew_instructions: {
+          type: 'string',
+          description:
+            'Gate codes, parking, customer quirks, anything the installer needs to know on site. Visible to the crew.',
+        },
+        customer_provides: {
+          type: 'string',
+          description:
+            'What the customer is supplying themselves (e.g. "Tile, shower fixtures, vanity"). Prevents the crew from duplicate-buying.',
+        },
         status: {
           type: 'string',
           enum: [
@@ -260,10 +290,50 @@ const tools = [
         estimated_cost: { type: 'number' },
         actual_cost: { type: 'number' },
         assigned_to: { type: 'string' },
-        notes: { type: 'string' },
+        notes: {
+          type: 'string',
+          description: 'Internal (sales-side) notes. Not shown to the installer.',
+        },
+        crew_instructions: {
+          type: 'string',
+          description: 'Crew-facing instructions (gate code, parking, quirks). Shown to the installer.',
+        },
+        customer_provides: {
+          type: 'string',
+          description: 'What the customer is supplying themselves so the crew doesn\'t duplicate-buy.',
+        },
+        crew_log: {
+          type: 'string',
+          description:
+            'Append-only text log of field events (extra purchases, scope surprises). Prefer use add_log_entry helper if you want to add one line instead of replacing the whole log.',
+        },
         scope_notes: { type: 'string' },
         square_footage: { type: 'number' },
         job_type: { type: 'string' },
+        client_name: { type: 'string' },
+        client_phone: { type: 'string' },
+        client_email: { type: 'string' },
+        client_address: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'add_log_entry',
+    description:
+      'Append one entry to a job\'s field log (for extra purchases, scope changes, surprises). Fetches current crew_log, prepends a new timestamped line, saves it back. Use this instead of update_job with crew_log unless you want to replace the whole log.',
+    inputSchema: {
+      type: 'object',
+      required: ['job_id', 'entry'],
+      properties: {
+        job_id: { type: 'string' },
+        entry: {
+          type: 'string',
+          description: 'Single-line note. E.g. "Bought extra bag of thinset $25 at HD".',
+        },
+        author: {
+          type: 'string',
+          description: 'Who the entry is from. Defaults to "Agent".',
+        },
       },
     },
   },
@@ -369,6 +439,24 @@ async function callTool(name, args) {
       return request(`/api/jobs/${job_id}`, {
         method: 'PATCH',
         body: { line_items: items },
+      })
+    }
+
+    case 'add_log_entry': {
+      const { job_id, entry, author = 'Agent' } = args
+      const job = await request(`/api/jobs/${job_id}`)
+      const existing = typeof job.crew_log === 'string' ? job.crew_log : ''
+      const stamp = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+      const newLine = `[${stamp} — ${author}] ${entry}`
+      const updated = existing ? `${newLine}\n${existing}` : newLine
+      return request(`/api/jobs/${job_id}`, {
+        method: 'PATCH',
+        body: { crew_log: updated },
       })
     }
 

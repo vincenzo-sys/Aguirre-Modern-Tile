@@ -13,6 +13,7 @@ import {
   Phone,
   ClipboardList,
   AlertCircle,
+  UserCheck,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { Job, JobLineItem, JobStatus, MaterialStatus } from '@/lib/supabase/types'
@@ -118,6 +119,17 @@ export default function InstallerJobCard({ job }: { job: Job }) {
             <action.icon className="w-5 h-5" />
             {updating ? 'Saving...' : action.label}
           </button>
+        )}
+
+        {/* Customer providing — critical so Christian doesn't duplicate-buy */}
+        {job.customer_provides && (
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-900 uppercase tracking-wider mb-1">
+              <UserCheck className="w-3.5 h-3.5" />
+              Customer is providing
+            </div>
+            <p className="text-sm text-blue-900 whitespace-pre-wrap">{job.customer_provides}</p>
+          </div>
         )}
 
         {/* Crew instructions — the field Vince writes for Christian */}

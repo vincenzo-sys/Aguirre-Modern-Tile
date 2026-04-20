@@ -80,6 +80,7 @@ export interface Job {
   notes: string | null
   crew_instructions: string | null
   crew_log: string | null
+  customer_provides: string | null
   created_by: string | null
   created_at: string
   updated_at: string

@@ -48,15 +48,16 @@ export default async function MaterialsPage({
 
   const { data: jobsRaw } = await supabase
     .from('jobs')
-    .select('id, title, status, scheduled_start, scheduled_end, line_items')
+    .select('id, title, status, scheduled_start, scheduled_end, line_items, amount_paid')
     .gte('scheduled_start', todayStr)
     .lte('scheduled_start', endStr)
     .not('status', 'in', '("completed","paid","cancelled")')
+    .gt('amount_paid', 0)
     .order('scheduled_start', { ascending: true })
 
   const jobs = (jobsRaw ?? []) as Pick<
     Job,
-    'id' | 'title' | 'status' | 'scheduled_start' | 'scheduled_end' | 'line_items'
+    'id' | 'title' | 'status' | 'scheduled_start' | 'scheduled_end' | 'line_items' | 'amount_paid'
   >[]
 
   const rollup: Record<string, MaterialRow> = {}
@@ -106,7 +107,10 @@ export default async function MaterialsPage({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Materials</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Rollup across {jobs.length} upcoming job{jobs.length !== 1 ? 's' : ''} in the {windowLabels[windowKey].toLowerCase()}
+            Rollup across {jobs.length} deposit-received job{jobs.length !== 1 ? 's' : ''} in the {windowLabels[windowKey].toLowerCase()}.
+            <span className="block text-xs text-gray-400 mt-0.5">
+              Only jobs where the 10% deposit has landed are included — so nothing gets bought on a job that hasn't committed.
+            </span>
           </p>
         </div>
 

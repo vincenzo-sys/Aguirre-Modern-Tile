@@ -276,6 +276,16 @@ export default async function JobDetailPage({
             </div>
           </div>
 
+          {/* Customer providing — always visible when set */}
+          {job.customer_provides && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-blue-900 uppercase tracking-wider mb-2">
+                Customer is providing
+              </h3>
+              <p className="text-sm text-blue-900 whitespace-pre-wrap">{job.customer_provides}</p>
+            </div>
+          )}
+
           {/* Crew Instructions — always visible when set */}
           {job.crew_instructions && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">

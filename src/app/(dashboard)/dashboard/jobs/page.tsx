@@ -61,11 +61,18 @@ export default async function JobsPage({
       isOwner = profile.role === 'owner'
     }
 
-    const { data: jobs } = await supabase
+    let jobsQuery = supabase
       .from('jobs')
       .select('*')
       .order('scheduled_start', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
+
+    // Non-owners only see their assigned jobs
+    if (!isOwner) {
+      jobsQuery = jobsQuery.eq('assigned_to', user.id)
+    }
+
+    const { data: jobs } = await jobsQuery
 
     const rawJobs = (jobs ?? []) as Job[]
 
@@ -112,9 +119,13 @@ export default async function JobsPage({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isOwner ? 'Jobs' : 'My jobs'}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {filtered.length} of {jobList.length} job{jobList.length !== 1 ? 's' : ''}
+            {isOwner
+              ? `${filtered.length} of ${jobList.length} job${jobList.length !== 1 ? 's' : ''}`
+              : `${jobList.length} assigned to you`}
           </p>
         </div>
         {isOwner && (
@@ -128,13 +139,15 @@ export default async function JobsPage({
         )}
       </div>
 
-      <Suspense fallback={null}>
-        <JobsFilterBar jobCount={jobList.length} />
-      </Suspense>
-
-      <div className="mb-4">
+      {isOwner && (
         <Suspense fallback={null}>
-          <ViewSwitcher />
+          <JobsFilterBar jobCount={jobList.length} />
+        </Suspense>
+      )}
+
+      <div className={isOwner ? 'mb-4' : 'mb-6'}>
+        <Suspense fallback={null}>
+          <ViewSwitcher prominent={!isOwner} />
         </Suspense>
       </div>
 

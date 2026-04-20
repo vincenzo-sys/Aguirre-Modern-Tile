@@ -129,6 +129,8 @@ export interface InvoiceWithJob extends Invoice {
 
 export type QuoteRequestStatus = 'new' | 'reviewed' | 'converted' | 'archived'
 
+export type QuoteRequestSource = 'website' | 'phone' | 'referral' | 'walk-in' | 'repeat' | 'other'
+
 export interface QuoteRequest {
   id: string
   status: QuoteRequestStatus
@@ -139,6 +141,11 @@ export interface QuoteRequest {
   project_type: string
   answers: Record<string, string>
   converted_job_id: string | null
+  source: QuoteRequestSource | null
+  last_contact_at: string | null
+  next_follow_up: string | null
+  lost_reason: string | null
+  notes: string | null
   created_at: string
   updated_at: string
 }

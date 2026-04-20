@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Inbox, ArrowRight, Eye, Archive, CheckCircle } from 'lucide-react'
+import { Inbox, ArrowRight, Archive, CheckCircle, Plus, Clock, AlertCircle } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
+
+type LeadTab = QuoteRequestStatus | 'all' | 'needs_follow_up'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -13,21 +15,29 @@ const statusColors: Record<QuoteRequestStatus, string> = {
   archived: 'bg-gray-100 text-gray-500',
 }
 
-const tabs: { label: string; value: QuoteRequestStatus | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'New', value: 'new' },
-  { label: 'Reviewed', value: 'reviewed' },
-  { label: 'Converted', value: 'converted' },
-  { label: 'Archived', value: 'archived' },
-]
+const sourceLabels: Record<string, string> = {
+  website: 'Website',
+  phone: 'Phone',
+  referral: 'Referral',
+  'walk-in': 'Walk-in',
+  repeat: 'Repeat',
+  other: 'Other',
+}
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
+function isFollowUpDue(lead: QuoteRequest): boolean {
+  if (!lead.next_follow_up) return false
+  if (lead.status === 'converted' || lead.status === 'archived') return false
+  const today = new Date().toISOString().slice(0, 10)
+  return lead.next_follow_up <= today
+}
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<QuoteRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<QuoteRequestStatus | 'all'>('all')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<LeadTab>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
 
   useEffect(() => {
     if (isDemoMode) {
@@ -82,13 +92,40 @@ export default function LeadsPage() {
     toast(`Lead marked as ${newStatus}`)
   }
 
-  const filtered = activeTab === 'all' ? leads : leads.filter((l) => l.status === activeTab)
+  const followUpCount = leads.filter(isFollowUpDue).length
   const newCount = leads.filter((l) => l.status === 'new').length
 
+  const availableSources = useMemo(() => {
+    const set = new Set<string>()
+    for (const l of leads) {
+      if (l.source) set.add(l.source)
+    }
+    return Array.from(set).sort()
+  }, [leads])
+
+  const tabs: { label: string; value: LeadTab; count?: number; emphasis?: boolean }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'New', value: 'new', count: newCount },
+    { label: 'Reviewed', value: 'reviewed' },
+    {
+      label: 'Needs follow-up',
+      value: 'needs_follow_up',
+      count: followUpCount,
+      emphasis: followUpCount > 0,
+    },
+    { label: 'Converted', value: 'converted' },
+    { label: 'Archived', value: 'archived' },
+  ]
+
+  const filtered = leads.filter((l) => {
+    if (activeTab === 'needs_follow_up' && !isFollowUpDue(l)) return false
+    if (activeTab !== 'all' && activeTab !== 'needs_follow_up' && l.status !== activeTab) return false
+    if (sourceFilter !== 'all' && (l.source ?? 'website') !== sourceFilter) return false
+    return true
+  })
+
   if (loading) {
-    return (
-      <div className="text-center py-12 text-gray-500">Loading leads...</div>
-    )
+    return <div className="text-center py-12 text-gray-500">Loading leads...</div>
   }
 
   return (
@@ -98,8 +135,16 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500 mt-1">
             {leads.length} total{newCount > 0 && ` · ${newCount} new`}
+            {followUpCount > 0 && ` · ${followUpCount} need follow-up`}
           </p>
         </div>
+        <Link
+          href="/dashboard/leads/new"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          New Lead
+        </Link>
       </div>
 
       {isDemoMode && (
@@ -110,109 +155,164 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              activeTab === tab.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+      {/* Tabs + source filter */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+          {tabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                activeTab === tab.value
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : tab.emphasis
+                    ? 'text-red-600 hover:text-red-700'
+                    : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs rounded-full ${
+                  tab.emphasis ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {availableSources.length > 0 && (
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
           >
-            {tab.label}
-          </button>
-        ))}
+            <option value="all">All sources</option>
+            {availableSources.map((s) => (
+              <option key={s} value={s}>
+                {sourceLabels[s] ?? s}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Lead cards */}
       <div className="space-y-3">
-        {filtered.map((lead) => (
-          <div
-            key={lead.id}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-5"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="font-semibold text-gray-900">{lead.client_name}</h3>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lead.status]}`}>
-                    {lead.status}
-                  </span>
+        {filtered.map((lead) => {
+          const overdue = isFollowUpDue(lead)
+          return (
+            <Link
+              key={lead.id}
+              href={`/dashboard/leads/${lead.id}`}
+              className="block bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:border-primary-300 hover:shadow-md transition-all"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1 flex-wrap">
+                    <h3 className="font-semibold text-gray-900">{lead.client_name}</h3>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lead.status]}`}>
+                      {lead.status}
+                    </span>
+                    {lead.source && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {sourceLabels[lead.source] ?? lead.source}
+                      </span>
+                    )}
+                    {overdue && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
+                        <AlertCircle className="w-3 h-3" />
+                        Follow-up due
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 capitalize">{lead.project_type} project</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
+                    {lead.client_phone && (
+                      <a
+                        href={`tel:${lead.client_phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:text-primary-600"
+                      >
+                        {lead.client_phone}
+                      </a>
+                    )}
+                    {lead.client_email && (
+                      <a
+                        href={`mailto:${lead.client_email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:text-primary-600"
+                      >
+                        {lead.client_email}
+                      </a>
+                    )}
+                    <span>
+                      {new Date(lead.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    {lead.next_follow_up && (
+                      <span className={`inline-flex items-center gap-1 ${overdue ? 'text-red-600' : 'text-gray-500'}`}>
+                        <Clock className="w-3 h-3" />
+                        Follow up {new Date(lead.next_follow_up).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 capitalize">{lead.project_type} project</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
-                  <a href={`tel:${lead.client_phone}`} className="hover:text-primary-600">{lead.client_phone}</a>
-                  <a href={`mailto:${lead.client_email}`} className="hover:text-primary-600">{lead.client_email}</a>
-                  <span>{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-                  title="View details"
+                <div
+                  className="flex items-center gap-2 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Eye className="w-4 h-4" />
-                </button>
-                {lead.status === 'new' && (
-                  <button
-                    onClick={() => updateStatus(lead.id, 'reviewed')}
-                    className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
-                    title="Mark reviewed"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                  </button>
-                )}
-                {(lead.status === 'new' || lead.status === 'reviewed') && (
-                  <>
-                    <Link
-                      href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}${lead.customer_id ? `&customer_id=${lead.customer_id}` : ''}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                      title="Convert to job"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                      Convert to Job
-                    </Link>
+                  {lead.status === 'new' && (
                     <button
-                      onClick={() => updateStatus(lead.id, 'archived')}
-                      className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-                      title="Archive"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        updateStatus(lead.id, 'reviewed')
+                      }}
+                      className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
+                      title="Mark reviewed"
                     >
-                      <Archive className="w-4 h-4" />
+                      <CheckCircle className="w-4 h-4" />
                     </button>
-                  </>
-                )}
+                  )}
+                  {(lead.status === 'new' || lead.status === 'reviewed') && (
+                    <>
+                      <Link
+                        href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}${lead.customer_id ? `&customer_id=${lead.customer_id}` : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                        title="Convert to job"
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                        Convert
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          updateStatus(lead.id, 'archived')
+                        }}
+                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+                        title="Archive"
+                      >
+                        <Archive className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Expanded details */}
-            {expandedId === lead.id && Object.keys(lead.answers).length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Project Details</h4>
-                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                  {Object.entries(lead.answers)
-                    .filter(([, v]) => v)
-                    .map(([key, value]) => (
-                      <div key={key}>
-                        <dt className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</dt>
-                        <dd className="text-sm text-gray-900">{value}</dd>
-                      </div>
-                    ))}
-                </dl>
-              </div>
-            )}
-          </div>
-        ))}
+            </Link>
+          )
+        })}
 
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Inbox className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No leads found.</p>
-            <p className="text-sm text-gray-400 mt-1">Quote form submissions from the website will appear here.</p>
+            <p className="text-sm text-gray-400 mt-1">Click "New Lead" to add one manually, or quote form submissions will land here.</p>
           </div>
         )}
       </div>
@@ -245,6 +345,11 @@ const demoLeads: QuoteRequest[] = [
       additionalNotes: 'Want a modern look with subway tiles. Budget around $5,000.',
     },
     converted_job_id: null,
+    source: 'website',
+    last_contact_at: null,
+    next_follow_up: null,
+    lost_reason: null,
+    notes: null,
     created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   },
@@ -263,6 +368,11 @@ const demoLeads: QuoteRequest[] = [
       additionalNotes: 'Replacing old fiberglass insert with custom tile.',
     },
     converted_job_id: null,
+    source: 'phone',
+    last_contact_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+    next_follow_up: new Date().toISOString().slice(0, 10),
+    lost_reason: null,
+    notes: 'Called Tuesday, wants quote by Friday.',
     created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
   },
@@ -280,6 +390,11 @@ const demoLeads: QuoteRequest[] = [
       tileType: 'porcelain',
     },
     converted_job_id: 'demo-job-4',
+    source: 'referral',
+    last_contact_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    next_follow_up: null,
+    lost_reason: null,
+    notes: null,
     created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
   },

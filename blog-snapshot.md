@@ -1,0 +1,502 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e8]: We Answer in 5 Minutes
+        - generic [ref=e9]: "|"
+        - generic [ref=e10]: Licensed & Insured
+      - link "(617) 766-1259" [ref=e11] [cursor=pointer]:
+        - /url: tel:6177661259
+        - img [ref=e12]
+        - text: (617) 766-1259
+    - navigation [ref=e14]:
+      - generic [ref=e15]:
+        - link "Aguirre Modern Tile Aguirre Modern Tile Expert Tile Installation" [ref=e16] [cursor=pointer]:
+          - /url: /
+          - img "Aguirre Modern Tile" [ref=e18]
+          - generic [ref=e19]:
+            - generic [ref=e20]: Aguirre Modern Tile
+            - generic [ref=e21]: Expert Tile Installation
+        - generic [ref=e22]:
+          - link "Home" [ref=e23] [cursor=pointer]:
+            - /url: /
+          - link "Services" [ref=e24] [cursor=pointer]:
+            - /url: /services
+          - link "Our Process" [ref=e25] [cursor=pointer]:
+            - /url: /process
+          - link "Gallery" [ref=e26] [cursor=pointer]:
+            - /url: /gallery
+          - link "About" [ref=e27] [cursor=pointer]:
+            - /url: /about
+          - link "Blog" [ref=e28] [cursor=pointer]:
+            - /url: /blog
+          - link "Contact" [ref=e29] [cursor=pointer]:
+            - /url: /contact
+        - link "Get Free Estimate" [ref=e31] [cursor=pointer]:
+          - /url: /contact
+  - main [ref=e32]:
+    - generic [ref=e35]:
+      - link "Back to Blog" [ref=e36] [cursor=pointer]:
+        - /url: /blog
+        - img [ref=e37]
+        - text: Back to Blog
+      - generic [ref=e40]: Tile Installation
+      - 'heading "Tile Installation: The Complete Guide for Homeowners" [level=1] [ref=e41]'
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - img [ref=e44]
+          - text: "1"
+        - generic [ref=e47]:
+          - img [ref=e48]
+          - text: April 10, 2026
+    - 'img "Tile Installation: The Complete Guide for Homeowners" [ref=e53]'
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - paragraph [ref=e58]:
+          - text: Tile installation means permanently bonding ceramic, porcelain, natural stone, or glass tile to a prepared surface using mortar, grout, and the right substrate. In Greater Boston, expect to pay
+          - strong [ref=e59]: $8–$25 per square foot installed
+          - text: (as of 2026 pricing), depending on tile type, room complexity, and surface prep. Done right, tile lasts 20–30 years with minimal maintenance. Done wrong, it cracks, shifts, and costs twice as much to fix.
+        - list [ref=e60]:
+          - listitem [ref=e61]: Labor costs run $5–$15 per square foot in Greater Boston (as of 2026 pricing), separate from material costs.
+          - listitem [ref=e62]: Material costs range from $1–$3/sq ft for ceramic to $15–$30+/sq ft for natural stone, depending on tile type and source.
+          - listitem [ref=e63]: Order 10–15% extra tile to account for cuts, waste, and future repairs — standard across all tile types.
+          - listitem [ref=e64]: Surface prep — including substrate, waterproofing, and leveling — determines whether your tile lasts 5 years or 30.
+          - listitem [ref=e65]: Most bathroom tile projects take 3–5 days from prep to final grout seal; large floor installations can take longer.
+          - listitem [ref=e66]: DIY works well for simple backsplashes, but wet areas, large-format tile, and pattern layouts benefit from professional installation.
+        - paragraph [ref=e67]:
+          - text: At
+          - link "Aguirre Modern Tile" [ref=e68] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com
+          - text: ", we've completed"
+          - strong [ref=e69]: 500+ tile installation projects
+          - text: "across Greater Boston over 15+ years. The most common problem we see: homeowners skip prep work, underestimate material quantities, or hire the cheapest installer — then spend more fixing it. This guide helps you avoid those mistakes before the first tile goes down."
+        - blockquote [ref=e70]:
+          - strong [ref=e71]: Planning a bathroom floor, shower, or kitchen backsplash?
+          - link "Send us photos and square footage for a free same-day tile installation estimate" [ref=e72] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/quote
+          - text: — we'll give you itemized pricing for your specific room and tile type, with no surprises.
+        - heading "How Much Does Tile Installation Cost in Greater Boston?" [level=2] [ref=e73]
+        - paragraph [ref=e74]:
+          - text: Tile installation costs
+          - strong [ref=e75]: $8–$25 per square foot all-in
+          - text: for most Greater Boston homeowners (as of 2026 pricing). That total combines labor, materials, substrate prep, and finishing. The range is wide because tile type, room complexity, and surface condition all affect the final number.
+        - paragraph [ref=e76]: "Here's how costs break down across the most common tile types:"
+        - paragraph [ref=e77]: Tile Type
+        - paragraph [ref=e78]: Material Cost (per sq ft)
+        - paragraph [ref=e79]: Labor Cost (per sq ft)
+        - paragraph [ref=e80]: Typical Total (per sq ft)
+        - paragraph [ref=e81]: Ceramic (e.g., Daltile Restore)
+        - paragraph [ref=e82]: $1–$4
+        - paragraph [ref=e83]: $5–$10
+        - paragraph [ref=e84]: $6–$14
+        - paragraph [ref=e85]: Porcelain (e.g., MSI Dimensions)
+        - paragraph [ref=e86]: $3–$8
+        - paragraph [ref=e87]: $6–$12
+        - paragraph [ref=e88]: $9–$20
+        - paragraph [ref=e89]: Natural Stone (e.g., Emser Marble)
+        - paragraph [ref=e90]: $8–$30+
+        - paragraph [ref=e91]: $8–$15
+        - paragraph [ref=e92]: $16–$45+
+        - paragraph [ref=e93]: Glass Mosaic (e.g., Daltile Sparkling Whites)
+        - paragraph [ref=e94]: $10–$25
+        - paragraph [ref=e95]: $8–$15
+        - paragraph [ref=e96]: $18–$40
+        - paragraph [ref=e97]: Large-Format Porcelain (24x48, e.g., MSI Stacked Stone)
+        - paragraph [ref=e98]: $5–$12
+        - paragraph [ref=e99]: $10–$18
+        - paragraph [ref=e100]: $15–$30
+        - paragraph [ref=e101]:
+          - text: Labor is the biggest variable. Simple floor tile in a rectangular room costs less than intricate shower tile with niches, bench seats, and custom cuts.
+          - strong [ref=e102]: Substrate repair, waterproofing, and demolition add $1–$5 per square foot
+          - text: on top of base labor — costs that are easy to miss when comparing bids.
+        - heading "What Affects Your Total Budget?" [level=3] [ref=e103]
+        - list [ref=e104]:
+          - listitem [ref=e105]: "Tile size and format: Large-format tiles (24x24 or bigger) require more precise leveling and specialized tools."
+          - listitem [ref=e106]: "Pattern complexity: Herringbone and diagonal layouts increase labor time and material waste by 15–20%."
+          - listitem [ref=e107]: "Substrate condition: Cracked, uneven, or water-damaged substrate adds cost — usually discovered after demo."
+          - listitem [ref=e108]: "Room shape: Irregular rooms, curves, and obstacles (toilets, vanities, shower niches) mean more cuts and more time."
+          - listitem [ref=e109]: "Grout joint width: Narrow grout joints require more precision and slower setting, which raises labor cost."
+        - paragraph [ref=e110]:
+          - text: For a full cost breakdown with room-by-room estimates and what Boston-area homeowners actually pay,
+          - link "read our complete guide to tile installation cost per square foot" [ref=e111] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/tile-installation-cost-per-square-foot
+          - text: .
+        - heading "What Types of Tile Are Best for Floors, Walls, and Showers?" [level=2] [ref=e112]
+        - paragraph [ref=e113]: The right tile depends on where it goes, how much foot traffic it sees, and what look you want. Each tile type has different durability, installation requirements, and maintenance needs.
+        - list [ref=e114]:
+          - listitem [ref=e115]: "Ceramic tile (e.g., Daltile Restore, American Olean Bordeaux):"
+          - listitem [ref=e116]:
+            - list [ref=e117]:
+              - listitem [ref=e118]: "Water absorption: 3–7% (semi-vitreous to vitreous)"
+              - listitem [ref=e119]: "Best for: Bathroom walls, backsplashes, low-traffic floors"
+              - listitem [ref=e120]: "Cost: $1–$4/sq ft materials (as of 2026 pricing)"
+              - listitem [ref=e121]: "DIY difficulty: Easiest — cuts cleanly, lighter than porcelain"
+              - listitem [ref=e122]: "Note: Not recommended for outdoor use or freeze-thaw climates"
+          - listitem [ref=e123]: "Porcelain tile (e.g., MSI Dimensions, Marazzi Developed by Nature):"
+          - listitem [ref=e124]:
+            - list [ref=e125]:
+              - listitem [ref=e126]: "Water absorption: Less than 0.5% — virtually impervious"
+              - listitem [ref=e127]: "Best for: Bathroom floors, shower walls, kitchen floors, outdoor use"
+              - listitem [ref=e128]: "Cost: $3–$8/sq ft materials (as of 2026 pricing)"
+              - listitem [ref=e129]: "DIY difficulty: Moderate — requires a diamond blade wet saw"
+              - listitem [ref=e130]: "Note: Heavy large-format slabs may require back-buttering and specific thin-set"
+          - listitem [ref=e131]: "Natural stone (e.g., Emser Marble, MSI Calacatta Gold, Dal-Tile Travertine):"
+          - listitem [ref=e132]:
+            - list [ref=e133]:
+              - listitem [ref=e134]: "Water absorption: Varies — marble absorbs more than slate or granite"
+              - listitem [ref=e135]: "Best for: Master bathrooms, accent walls, high-end floors"
+              - listitem [ref=e136]: "Cost: $8–$30+/sq ft materials (as of 2026 pricing)"
+              - listitem [ref=e137]: "DIY difficulty: Hard — requires sealing before grouting and specialty thin-set for marble"
+              - listitem [ref=e138]: "Note: Must be sealed before and after grouting; re-seal annually in wet areas"
+          - listitem [ref=e139]: "Glass mosaic tile (e.g., Daltile Sparkling Whites, Crossville Translucent):"
+          - listitem [ref=e140]:
+            - list [ref=e141]:
+              - listitem [ref=e142]: "Water absorption: Near zero — glass is non-porous"
+              - listitem [ref=e143]: "Best for: Shower accents, backsplashes, pool surrounds"
+              - listitem [ref=e144]: "Cost: $10–$25/sq ft materials (as of 2026 pricing)"
+              - listitem [ref=e145]: "DIY difficulty: Moderate — requires white thin-set, back-buttering each sheet"
+              - listitem [ref=e146]: "Note: Use unsanded grout; never use gray thin-set under glass (it bleeds through)"
+        - heading "How Do Professional Tile Installers Prepare a Surface Before Tiling?" [level=2] [ref=e147]
+        - paragraph [ref=e148]: Surface preparation is what separates a tile installation that lasts 30 years from one that fails in 3. The substrate must be clean, flat, structurally sound, and — in wet areas — properly waterproofed before a single tile goes down.
+        - heading "Subfloor Types and What They Need" [level=3] [ref=e149]
+        - list [ref=e150]:
+          - listitem [ref=e151]: "Concrete slab: The most stable substrate. Check for cracks, moisture vapor, and high spots. Grind down ridges over 1/8 inch. Use self-leveling compound for low spots before tiling."
+          - listitem [ref=e152]: "Plywood subfloor: Must be at least 3/4 inch thick with a combined minimum of 1-1/8 inches (subfloor + underlayment), per TCNA guidelines. Cover with cement board (HardieBacker, USG Durock) or Schluter DITRA before tiling."
+          - listitem [ref=e153]: "Existing vinyl or tile: Can tile over if fully bonded, flat, and structurally sound. Otherwise, remove it — tiling over failed material transfers the failure to your new tile."
+        - heading "What Is Schluter DITRA?" [level=3] [ref=e154]
+        - paragraph [ref=e155]:
+          - strong [ref=e156]: Schluter DITRA
+          - text: is an uncoupling membrane — a thin polyethylene mat with square cavities that bond to thin-set on both sides. It isolates the tile layer from subfloor movement, which is a primary cause of cracked tile and grout. DITRA also provides waterproofing and allows moisture vapor transmission from below. It's especially valuable over wood subfloors and in-floor radiant heat systems.
+        - paragraph [ref=e157]:
+          - text: Floor tile needs a subfloor that meets the
+          - strong [ref=e158]: L/360 deflection standard
+          - text: ", meaning it flexes no more than the span divided by 360 under load, according to TCNA installation guidelines. Exceeding that threshold causes tile and grout to crack over time."
+        - heading "Bathroom and Shower Tile Installation" [level=2] [ref=e159]
+        - paragraph [ref=e160]: Bathroom and shower tile installation requires waterproofing, careful substrate prep, and tile suited to constant moisture. Mistakes in wet areas lead to mold, structural damage, and full gut renovations.
+        - 'heading "Waterproofing: The Step Most DIYers Skip" [level=3] [ref=e161]'
+        - paragraph [ref=e162]:
+          - strong [ref=e163]: Waterproofing is the most critical step in any shower or wet-area tile installation.
+          - text: Tile and grout are not inherently waterproof — water migrates through grout joints and reaches the substrate. Without a proper membrane, that moisture damages framing, causes mold, and destroys the tile installation itself.
+        - paragraph [ref=e164]: "The three most trusted waterproofing systems used by professional installers:"
+        - list [ref=e165]:
+          - listitem [ref=e166]: "Schluter KERDI: A polyethylene membrane bonded directly to the substrate with thin-set. Industry standard for custom showers. Works with Schluter's KERDI-BOARD panels and KERDI-DRAIN for a fully integrated system."
+          - listitem [ref=e167]: "Wedi Board: A foam-core, glass-fiber-reinforced panel that is inherently waterproof. No separate membrane needed. Excellent for shower walls and niches."
+          - listitem [ref=e168]: "Laticrete Hydro Ban: A liquid-applied membrane that cures to a flexible, waterproof layer. Good for shower floors and areas with complex geometry."
+        - paragraph [ref=e169]:
+          - text: For shower pans, the substrate must slope
+          - strong [ref=e170]: 1/4 inch per foot
+          - text: toward the drain, per TCNA installation guidelines. The floor tile COF (Coefficient of Friction) rating should be
+          - strong [ref=e171]: 0.42 or higher
+          - text: for wet applications, per ADA guidelines. Smaller tiles (2x2 or mosaic) work best on shower floors — more grout joints mean better grip and more flex points on curved surfaces.
+        - paragraph [ref=e172]:
+          - text: For detailed bathroom guidance including shower niches, bench installation, and glass tile on walls,
+          - link "read our complete guide to bathroom tile installation" [ref=e173] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/tile-installation-for-bathroom
+          - text: .
+        - heading "What Is the Tile Installation Process Step by Step?" [level=2] [ref=e174]
+        - paragraph [ref=e175]: Professional tile installation follows a consistent sequence. Skipping or rushing any step affects every step that follows.
+        - list [ref=e176]:
+          - listitem [ref=e177]: "Demo and substrate inspection: Remove existing flooring or wall material. Inspect the substrate for cracks, moisture damage, and flex. Address any structural issues before continuing."
+          - listitem [ref=e178]: "Substrate prep: Install cement board or uncoupling membrane over wood subfloors. Grind high spots on concrete. Apply self-leveling compound to low spots. Tape and thin-set seams on cement board."
+          - listitem [ref=e179]: "Waterproofing (wet areas only): Apply KERDI membrane, Wedi Board, or Laticrete Hydro Ban. Allow full cure time before proceeding."
+          - listitem [ref=e180]: "Layout planning: Snap chalk lines through the center of the room. Dry-lay tile in both directions to check cuts at borders. Adjust layout to avoid slivers at visible edges."
+          - listitem [ref=e181]: "Applying thin-set and setting tile: Spread polymer-modified thin-set with the correct notched trowel. Back-butter large-format tiles. Set tile with a rubber mallet and use a leveling clip system to control lippage."
+          - listitem [ref=e182]: "Cutting tile: Use a wet saw for straight cuts. Use an angle grinder for notches and curves. Score glass tile from the front face only."
+          - listitem [ref=e183]: "Curing: Allow thin-set to cure at least 24 hours before grouting — longer in humid or cool conditions."
+          - listitem [ref=e184]: "Grouting: Mix grout to a smooth, lump-free consistency. Pack joints with a grout float. Wipe excess with a damp sponge in circular passes."
+          - listitem [ref=e185]: "Sealing: Apply a penetrating grout sealer 72 hours after grouting. This is required for all cementitious grout in wet or high-traffic areas."
+          - listitem [ref=e186]: "Final cleanup and trim: Install Schluter edge trim at exposed tile edges. Caulk perimeter joints at walls (never grout them). Complete final cleanup."
+        - heading "Floor Tile Installation Guide" [level=2] [ref=e187]
+        - paragraph [ref=e188]: Floor tile installation starts with the subfloor. If it moves, flexes, or isn't level, your tile will crack. No amount of quality tile or premium grout compensates for a bad foundation.
+        - paragraph [ref=e189]: Layout planning is equally critical. Always dry-lay your tile before setting to check the full layout. Snap chalk lines through the center of the room to keep things square. Cut tiles at perimeter walls should be equal on both sides. A cut tile smaller than half a tile width at the wall looks off and is avoidable with proper centering.
+        - paragraph [ref=e190]:
+          - text: For complete floor tile guidance including leveling, expansion joints, and large-format tile installation,
+          - link "read our complete guide to floor tile installation" [ref=e191] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/tile-installation-floor
+          - text: .
+        - heading "Kitchen and Backsplash Tile Installation" [level=2] [ref=e192]
+        - paragraph [ref=e193]: Kitchen backsplash tile installation is one of the most beginner-friendly tile projects. It's a dry area, the tiles are small, and most backsplashes are between 30 and 60 square feet. That said, getting the layout centered, cutting cleanly around outlets, and choosing the right grout takes planning.
+        - heading "Planning Your Backsplash Layout" [level=3] [ref=e194]
+        - paragraph [ref=e195]:
+          - text: Start by finding the visual center of your backsplash — usually centered on the range hood or between windows above the sink. Snap a vertical chalk line there. Dry-lay tiles in both directions to check that cuts at the edges are balanced.
+          - strong [ref=e196]: Avoid ending with a tile sliver smaller than 1/3 tile width
+          - text: at any visible edge or corner.
+        - paragraph [ref=e197]: For outlet boxes, measure carefully and use a tile saw or angle grinder to notch the tile. Never try to snap tile cleanly around an outlet — it rarely works. Use electrical box extenders so cover plates sit flush with the new tile surface.
+        - heading "Grout and Adhesive Selection for Kitchens" [level=3] [ref=e198]
+        - paragraph [ref=e199]:
+          - text: For backsplashes on drywall, most installers use
+          - strong [ref=e200]: mastic adhesive
+          - text: (pre-mixed tile adhesive). It's easier to work with in dry areas and bonds well to standard painted drywall. Do not use mastic behind a range or anywhere with heat or steam — use polymer-modified thin-set there instead.
+        - paragraph [ref=e201]:
+          - strong [ref=e202]: Unsanded grout
+          - text: is standard for joints 1/8 inch or smaller (common with subway tile and mosaic).
+          - strong [ref=e203]: Sanded grout
+          - text: handles joints wider than 1/8 inch. Epoxy grout (like MAPEI Kerapoxy) resists staining and doesn't need sealing — a good choice for light-colored grout near the stove or sink.
+        - paragraph [ref=e204]:
+          - text: For full backsplash layout guides, grout color selection, and coordinating tile with countertops,
+          - link "read our complete guide to kitchen and backsplash tile installation" [ref=e205] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/tile-installation-backsplash
+          - text: .
+        - 'heading "DIY vs. Professional Tile Installation: Which Should You Choose?" [level=2] [ref=e206]'
+        - paragraph [ref=e207]: DIY tile installation is realistic for simple, small, dry-area projects — a kitchen backsplash, a laundry room floor, or a small entryway. For wet areas, large-format tile, or complex patterns, the margin for error shrinks fast and mistakes are expensive to fix.
+        - 'heading "DIY vs. Professional: A Side-by-Side Comparison" [level=3] [ref=e208]'
+        - list [ref=e209]:
+          - listitem [ref=e210]: "Cost: DIY saves $5–$15 per square foot in labor, but tool rental, wasted material, and potential do-overs can eat that savings quickly."
+          - listitem [ref=e211]: "Time: A professional tiles a standard bathroom floor in 1–2 days. A first-time DIYer doing the same job may take 4–6 days spread over two weekends."
+          - listitem [ref=e212]: "Quality: Professionals achieve consistent lippage (less than 1/32 inch per TCNA standards) and clean cuts. These are hard to replicate without experience."
+          - listitem [ref=e213]: "Warranty: Professional installations carry a workmanship warranty. DIY installations carry none — and tile product warranties may be voided if not installed per manufacturer specs."
+          - listitem [ref=e214]: "Best for DIY: Dry backsplashes, simple rectangular floors with standard-size tile, low-stakes areas with forgiving layouts."
+          - listitem [ref=e215]: "Best for pros: Full bathroom renovations, shower walls and floors, large-format tile (18x18 or bigger), natural stone, heated floors, and any wet area requiring waterproofing."
+        - heading "Essential DIY Skills Required" [level=3] [ref=e216]
+        - paragraph [ref=e217]: "Before you start, be honest about your skill set. Successful DIY tile installation requires:"
+        - list [ref=e218]:
+          - listitem [ref=e219]: Measuring accurately and planning layout before setting a single tile
+          - listitem [ref=e220]: Mixing and spreading thin-set mortar at the right consistency
+          - listitem [ref=e221]: Using a wet saw safely and accurately for straight and notched cuts
+          - listitem [ref=e222]: Maintaining consistent spacing with tile spacers or a clip-and-wedge leveling system
+          - listitem [ref=e223]: Grouting without pulling tiles loose or leaving voids in joints
+        - paragraph [ref=e224]:
+          - text: For step-by-step instructions with photos, tool lists, and the most common DIY mistakes to avoid,
+          - link "read our complete DIY tile installation guide" [ref=e225] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/tile-installation-how-to
+          - text: .
+        - heading "How Long Does Tile Installation Take?" [level=2] [ref=e226]
+        - paragraph [ref=e227]: Project timelines vary by room size, tile type, and how much prep work is required. These estimates reflect our experience across 500+ completed projects in Greater Boston (as of 2026).
+        - list [ref=e228]:
+          - listitem [ref=e229]: "Kitchen backsplash (30–60 sq ft): 1–2 days including layout, setting, grouting, and cleanup"
+          - listitem [ref=e230]: "Bathroom floor only (40–60 sq ft): 2–3 days including demo, prep, setting, and grouting"
+          - listitem [ref=e231]: "Full bathroom (floor + walls + shower): 4–7 days depending on waterproofing system and complexity"
+          - listitem [ref=e232]: "Large floor area (200+ sq ft): 3–5 days for setting and grouting; add 1–2 days for substrate prep or self-leveling"
+          - listitem [ref=e233]: "Curing time before foot traffic: 24–72 hours after setting, depending on mortar type and room temperature"
+          - listitem [ref=e234]: "Grouting to final grout seal: Minimum 72 hours curing before sealer application"
+        - paragraph [ref=e235]: DIY projects typically take 2–3x longer due to the learning curve, tool setup, and working in stages over weekends.
+        - heading "Tile Patterns and Design Ideas" [level=2] [ref=e236]
+        - paragraph [ref=e237]: Your tile pattern choice affects more than looks — it directly impacts installation difficulty, labor cost, and how much extra tile you need to order. Some patterns are beginner-friendly; others require experience and a steady hand.
+        - list [ref=e238]:
+          - listitem [ref=e239]: "Running Bond (Subway / Brick Offset): Tiles offset by 1/3 or 1/2. Minimal waste. Great for backsplashes and shower walls. Difficulty: Beginner."
+          - listitem [ref=e240]: "Stacked (Grid / Straight Set): All tiles align vertically and horizontally. Requires a perfectly level layout — any deviation is visible. Difficulty: Beginner to Intermediate."
+          - listitem [ref=e241]: "Herringbone: Tiles set at 45-degree angles in a V-shape. Requires precise cuts and more planning. Increases material waste by 10–15%. Difficulty: Intermediate to Advanced."
+          - listitem [ref=e242]: "Diagonal (Diamond): Tiles rotated 45 degrees — every perimeter tile is a triangle cut. Adds 15–20% more waste. Difficulty: Advanced."
+          - listitem [ref=e243]: "Basketweave: Typically used with mosaic combinations pre-mounted on mesh sheets, which simplifies installation. Difficulty: Intermediate."
+          - listitem [ref=e244]: "Versailles (French Pattern): Multiple tile sizes in a repeating pattern. Used often with travertine and porcelain. Difficulty: Advanced."
+        - paragraph [ref=e245]:
+          - text: For pattern guides with visual examples and layout instructions,
+          - link "read our complete guide to tile installation patterns" [ref=e246] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/blog/12x24-tile-installation-patterns
+          - text: .
+        - heading "Essential Tools and Materials for Tile Installation" [level=2] [ref=e247]
+        - paragraph [ref=e248]: Having the right tools before you start prevents the most common installation errors — uneven tiles, cracked cuts, inconsistent spacing, and weak mortar bonds.
+        - heading "Tools" [level=3] [ref=e249]
+        - list [ref=e250]:
+          - listitem [ref=e251]: "Wet saw (tile saw): Required for straight cuts on porcelain, ceramic, and stone. A 7-inch wet saw handles most residential tile. Rent for $40–$60/day or buy for $150–$400."
+          - listitem [ref=e252]: "Angle grinder with diamond blade: Best for curved cuts, notches, and cutting around pipes."
+          - listitem [ref=e253]: "Manual snap cutter: Works for standard ceramic tile up to about 18 inches. Not suitable for porcelain or stone."
+          - listitem [ref=e254]: "Notched trowel: Spreads thin-set with the right ridge profile. Match notch size to tile size — typically a 3/8-inch V-notch or square notch for standard tile, larger for big-format tile."
+          - listitem [ref=e255]: "Grout float: A rubber-faced tool for pushing grout into joints and clearing excess from the tile surface."
+          - listitem [ref=e256]: "Tile leveling clip system: A clip-and-wedge system (like Raimondi or Tuscan Leveling System) prevents lippage on large-format tile."
+          - listitem [ref=e257]: "Chalk line and measuring tape: For snapping layout lines and centering your tile field accurately."
+          - listitem [ref=e258]: "Rubber mallet: For setting tiles into mortar without cracking them."
+          - listitem [ref=e259]: "Grout sealer applicator: For applying penetrating sealer to finished grout joints after curing."
+        - heading "Materials" [level=3] [ref=e260]
+        - list [ref=e261]:
+          - listitem [ref=e262]: "Thin-set mortar: Polymer-modified thin-set (like MAPEI Ultraflex 2 or Laticrete 254 Platinum) bonds to most substrates and handles minor movement. A 50-lb bag covers roughly 40–50 sq ft at 3/8-inch depth, per manufacturer coverage rates. Use white thin-set under glass or light-colored tile; gray under dark tile."
+          - listitem [ref=e263]: "Grout: Sanded grout for joints wider than 1/8 inch; unsanded for narrower joints. Epoxy grout (MAPEI Kerapoxy, Laticrete SpectraLOCK) resists staining and needs no sealing — higher cost, lower maintenance."
+          - listitem [ref=e264]: "Cement board / backer board: HardieBacker and USG Durock are the most common. Attach with corrosion-resistant screws and tape seams with alkaline-resistant mesh tape before tiling."
+          - listitem [ref=e265]: "Waterproofing membrane: Required in all wet areas. Options include Schluter KERDI, Wedi Board, and Laticrete Hydro Ban."
+          - listitem [ref=e266]: "Schluter DITRA or DITRA-HEAT: Uncoupling membrane for floors. DITRA-HEAT integrates electric radiant heating cables into the mat for heated tile floors."
+          - listitem [ref=e267]: "Grout sealer: Apply to cementitious grout after full cure — typically 72 hours after grouting. Reseal every 1–2 years in high-traffic or wet areas."
+          - listitem [ref=e268]: "Tile: Order 10–15% more than your measured square footage to account for cuts, breakage, and future repairs."
+        - heading "Pro Tips and Common Tile Installation Mistakes to Avoid" [level=2] [ref=e269]
+        - paragraph [ref=e270]: Across 500+ completed tile projects in Greater Boston, we see the same mistakes repeatedly. Most are avoidable. All are expensive to fix after the mortar sets.
+        - heading "The Most Costly Tile Installation Mistakes" [level=3] [ref=e271]
+        - list [ref=e272]:
+          - listitem [ref=e273]: "Skipping the dry layout: Always dry-set your full floor or wall layout before applying mortar. This reveals bad cuts at borders and lets you shift the layout to avoid slivers."
+          - listitem [ref=e274]: "Wrong trowel notch size: Too small a notch means inadequate mortar coverage. Per TCNA standards, floor tile needs at least 80% mortar coverage (95% in wet areas). Use the trowel size specified for your tile format."
+          - listitem [ref=e275]: "Not back-buttering large-format tile: Tiles 15 inches or larger need mortar on both the substrate and the tile back. Skipping this causes hollow spots that crack under foot traffic."
+          - listitem [ref=e276]: "Grouting too soon: Wait at least 24 hours after setting before grouting — longer in humid or cool conditions. Early grouting traps moisture and weakens the bond."
+          - listitem [ref=e277]: "No expansion joints at perimeter walls: A 1/8-inch gap at every perimeter wall and transition — filled with caulk, not grout — is required per TCNA guidelines. Skipping it causes grout and tile to crack outward from the corners."
+          - listitem [ref=e278]: "Using mastic in wet areas: Organic mastic fails when permanently wet. Use only polymer-modified thin-set in showers, shower floors, and around bathtubs."
+          - listitem [ref=e279]: "Ignoring lippage: Lippage is the height difference between adjacent tiles. Per TCNA standards, the maximum is 1/32 inch for joints under 1/4 inch. More than that is a tripping hazard. Large-format tile almost always needs a leveling clip system."
+          - listitem [ref=e280]: "Forgetting to seal: Unsealed grout absorbs stains immediately. Apply penetrating sealer 72 hours after grouting. Reapply every 1–2 years in wet or high-traffic areas."
+        - heading "Pro Tips for a Better Tile Installation" [level=3] [ref=e281]
+        - list [ref=e282]:
+          - listitem [ref=e283]: Mix multiple boxes of tile together before setting — slight dye-lot variations are invisible when blended but obvious in patches.
+          - listitem [ref=e284]: Use a laser level on large floor areas to find high and low points before you start. Self-leveling compound on low spots saves hours of shimming individual tiles.
+          - listitem [ref=e285]: Keep your trowel at a 45-degree angle when spreading thin-set to create uniform ridges that fully collapse under the tile.
+          - listitem [ref=e286]: Score glass tile from the front face — cutting from the mesh side chips the visible surface.
+          - listitem [ref=e287]: Change your wet saw water frequently — dirty water reduces blade life and causes chips on porcelain edges.
+          - listitem [ref=e288]: Plan for Schluter edge trim (JOLLY, RONDEC, QUADEC) at all exposed tile edges — it protects the edge and looks professional without needing bullnose tile.
+        - heading "How Do You Choose a Qualified Tile Installer in Massachusetts?" [level=2] [ref=e289]
+        - paragraph [ref=e290]: Hiring the right tile installer matters as much as choosing the right tile. A bad installation costs more to fix than it did to do incorrectly in the first place. Here's how to find someone worth hiring.
+        - heading "What to Look for in a Tile Installer" [level=3] [ref=e291]
+        - list [ref=e292]:
+          - listitem [ref=e293]: "Verifiable portfolio: Ask to see completed projects similar to yours — shower installations, large-format floor tile, or natural stone. Photos should show clean grout lines, consistent spacing, and tight cuts at edges."
+          - listitem [ref=e294]: "References from recent projects: A confident installer gives references without hesitation. Call them and ask about cleanup, timeline, and how the installer handled problems."
+          - listitem [ref=e295]: "Liability insurance and workers' comp: Ask for certificates — not just a verbal confirmation."
+          - listitem [ref=e296]: "Written estimate with line items: Labor, materials, substrate prep, waterproofing, and demo should each be separate. A lump-sum bid makes it impossible to compare quotes or spot what's missing."
+          - listitem [ref=e297]: "Experience with your specific tile type: Installing large-format porcelain is different from setting natural stone or mosaic glass. Make sure the installer has hands-on experience with your tile, not just tile in general."
+        - heading "Questions to Ask Before You Hire" [level=3] [ref=e298]
+        - list [ref=e299]:
+          - listitem [ref=e300]: How do you handle substrate prep — and what happens if you find damage under the existing floor?
+          - listitem [ref=e301]: What waterproofing system do you use in wet areas, and why?
+          - listitem [ref=e302]: Do you use a leveling clip system on large-format tile?
+          - listitem [ref=e303]: How many days will this project take, and will you be on-site every day?
+          - listitem [ref=e304]: What's your process for protecting the rest of my home during the project?
+          - listitem [ref=e305]: Do you offer a workmanship warranty — and what does it cover?
+        - heading "Red Flags to Watch For" [level=3] [ref=e306]
+        - list [ref=e307]:
+          - listitem [ref=e308]: Cash-only payment with no written contract
+          - listitem [ref=e309]: A bid significantly lower than all other quotes (usually means skipped steps)
+          - listitem [ref=e310]: No verifiable business address, license number, or online reviews
+          - listitem [ref=e311]: Pressure to decide or sign same-day
+          - listitem [ref=e312]: Vague answers about waterproofing, substrate, or curing time
+        - paragraph [ref=e313]:
+          - text: At
+          - link "Aguirre Modern Tile" [ref=e314] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com
+          - text: ", every project starts with a written estimate that breaks down labor, materials, and prep work separately. Owner Christian Aguirre has been installing tile in Greater Boston for"
+          - strong [ref=e315]: 15+ years
+          - text: and personally oversees every project.
+          - link "Contact us to schedule a free in-home consultation" [ref=e316] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/contact
+          - text: .
+        - heading "Ready to Start Your Tile Installation Project?" [level=2] [ref=e317]
+        - paragraph [ref=e318]: Tile installation done right transforms a room for decades. Done wrong, it leads to cracked grout, failed waterproofing, and expensive repairs within a few years. The difference comes down to prep, materials, and the skill of who lays the tile.
+        - paragraph [ref=e319]:
+          - text: At
+          - link "Aguirre Modern Tile" [ref=e320] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com
+          - text: ", owner Christian Aguirre and our team bring"
+          - strong [ref=e321]: 15+ years of tile installation experience
+          - text: to every project in Greater Boston. We've completed
+          - strong [ref=e322]: 500+ installations
+          - text: across bathrooms, kitchens, floors, and custom showers — using professional-grade materials like Schluter KERDI, MAPEI thin-set, and Laticrete grout systems on every job. We carry full liability insurance and stand behind our work with a written workmanship warranty.
+        - paragraph [ref=e323]:
+          - text: Planning a bathroom floor, shower remodel, or kitchen backsplash?
+          - link "Request a free tile installation quote for your specific project" [ref=e324] [cursor=pointer]:
+            - /url: https://www.aguirremoderntile.com/quote
+          - text: — send us your room type, square footage, and tile choice, and we'll send back an itemized estimate the same day.
+      - generic [ref=e325]:
+        - generic [ref=e326]: "#tile installation"
+        - generic [ref=e327]: "#floor tile"
+        - generic [ref=e328]: "#bathroom tile"
+        - generic [ref=e329]: "#professional tile installer"
+        - generic [ref=e330]: "#Boston tile installation"
+      - generic [ref=e331]:
+        - heading "Frequently Asked Questions" [level=2] [ref=e332]
+        - generic [ref=e333]:
+          - group [ref=e334]:
+            - generic "How much does tile installation cost per square foot in Greater Boston? ▾" [ref=e335] [cursor=pointer]:
+              - text: How much does tile installation cost per square foot in Greater Boston?
+              - generic [ref=e336]: ▾
+          - group [ref=e337]:
+            - generic "How long does tile installation take? ▾" [ref=e338] [cursor=pointer]:
+              - text: How long does tile installation take?
+              - generic [ref=e339]: ▾
+          - group [ref=e340]:
+            - generic "Can I tile over existing tile? ▾" [ref=e341] [cursor=pointer]:
+              - text: Can I tile over existing tile?
+              - generic [ref=e342]: ▾
+          - group [ref=e343]:
+            - generic "What is the best tile for a shower? ▾" [ref=e344] [cursor=pointer]:
+              - text: What is the best tile for a shower?
+              - generic [ref=e345]: ▾
+          - group [ref=e346]:
+            - generic "Do I need to waterproof before tiling a shower? ▾" [ref=e347] [cursor=pointer]:
+              - text: Do I need to waterproof before tiling a shower?
+              - generic [ref=e348]: ▾
+          - group [ref=e349]:
+            - generic "What's the difference between thinset mortar and mastic adhesive? ▾" [ref=e350] [cursor=pointer]:
+              - text: What's the difference between thinset mortar and mastic adhesive?
+              - generic [ref=e351]: ▾
+          - group [ref=e352]:
+            - generic "How often does grout need to be sealed? ▾" [ref=e353] [cursor=pointer]:
+              - text: How often does grout need to be sealed?
+              - generic [ref=e354]: ▾
+    - generic [ref=e356]:
+      - heading "Ready to Get Started?" [level=2] [ref=e357]
+      - paragraph [ref=e358]: Send us photos and get a same-day estimate.
+      - link "Get Your Free Estimate" [ref=e360] [cursor=pointer]:
+        - /url: /contact
+  - contentinfo [ref=e361]:
+    - generic [ref=e363]:
+      - generic [ref=e364]:
+        - generic [ref=e365]:
+          - img "Aguirre Modern Tile" [ref=e367]
+          - generic [ref=e368]:
+            - generic [ref=e369]: Aguirre Modern Tile
+            - generic [ref=e370]: Expert Tile Installation
+        - paragraph [ref=e371]: Professional tile installation in Greater Boston for over 15 years. Bathroom renovations, shower builds, floor tile, backsplash, and repair.
+        - generic [ref=e372]:
+          - img [ref=e373]
+          - generic [ref=e375]: "4.9"
+          - generic [ref=e376]: "| 150+ Google Reviews"
+      - generic [ref=e377]:
+        - heading "Our Services" [level=3] [ref=e378]
+        - list [ref=e379]:
+          - listitem [ref=e380]:
+            - link "Bathroom Tile Installation" [ref=e381] [cursor=pointer]:
+              - /url: /services/bathroom-tile
+          - listitem [ref=e382]:
+            - link "Shower Tile Installation" [ref=e383] [cursor=pointer]:
+              - /url: /services/shower-tile
+          - listitem [ref=e384]:
+            - link "Floor Tile Installation" [ref=e385] [cursor=pointer]:
+              - /url: /services/floor-tile
+          - listitem [ref=e386]:
+            - link "Backsplash Tile Installation" [ref=e387] [cursor=pointer]:
+              - /url: /services/backsplash-tile
+          - listitem [ref=e388]:
+            - link "Tile Repair" [ref=e389] [cursor=pointer]:
+              - /url: /services/tile-repair
+          - listitem [ref=e390]:
+            - link "Tile Reglazing" [ref=e391] [cursor=pointer]:
+              - /url: /services/tile-reglazing
+      - generic [ref=e392]:
+        - heading "Service Areas" [level=3] [ref=e393]
+        - generic [ref=e394]:
+          - generic [ref=e395]: Revere
+          - generic [ref=e396]: Boston
+          - generic [ref=e397]: Cambridge
+          - generic [ref=e398]: Somerville
+          - generic [ref=e399]: Everett
+          - generic [ref=e400]: Chelsea
+          - generic [ref=e401]: Malden
+          - generic [ref=e402]: Medford
+          - generic [ref=e403]: Melrose
+          - generic [ref=e404]: Lynn
+          - generic [ref=e405]: Saugus
+          - generic [ref=e406]: Winthrop
+          - generic [ref=e407]: Brookline
+          - generic [ref=e408]: Arlington
+          - generic [ref=e409]: Belmont
+          - generic [ref=e410]: Watertown
+      - generic [ref=e411]:
+        - heading "Contact Us" [level=3] [ref=e412]
+        - list [ref=e413]:
+          - listitem [ref=e414]:
+            - link "(617) 766-1259" [ref=e415] [cursor=pointer]:
+              - /url: tel:6177661259
+              - img [ref=e416]
+              - text: (617) 766-1259
+          - listitem [ref=e418]:
+            - link "vin@moderntile.pro" [ref=e419] [cursor=pointer]:
+              - /url: mailto:vin@moderntile.pro
+              - img [ref=e420]
+              - text: vin@moderntile.pro
+          - listitem [ref=e423]:
+            - img [ref=e424]
+            - generic [ref=e427]: 106 Pemberton St, Revere, MA 02151
+          - listitem [ref=e428]:
+            - img [ref=e429]
+            - generic [ref=e432]: "Mon-Sat: 7AM - 6PM"
+        - link "Get Free Estimate" [ref=e433] [cursor=pointer]:
+          - /url: /contact
+    - generic [ref=e435]:
+      - paragraph [ref=e436]: © 2026 Aguirre Modern Tile. All rights reserved.
+      - generic [ref=e437]:
+        - link "Privacy Policy" [ref=e438] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms of Service" [ref=e439] [cursor=pointer]:
+          - /url: /terms
+  - alert [ref=e440]

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
 
 const RESEND_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
 const TO_EMAIL = process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +43,64 @@ export async function POST(req: NextRequest) {
         if (typeof v === 'string') {
           answers[sanitize(k).slice(0, 100)] = sanitize(v)
         }
+      }
+    }
+
+    // Save to Supabase — unless /api/quotes already handled this submission
+    if (source !== 'quote' && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+        let customerId: string | null = null
+        if (email) {
+          const { data: existing } = await supabase
+            .from('customers')
+            .select('id')
+            .ilike('email', email)
+            .limit(1)
+            .single()
+          if (existing) customerId = existing.id
+        }
+        if (!customerId && phone) {
+          const { data: existing } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('phone', phone)
+            .limit(1)
+            .single()
+          if (existing) customerId = existing.id
+        }
+        if (!customerId) {
+          const { data: newCustomer } = await supabase
+            .from('customers')
+            .insert({
+              name,
+              email: email || null,
+              phone: phone || null,
+              source: 'website',
+            })
+            .select('id')
+            .single()
+          if (newCustomer) customerId = newCustomer.id
+        }
+
+        const answersWithDescription = {
+          ...answers,
+          ...(description ? { description } : {}),
+        }
+
+        await supabase.from('quote_requests').insert({
+          client_name: name,
+          client_email: email,
+          client_phone: phone,
+          project_type: projectType || 'other',
+          answers: answersWithDescription,
+          status: 'new',
+          customer_id: customerId,
+        })
+      } catch (err) {
+        // Non-fatal: email still sends even if DB write fails
+        console.error('Contact form Supabase write error:', err)
       }
     }
 

@@ -78,6 +78,7 @@ export interface Job {
   notion_last_synced_at: string | null
   assigned_to: string | null
   notes: string | null
+  crew_instructions: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -149,6 +150,8 @@ export interface QuoteRequest {
   next_follow_up: string | null
   lost_reason: string | null
   notes: string | null
+  site_visit_at: string | null
+  site_visit_notes: string | null
   created_at: string
   updated_at: string
 }

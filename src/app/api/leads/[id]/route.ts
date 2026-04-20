@@ -58,6 +58,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       'last_contact_at',
       'lost_reason',
       'answers',
+      'site_visit_at',
+      'site_visit_notes',
     ]) {
       if (key in body) allowed[key] = body[key]
     }

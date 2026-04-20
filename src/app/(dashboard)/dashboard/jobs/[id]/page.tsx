@@ -274,6 +274,16 @@ export default async function JobDetailPage({
             </div>
           </div>
 
+          {/* Crew Instructions — always visible when set */}
+          {job.crew_instructions && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-amber-900 uppercase tracking-wider mb-2">
+                Instructions for the crew
+              </h3>
+              <p className="text-sm text-amber-900 whitespace-pre-wrap">{job.crew_instructions}</p>
+            </div>
+          )}
+
           {/* Scope of Work */}
           {job.scope_notes && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -282,8 +292,8 @@ export default async function JobDetailPage({
             </div>
           )}
 
-          {/* Internal Notes — collapsed by default */}
-          {job.notes && (
+          {/* Internal Notes — owner only, collapsed by default */}
+          {isOwner && job.notes && (
             <details className="bg-white rounded-xl shadow-sm border border-gray-200 group">
               <summary className="cursor-pointer list-none p-4 flex items-center justify-between">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -305,17 +315,19 @@ export default async function JobDetailPage({
         <JobLineItems items={job.line_items ?? []} jobId={job.id} isOwner={isOwner} />
       </div>
 
-      {/* Estimate + Invoice — collapsed by default */}
-      <details className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 group">
-        <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Estimate &amp; Invoice</h3>
-          <span className="text-xs text-gray-400 group-open:hidden">Show</span>
-          <span className="text-xs text-gray-400 hidden group-open:inline">Hide</span>
-        </summary>
-        <div className="px-4 pb-4 -mt-2">
-          <EstimateInvoiceCards job={job} invoices={invoices} />
-        </div>
-      </details>
+      {/* Estimate + Invoice — owner only, collapsed by default */}
+      {isOwner && (
+        <details className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 group">
+          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900">Estimate &amp; Invoice</h3>
+            <span className="text-xs text-gray-400 group-open:hidden">Show</span>
+            <span className="text-xs text-gray-400 hidden group-open:inline">Hide</span>
+          </summary>
+          <div className="px-4 pb-4 -mt-2">
+            <EstimateInvoiceCards job={job} invoices={invoices} />
+          </div>
+        </details>
+      )}
 
       {/* Photos — collapsed by default */}
       {photosWithUrls.length > 0 && (

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, Phone, AlertCircle, Briefcase, Sparkles, ArrowRight, CalendarDays } from 'lucide-react'
+import { Plus, Phone, AlertCircle, Briefcase, Sparkles, ArrowRight, CalendarDays, MapPin } from 'lucide-react'
 import { demoJobs, demoProfile } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, QuoteRequest } from '@/lib/supabase/types'
@@ -121,6 +121,15 @@ function OwnerHome({
     .sort((a, b) => (a.next_follow_up ?? '').localeCompare(b.next_follow_up ?? ''))
     .slice(0, 5)
 
+  const visitsToday = leads
+    .filter(
+      (l) =>
+        (l.status === 'new' || l.status === 'reviewed') &&
+        l.site_visit_at &&
+        l.site_visit_at.slice(0, 10) === todayStr
+    )
+    .sort((a, b) => (a.site_visit_at ?? '').localeCompare(b.site_visit_at ?? ''))
+
   const activeJobs = jobs
     .filter((j) => j.status === 'in_progress' || j.status === 'scheduled')
     .slice(0, 5)
@@ -170,46 +179,101 @@ function OwnerHome({
             <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
               <AlertCircle className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-semibold text-gray-900">Follow up today</h2>
-            {followUps.length > 0 && (
+            <h2 className="text-sm font-semibold text-gray-900">Today</h2>
+            {(followUps.length + visitsToday.length) > 0 && (
               <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700">
-                {followUps.length}
+                {followUps.length + visitsToday.length}
               </span>
             )}
           </div>
 
-          {followUps.length === 0 ? (
-            <p className="text-sm text-gray-500">Nothing due today. Nice.</p>
-          ) : (
-            <ul className="space-y-3">
-              {followUps.map((lead) => (
-                <li key={lead.id}>
-                  <Link
-                    href={`/dashboard/leads/${lead.id}`}
-                    className="block p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {lead.client_name}
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">{lead.project_type}</p>
+          {visitsToday.length > 0 && (
+            <div className="mb-3">
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                In-person estimates
+              </p>
+              <ul className="space-y-2">
+                {visitsToday.map((lead) => {
+                  const visitTime = new Date(lead.site_visit_at!).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                  return (
+                    <li key={lead.id}>
+                      <Link
+                        href={`/dashboard/leads/${lead.id}`}
+                        className="block p-3 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-amber-700" />
+                              {visitTime} · {lead.client_name}
+                            </p>
+                            <p className="text-xs text-gray-500 capitalize truncate">
+                              {lead.project_type}
+                              {lead.site_visit_notes ? ` · ${lead.site_visit_notes}` : ''}
+                            </p>
+                          </div>
+                          {lead.client_phone && (
+                            <a
+                              href={`tel:${lead.client_phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-700 bg-white rounded-md hover:bg-primary-50 shrink-0"
+                            >
+                              <Phone className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
+          {followUps.length > 0 && (
+            <div>
+              {visitsToday.length > 0 && (
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Follow-ups
+                </p>
+              )}
+              <ul className="space-y-2">
+                {followUps.map((lead) => (
+                  <li key={lead.id}>
+                    <Link
+                      href={`/dashboard/leads/${lead.id}`}
+                      className="block p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {lead.client_name}
+                          </p>
+                          <p className="text-xs text-gray-500 capitalize">{lead.project_type}</p>
+                        </div>
+                        {lead.client_phone && (
+                          <a
+                            href={`tel:${lead.client_phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-md hover:bg-primary-100"
+                          >
+                            <Phone className="w-3 h-3" />
+                            Call
+                          </a>
+                        )}
                       </div>
-                      {lead.client_phone && (
-                        <a
-                          href={`tel:${lead.client_phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary-700 bg-primary-50 rounded-md hover:bg-primary-100"
-                        >
-                          <Phone className="w-3 h-3" />
-                          Call
-                        </a>
-                      )}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {followUps.length === 0 && visitsToday.length === 0 && (
+            <p className="text-sm text-gray-500">Nothing on deck today. Nice.</p>
           )}
 
           <Link

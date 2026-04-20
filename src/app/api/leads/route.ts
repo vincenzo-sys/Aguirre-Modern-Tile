@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
       source = 'phone',
       notes,
       next_follow_up,
+      site_visit_at,
+      site_visit_notes,
       answers = {},
     } = body
 
@@ -85,6 +87,8 @@ export async function POST(request: NextRequest) {
         source,
         notes: notes || null,
         next_follow_up: next_follow_up || null,
+        site_visit_at: site_visit_at || null,
+        site_visit_notes: site_visit_notes || null,
       })
       .select()
       .single()

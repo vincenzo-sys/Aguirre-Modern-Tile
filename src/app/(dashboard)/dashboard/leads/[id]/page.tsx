@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive, CheckCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive, CheckCircle, MapPin } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
 
@@ -33,6 +33,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [nextFollowUp, setNextFollowUp] = useState('')
   const [source, setSource] = useState<string>('website')
   const [lostReason, setLostReason] = useState('')
+  const [siteVisitAt, setSiteVisitAt] = useState('')
+  const [siteVisitNotes, setSiteVisitNotes] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -48,6 +50,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       setNextFollowUp(data.next_follow_up ?? '')
       setSource(data.source ?? 'website')
       setLostReason(data.lost_reason ?? '')
+      setSiteVisitAt(
+        data.site_visit_at ? new Date(data.site_visit_at).toISOString().slice(0, 16) : ''
+      )
+      setSiteVisitNotes(data.site_visit_notes ?? '')
       setLoading(false)
     }
     load()
@@ -76,6 +82,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       source,
       lost_reason: lostReason || null,
       last_contact_at: new Date().toISOString(),
+      site_visit_at: siteVisitAt ? new Date(siteVisitAt).toISOString() : null,
+      site_visit_notes: siteVisitNotes || null,
     })
     setSaving(false)
     toast('Saved', 'success')
@@ -214,6 +222,38 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               </dl>
             </div>
           )}
+
+          {/* In-person estimate visit */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-gray-400" />
+              In-person estimate visit
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Date &amp; time</label>
+                <input
+                  type="datetime-local"
+                  value={siteVisitAt}
+                  onChange={(e) => setSiteVisitAt(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Visit notes</label>
+                <input
+                  type="text"
+                  value={siteVisitNotes}
+                  onChange={(e) => setSiteVisitNotes(e.target.value)}
+                  placeholder="Gate code, parking, what to bring..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Save on the right → visit appears on your Home page and the leads list.
+            </p>
+          </div>
 
           {/* Notes */}
           <div className="bg-white rounded-lg border border-gray-200 p-5">

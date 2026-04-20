@@ -3,15 +3,25 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MapPin, Camera, Play, CheckCircle2, Package, Clock } from 'lucide-react'
+import {
+  MapPin,
+  Camera,
+  Play,
+  CheckCircle2,
+  Package,
+  Clock,
+  Phone,
+  ClipboardList,
+  AlertCircle,
+} from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { Job, JobLineItem, JobStatus, MaterialStatus } from '@/lib/supabase/types'
 
-const statusMetaFor: Record<MaterialStatus, string> = {
-  needed: 'Needed',
-  ordered: 'Ordered',
-  received: 'Received',
-  on_site: 'On site',
+const statusMetaFor: Record<MaterialStatus, { label: string; className: string }> = {
+  needed: { label: 'Needed', className: 'bg-gray-100 text-gray-700' },
+  ordered: { label: 'Ordered', className: 'bg-blue-100 text-blue-700' },
+  received: { label: 'Received', className: 'bg-yellow-100 text-yellow-700' },
+  on_site: { label: 'On site', className: 'bg-green-100 text-green-700' },
 }
 
 function nextActionFor(status: JobStatus): { next: JobStatus; label: string; icon: typeof Play } | null {
@@ -33,7 +43,6 @@ export default function InstallerJobCard({ job }: { job: Job }) {
   const materials = (job.line_items ?? []).filter(
     (i): i is JobLineItem => i.category === 'materials'
   )
-  const topMaterials = materials.slice(0, 3)
   const needingCount = materials.filter((m) => (m.status ?? 'needed') === 'needed').length
 
   async function advanceStatus() {
@@ -63,28 +72,42 @@ export default function InstallerJobCard({ job }: { job: Job }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
+        {/* Title + status */}
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 truncate">{job.title}</h3>
-            <p className="text-sm text-gray-500 truncate">{job.client_name}</p>
+            <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+            <p className="text-sm text-gray-500">{job.client_name}</p>
           </div>
           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700 capitalize whitespace-nowrap">
             {status.replace('_', ' ')}
           </span>
         </div>
 
-        {job.client_address && (
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${addressQuery}`}
-            target="_blank"
-            rel="noopener"
-            className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:underline mb-4"
-          >
-            <MapPin className="w-4 h-4" />
-            {job.client_address}
-          </a>
-        )}
+        {/* Customer contact — tap-to-call + tap-to-map */}
+        <div className="space-y-2 mb-4">
+          {job.client_phone && (
+            <a
+              href={`tel:${job.client_phone.replace(/\D/g, '')}`}
+              className="flex items-center gap-2 px-3 py-2 bg-primary-50 hover:bg-primary-100 rounded-lg text-primary-700 font-medium text-sm"
+            >
+              <Phone className="w-4 h-4 shrink-0" />
+              {job.client_phone}
+            </a>
+          )}
+          {job.client_address && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${addressQuery}`}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-gray-700 font-medium text-sm"
+            >
+              <MapPin className="w-4 h-4 shrink-0" />
+              <span className="truncate">{job.client_address}</span>
+            </a>
+          )}
+        </div>
 
+        {/* Primary action */}
         {action && (
           <button
             type="button"
@@ -97,41 +120,75 @@ export default function InstallerJobCard({ job }: { job: Job }) {
           </button>
         )}
 
-        {topMaterials.length > 0 && (
-          <div className="mb-3">
+        {/* Crew instructions — the field Vince writes for Christian */}
+        {job.crew_instructions && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 uppercase tracking-wider mb-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Instructions
+            </div>
+            <p className="text-sm text-amber-900 whitespace-pre-wrap">{job.crew_instructions}</p>
+          </div>
+        )}
+
+        {/* Scope of work */}
+        {job.scope_notes && (
+          <div className="mb-4">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+              <ClipboardList className="w-3.5 h-3.5" />
+              Scope
+            </div>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.scope_notes}</p>
+          </div>
+        )}
+
+        {/* Full materials list */}
+        {materials.length > 0 && (
+          <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Materials
-              </span>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <Package className="w-3.5 h-3.5" />
+                Materials ({materials.length})
+              </div>
               {needingCount > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
-                  <Package className="w-3 h-3" />
-                  {needingCount} still needed
+                  {needingCount} not ready
                 </span>
               )}
             </div>
-            <ul className="space-y-1">
-              {topMaterials.map((m, i) => (
-                <li key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700 truncate">{m.description}</span>
-                  <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
-                    {statusMetaFor[m.status ?? 'needed']}
-                  </span>
-                </li>
-              ))}
-              {materials.length > 3 && (
-                <li className="text-xs text-gray-400">+{materials.length - 3} more</li>
-              )}
+            <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+              {materials.map((m, i) => {
+                const meta = statusMetaFor[m.status ?? 'needed']
+                return (
+                  <li
+                    key={i}
+                    className="px-3 py-2 flex items-center justify-between gap-2 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-gray-900 truncate">{m.description}</p>
+                      <p className="text-xs text-gray-500">
+                        {m.quantity} {m.unit}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${meta.className} shrink-0`}
+                    >
+                      {meta.label}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}
 
+        {/* Footer actions */}
         <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
           <Link
             href={`/dashboard/jobs/${job.id}`}
             className="flex-1 text-center text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md py-2"
           >
-            View details
+            Full details
           </Link>
           <Link
             href={`/dashboard/jobs/${job.id}#photos`}
@@ -142,6 +199,7 @@ export default function InstallerJobCard({ job }: { job: Job }) {
           </Link>
         </div>
 
+        {/* Schedule line (when not in active state) */}
         {job.scheduled_start && !action && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-3">
             <Clock className="w-3 h-3" />

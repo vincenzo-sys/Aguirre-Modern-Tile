@@ -32,6 +32,7 @@ export default function JobEditForm({ job, teamMembers }: JobEditFormProps) {
     actual_cost: job.actual_cost?.toString() ?? '',
     assigned_to: job.assigned_to ?? '',
     notes: job.notes ?? '',
+    crew_instructions: job.crew_instructions ?? '',
     client_name: job.client_name,
     client_phone: job.client_phone ?? '',
     client_email: job.client_email ?? '',
@@ -60,6 +61,7 @@ export default function JobEditForm({ job, teamMembers }: JobEditFormProps) {
           actual_cost: form.actual_cost ? parseFloat(form.actual_cost) : null,
           assigned_to: form.assigned_to || null,
           notes: form.notes || null,
+          crew_instructions: form.crew_instructions || null,
           client_name: form.client_name,
           client_phone: form.client_phone || null,
           client_email: form.client_email || null,
@@ -186,10 +188,20 @@ export default function JobEditForm({ job, teamMembers }: JobEditFormProps) {
 
         <div className="md:col-span-2">
           <label className={labelClass}>Scope of Work</label>
-          <textarea rows={4} value={form.scope_notes} onChange={(e) => updateField('scope_notes', e.target.value)} className={inputClass} />
+          <textarea rows={4} value={form.scope_notes} onChange={(e) => updateField('scope_notes', e.target.value)} className={inputClass} placeholder="What's getting installed — visible to Christian." />
         </div>
         <div className="md:col-span-2">
-          <label className={labelClass}>Internal Notes</label>
+          <label className={labelClass}>Instructions for the crew</label>
+          <textarea
+            rows={3}
+            value={form.crew_instructions}
+            onChange={(e) => updateField('crew_instructions', e.target.value)}
+            className={inputClass}
+            placeholder="Gate code, parking, customer quirks, anything Christian needs to know on site."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelClass}>Internal Notes <span className="text-gray-400 normal-case font-normal">(sales-side only, not for crew)</span></label>
           <textarea rows={3} value={form.notes} onChange={(e) => updateField('notes', e.target.value)} className={inputClass} />
         </div>
       </div>

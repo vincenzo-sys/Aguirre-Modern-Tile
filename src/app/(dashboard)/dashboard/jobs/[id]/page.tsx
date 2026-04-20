@@ -7,6 +7,8 @@ import CustomerCard from '@/components/dashboard/CustomerCard'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
 import JobEditForm from '@/components/dashboard/JobEditForm'
+import CrewLog from '@/components/dashboard/CrewLog'
+import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -329,44 +331,101 @@ export default async function JobDetailPage({
         </details>
       )}
 
-      {/* Photos — collapsed by default */}
-      {photosWithUrls.length > 0 && (
-        <details id="photos" className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 group">
-          <summary className="cursor-pointer list-none px-4 py-3 bg-gray-800 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-              <ImageIcon className="w-4 h-4" />
-              Photos ({photosWithUrls.length})
-            </h3>
-            <span className="text-xs text-gray-300 group-open:hidden">Show</span>
-            <span className="text-xs text-gray-300 hidden group-open:inline">Hide</span>
-          </summary>
-          <div className="p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {photosWithUrls.map((photo) => (
-                <div key={photo.id} className="group">
-                  {photo.url ? (
-                    <a href={photo.url} target="_blank" rel="noopener noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photo.url}
-                        alt={photo.caption || photo.file_name}
-                        className="w-full aspect-square object-cover rounded-lg border border-gray-200 group-hover:border-primary-300 transition-colors"
-                      />
-                    </a>
-                  ) : (
-                    <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-                      <ImageIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                  )}
-                  {photo.caption && (
-                    <p className="text-xs text-gray-500 mt-1 truncate">{photo.caption}</p>
-                  )}
-                </div>
-              ))}
-            </div>
+      {/* Field log — any user can add entries */}
+      <div className="mb-6">
+        <CrewLog
+          jobId={job.id}
+          initialLog={job.crew_log}
+          authorName={profile.full_name?.split(' ')[0] || 'Crew'}
+        />
+      </div>
+
+      {/* Photos — Before */}
+      <PhotoSection
+        id="photos"
+        title="Before photos"
+        description={
+          isOwner
+            ? 'Reference shots Christian uses on site.'
+            : 'Reference shots from Vince — use these on site.'
+        }
+        photos={photosWithUrls.filter(
+          (p) => p.photo_type === 'before' || p.photo_type === 'reference'
+        )}
+        uploadSlot={
+          isOwner ? (
+            <UploadJobPhotos jobId={job.id} photoType="before" label="Add before photos" />
+          ) : null
+        }
+      />
+
+      {/* Photos — After */}
+      <PhotoSection
+        title="After photos"
+        description="Finished work. Christian uploads these on site."
+        photos={photosWithUrls.filter((p) => p.photo_type === 'after')}
+        uploadSlot={<UploadJobPhotos jobId={job.id} photoType="after" label="Add after photos" />}
+      />
+    </div>
+  )
+}
+
+function PhotoSection({
+  id,
+  title,
+  description,
+  photos,
+  uploadSlot,
+}: {
+  id?: string
+  title: string
+  description: string
+  photos: (JobPhoto & { url?: string })[]
+  uploadSlot: React.ReactNode
+}) {
+  return (
+    <div id={id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-gray-500" />
+            {title}
+            <span className="text-xs font-normal text-gray-400">({photos.length})</span>
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+        </div>
+        {uploadSlot}
+      </div>
+
+      <div className="p-4">
+        {photos.length === 0 ? (
+          <p className="text-sm text-gray-400 italic text-center py-6">No photos yet.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {photos.map((photo) => (
+              <div key={photo.id}>
+                {photo.url ? (
+                  <a href={photo.url} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.url}
+                      alt={photo.caption || photo.file_name}
+                      className="w-full aspect-square object-cover rounded-lg border border-gray-200 hover:border-primary-300 transition-colors"
+                    />
+                  </a>
+                ) : (
+                  <div className="w-full aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+                {photo.caption && (
+                  <p className="text-xs text-gray-500 mt-1 truncate">{photo.caption}</p>
+                )}
+              </div>
+            ))}
           </div>
-        </details>
-      )}
+        )}
+      </div>
     </div>
   )
 }

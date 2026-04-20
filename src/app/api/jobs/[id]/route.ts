@@ -75,7 +75,7 @@ export async function PATCH(
       'customer_id', 'job_type', 'square_footage', 'scope_notes',
       'scheduled_start', 'scheduled_end', 'estimated_days', 'actual_days',
       'estimated_cost', 'actual_cost', 'amount_invoiced', 'amount_paid',
-      'line_items', 'assigned_to', 'notes', 'crew_instructions',
+      'line_items', 'assigned_to', 'notes', 'crew_instructions', 'crew_log',
     ]
 
     const updates: Record<string, unknown> = {}

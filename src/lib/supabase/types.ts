@@ -79,6 +79,7 @@ export interface Job {
   assigned_to: string | null
   notes: string | null
   crew_instructions: string | null
+  crew_log: string | null
   created_by: string | null
   created_at: string
   updated_at: string

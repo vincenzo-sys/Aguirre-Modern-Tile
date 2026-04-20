@@ -4,7 +4,6 @@ import { Plus } from 'lucide-react'
 import { demoJobs, demoProfile, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, JobWithAssignee, JobStatus } from '@/lib/supabase/types'
-import MetricsCards from '@/components/dashboard/MetricsCards'
 import ViewSwitcher from '@/components/dashboard/ViewSwitcher'
 import JobsFilterBar from '@/components/dashboard/JobsFilterBar'
 import { filterJobs } from '@/lib/filterJobs'
@@ -13,6 +12,7 @@ import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import CalendarView from '@/components/dashboard/CalendarView'
 import CrewWeekView from '@/components/dashboard/CrewWeekView'
 import TimelineView from '@/components/dashboard/TimelineView'
+import TodayUpcomingJobs from '@/components/dashboard/TodayUpcomingJobs'
 
 const statusTabMap: Record<string, JobStatus[]> = {
   leads: ['lead'],
@@ -98,7 +98,7 @@ export default async function JobsPage({
   }
 
   const { view: viewParam, status: statusFilter, type: typeFilter, q: searchFilter } = await searchParams
-  const view = viewParam || 'kanban'
+  const view = viewParam || 'cards'
 
   // Apply filters
   const filtered = filterJobs(
@@ -128,10 +128,6 @@ export default async function JobsPage({
         )}
       </div>
 
-      <div className="mb-6">
-        <MetricsCards jobs={jobList} />
-      </div>
-
       <Suspense fallback={null}>
         <JobsFilterBar jobCount={jobList.length} />
       </Suspense>
@@ -143,11 +139,12 @@ export default async function JobsPage({
       </div>
 
       {view === 'calendar' && <CalendarView jobs={filtered} />}
+      {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
+      {view === 'kanban' && <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />}
       {view === 'list' && <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />}
       {view === 'crew' && <CrewWeekView jobs={filtered} team={team} />}
-      {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
-      {!['calendar', 'list', 'crew', 'timeline'].includes(view) && (
-        <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />
+      {!['calendar', 'timeline', 'kanban', 'list', 'crew'].includes(view) && (
+        <TodayUpcomingJobs jobs={filtered} />
       )}
     </div>
   )

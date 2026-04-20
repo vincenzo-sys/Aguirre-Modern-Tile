@@ -1,11 +1,12 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Columns3, Calendar } from 'lucide-react'
+import { LayoutGrid, Calendar, GanttChart } from 'lucide-react'
 
 const views = [
-  { key: 'kanban', label: 'Board', icon: Columns3 },
+  { key: 'cards', label: 'Cards', icon: LayoutGrid },
   { key: 'calendar', label: 'Calendar', icon: Calendar },
+  { key: 'timeline', label: 'Timeline', icon: GanttChart },
 ] as const
 
 export type ViewMode = (typeof views)[number]['key']
@@ -13,11 +14,11 @@ export type ViewMode = (typeof views)[number]['key']
 export default function ViewSwitcher() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const current = (searchParams.get('view') as ViewMode) || 'kanban'
+  const current = (searchParams.get('view') as ViewMode) || 'cards'
 
   function setView(view: ViewMode) {
     const params = new URLSearchParams(searchParams.toString())
-    if (view === 'kanban') {
+    if (view === 'cards') {
       params.delete('view')
     } else {
       params.set('view', view)
@@ -39,7 +40,7 @@ export default function ViewSwitcher() {
           }`}
         >
           <Icon className="w-4 h-4" />
-          {label}
+          <span className="hidden sm:inline">{label}</span>
         </button>
       ))}
     </div>

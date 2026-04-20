@@ -11,6 +11,7 @@ import { filterJobs } from '@/lib/filterJobs'
 import JobListView from '@/components/dashboard/JobListView'
 import KanbanBoard from '@/components/dashboard/KanbanBoard'
 import CalendarView from '@/components/dashboard/CalendarView'
+import CrewWeekView from '@/components/dashboard/CrewWeekView'
 import TimelineView from '@/components/dashboard/TimelineView'
 
 const statusTabMap: Record<string, JobStatus[]> = {
@@ -145,8 +146,9 @@ export default async function JobsPage({
         <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />
       )}
       {view === 'calendar' && <CalendarView jobs={filtered} />}
+      {view === 'crew' && <CrewWeekView jobs={filtered} team={team} />}
       {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
-      {(view === 'list' || !['kanban', 'calendar', 'timeline'].includes(view)) && (
+      {(view === 'list' || !['kanban', 'calendar', 'crew', 'timeline'].includes(view)) && (
         <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />
       )}
     </div>

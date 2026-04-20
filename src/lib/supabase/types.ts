@@ -39,6 +39,8 @@ export interface CustomerWithStats extends Customer {
   last_job_date: string | null
 }
 
+export type MaterialStatus = 'needed' | 'ordered' | 'received' | 'on_site'
+
 export interface JobLineItem {
   category: 'materials' | 'labor'
   description: string
@@ -46,6 +48,7 @@ export interface JobLineItem {
   unit: 'sq ft' | 'hr' | 'ea' | 'ln ft' | 'bag' | 'box'
   unit_price: number
   amount: number
+  status?: MaterialStatus
 }
 
 export interface Job {

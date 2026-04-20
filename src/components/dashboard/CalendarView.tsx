@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { toast } from '@/components/Toast'
 import type { JobWithAssignee, JobStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<JobStatus, string> = {
@@ -18,9 +19,32 @@ const statusColors: Record<JobStatus, string> = {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export default function CalendarView({ jobs }: { jobs: JobWithAssignee[] }) {
+function formatDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function daysBetween(from: string, to: string): number {
+  const fromTime = new Date(from + 'T00:00:00').getTime()
+  const toTime = new Date(to + 'T00:00:00').getTime()
+  return Math.round((toTime - fromTime) / 86_400_000)
+}
+
+function shiftDate(dateStr: string, deltaDays: number): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + deltaDays)
+  return d.toISOString().slice(0, 10)
+}
+
+export default function CalendarView({ jobs: initialJobs }: { jobs: JobWithAssignee[] }) {
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [jobs, setJobs] = useState(initialJobs)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null)
+
+  useEffect(() => {
+    setJobs(initialJobs)
+  }, [initialJobs])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -43,13 +67,46 @@ export default function CalendarView({ jobs }: { jobs: JobWithAssignee[] }) {
   }
 
   function getJobsForDay(day: number) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const dateStr = formatDate(year, month, day)
     return jobs.filter((j) => {
       if (!j.scheduled_start) return false
       const start = j.scheduled_start
       const end = j.scheduled_end || j.scheduled_start
       return dateStr >= start && dateStr <= end
     })
+  }
+
+  async function rescheduleJob(jobId: string, targetDate: string) {
+    const job = jobs.find((j) => j.id === jobId)
+    if (!job || !job.scheduled_start) return
+
+    if (job.scheduled_start === targetDate) return
+
+    const duration = job.scheduled_end ? daysBetween(job.scheduled_start, job.scheduled_end) : 0
+    const newStart = targetDate
+    const newEnd = duration > 0 ? shiftDate(targetDate, duration) : null
+
+    const originalJobs = jobs
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId ? { ...j, scheduled_start: newStart, scheduled_end: newEnd } : j
+      )
+    )
+
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduled_start: newStart, scheduled_end: newEnd }),
+      })
+      if (!res.ok) throw new Error('Failed to reschedule')
+      toast(`Rescheduled to ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`)
+      router.refresh()
+    } catch (err) {
+      console.error(err)
+      setJobs(originalJobs)
+      toast('Failed to reschedule — reverted', 'error')
+    }
   }
 
   const cells: (number | null)[] = []
@@ -79,21 +136,45 @@ export default function CalendarView({ jobs }: { jobs: JobWithAssignee[] }) {
         </div>
       </div>
 
+      <p className="text-xs text-gray-500 mb-2">Drag any job to a different day to reschedule.</p>
+
       <div className="grid grid-cols-7 border border-gray-200 rounded-lg overflow-hidden">
         {DAY_NAMES.map((d) => (
-          <div key={d} className="bg-gray-50 border-b border-gray-200 px-2 py-2 text-xs font-semibold text-gray-500 text-center">
+          <div
+            key={d}
+            className="bg-gray-50 border-b border-gray-200 px-2 py-2 text-xs font-semibold text-gray-500 text-center"
+          >
             {d}
           </div>
         ))}
         {cells.map((day, i) => {
+          const dateStr = day ? formatDate(year, month, day) : null
           const isToday = isThisMonth && day === today.getDate()
           const dayJobs = day ? getJobsForDay(day) : []
+          const isDropTarget = dateStr !== null && dragOverDate === dateStr
+
           return (
             <div
               key={i}
-              className={`min-h-[80px] sm:min-h-[100px] border-b border-r border-gray-200 p-1 ${
+              onDragOver={(e) => {
+                if (!dateStr || !draggingId) return
+                e.preventDefault()
+                if (dragOverDate !== dateStr) setDragOverDate(dateStr)
+              }}
+              onDragLeave={() => {
+                if (dragOverDate === dateStr) setDragOverDate(null)
+              }}
+              onDrop={(e) => {
+                if (!dateStr || !draggingId) return
+                e.preventDefault()
+                const jobId = e.dataTransfer.getData('text/job-id') || draggingId
+                rescheduleJob(jobId, dateStr)
+                setDragOverDate(null)
+                setDraggingId(null)
+              }}
+              className={`min-h-[80px] sm:min-h-[100px] border-b border-r border-gray-200 p-1 transition-colors ${
                 day ? 'bg-white' : 'bg-gray-50'
-              }`}
+              } ${isDropTarget ? 'bg-primary-50 ring-2 ring-primary-400 ring-inset' : ''}`}
             >
               {day && (
                 <>
@@ -108,8 +189,20 @@ export default function CalendarView({ jobs }: { jobs: JobWithAssignee[] }) {
                     {dayJobs.slice(0, 3).map((j) => (
                       <button
                         key={j.id}
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggingId(j.id)
+                          e.dataTransfer.setData('text/job-id', j.id)
+                          e.dataTransfer.effectAllowed = 'move'
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null)
+                          setDragOverDate(null)
+                        }}
                         onClick={() => router.push(`/dashboard/jobs/${j.id}`)}
-                        className={`block w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight ${statusColors[j.status]} hover:opacity-80`}
+                        className={`block w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight cursor-grab active:cursor-grabbing ${statusColors[j.status]} hover:opacity-80 ${
+                          draggingId === j.id ? 'opacity-40' : ''
+                        }`}
                       >
                         {j.title}
                       </button>

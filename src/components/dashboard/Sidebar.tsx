@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users, Settings } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users, Settings, Package } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
 const allNavItems = [
@@ -13,6 +13,7 @@ const allNavItems = [
   { label: 'Leads', href: '/dashboard/leads', icon: Inbox, ownerOnly: true },
   { label: 'Customers', href: '/dashboard/customers', icon: Users, ownerOnly: true },
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
+  { label: 'Materials', href: '/dashboard/materials', icon: Package, ownerOnly: false },
   { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
   { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
   { label: 'Estimating', href: '/dashboard/settings', icon: Settings, ownerOnly: true },

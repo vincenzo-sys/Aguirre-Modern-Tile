@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react'
 import PhotoUpload from '@/components/dashboard/PhotoUpload'
 import { toast } from '@/components/Toast'
 import { demoTeamMembers } from '@/lib/demo'
-import type { Profile } from '@/lib/supabase/types'
+import type { Profile, JobTemplate } from '@/lib/supabase/types'
 
 const JOB_TYPES = [
   'Bathroom Tile',
@@ -46,6 +46,8 @@ function NewJobForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [teamMembers, setTeamMembers] = useState<Profile[]>([])
+  const [templates, setTemplates] = useState<JobTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [photos, setPhotos] = useState<File[]>([])
   const fromLeadId = searchParams.get('from_lead') || ''
   const customerIdParam = searchParams.get('customer_id') || ''
@@ -103,10 +105,46 @@ function NewJobForm() {
         .order('full_name')
 
       setTeamMembers((members ?? []) as Profile[])
+
+      const { data: tmpls } = await supabase
+        .from('job_templates')
+        .select('*')
+        .order('template_name')
+
+      setTemplates((tmpls ?? []) as JobTemplate[])
     }
 
     checkOwnerAndLoadTeam()
   }, [router])
+
+  function applyTemplate(templateId: string) {
+    setSelectedTemplateId(templateId)
+    if (!templateId) return
+
+    const tmpl = templates.find((t) => t.id === templateId)
+    if (!tmpl) return
+
+    const midPrice =
+      tmpl.base_price_low && tmpl.base_price_high
+        ? (Number(tmpl.base_price_low) + Number(tmpl.base_price_high)) / 2
+        : tmpl.base_price_low ?? tmpl.base_price_high ?? null
+
+    const totalDays = (tmpl.demo_days ?? 0) + (tmpl.install_days ?? 0)
+
+    setForm((prev) => ({
+      ...prev,
+      title: prev.title || tmpl.template_name,
+      job_type: tmpl.job_type || prev.job_type,
+      scope_notes:
+        prev.scope_notes ||
+        [tmpl.notes, tmpl.typical_materials && `Typical materials: ${tmpl.typical_materials}`]
+          .filter(Boolean)
+          .join('\n\n'),
+      estimated_days: prev.estimated_days || (totalDays > 0 ? String(totalDays) : ''),
+      estimated_cost: prev.estimated_cost || (midPrice ? String(Math.round(midPrice)) : ''),
+    }))
+    toast(`Applied template: ${tmpl.template_name}`)
+  }
 
   function updateField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -236,6 +274,34 @@ function NewJobForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Template picker */}
+        {templates.length > 0 && (
+          <section className="bg-primary-50 rounded-lg border border-primary-200 p-4">
+            <label htmlFor="template_picker" className="block text-sm font-semibold text-primary-900 mb-1">
+              Start from a template <span className="text-primary-700 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-primary-700 mb-2">
+              Pre-fills job type, scope, estimated days, and price based on past projects.
+            </p>
+            <select
+              id="template_picker"
+              value={selectedTemplateId}
+              onChange={(e) => applyTemplate(e.target.value)}
+              className="w-full rounded-md border border-primary-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm bg-white"
+            >
+              <option value="">— No template —</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.template_name}
+                  {t.base_price_low && t.base_price_high
+                    ? ` — $${Number(t.base_price_low).toLocaleString()}–$${Number(t.base_price_high).toLocaleString()}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
+
         {/* Job Info */}
         <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Info</h2>

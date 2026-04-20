@@ -25,11 +25,6 @@ const statusOrder: MaterialStatus[] = ['needed', 'ordered', 'received', 'on_site
 const MATERIAL_UNITS: JobLineItem['unit'][] = ['sq ft', 'ea', 'ln ft', 'bag', 'box']
 const LABOR_UNITS: JobLineItem['unit'][] = ['hr', 'ea', 'sq ft']
 
-function nextStatus(current: MaterialStatus | undefined): MaterialStatus {
-  const idx = statusOrder.indexOf(current ?? 'needed')
-  return statusOrder[(idx + 1) % statusOrder.length]
-}
-
 function calcAmount(qty: number, price: number): number {
   return Number((qty * price).toFixed(2))
 }
@@ -88,12 +83,13 @@ export default function JobLineItems({
     }
   }
 
-  async function cycleStatus(index: number) {
+  async function setStatus(index: number, newStatus: MaterialStatus) {
     if (!jobId) return
     const target = liveItems[index]
     if (target.category !== 'materials') return
+    if ((target.status ?? 'needed') === newStatus) return
     const updated = liveItems.map((it, i) =>
-      i === index ? { ...it, status: nextStatus(it.status) } : it
+      i === index ? { ...it, status: newStatus } : it
     )
     await persist(updated)
   }
@@ -245,16 +241,21 @@ export default function JobLineItems({
                         </p>
                       </div>
                       {jobId && (
-                        <button
-                          type="button"
-                          onClick={() => cycleStatus(i)}
-                          disabled={updating}
-                          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${meta.className} hover:opacity-80 disabled:opacity-50 shrink-0`}
-                          title="Click to cycle status"
-                        >
-                          <Icon className="w-3 h-3" />
-                          {meta.label}
-                        </button>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <Icon className="w-3 h-3 text-gray-500" />
+                          <select
+                            value={status}
+                            onChange={(e) => setStatus(i, e.target.value as MaterialStatus)}
+                            disabled={updating}
+                            className={`text-xs font-medium px-2 py-1 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer ${meta.className} disabled:opacity-50`}
+                          >
+                            {statusOrder.map((s) => (
+                              <option key={s} value={s}>
+                                {statusMeta[s].label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
                       <span className="text-sm font-medium text-gray-900 w-24 text-right shrink-0">
                         {formatCurrency(item.amount)}

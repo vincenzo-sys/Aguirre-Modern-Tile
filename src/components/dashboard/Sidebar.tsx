@@ -15,7 +15,6 @@ import {
   BarChart3,
   MapPin,
   Settings,
-  ChevronDown,
   LogOut,
   Menu,
   X,
@@ -28,19 +27,35 @@ type NavItem = {
   icon: typeof Home
 }
 
-const ownerPrimary: NavItem[] = [
-  { label: 'Home', href: '/dashboard', icon: Home },
-  { label: 'Leads', href: '/dashboard/leads', icon: Inbox },
-  { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList },
-]
+type NavSection = {
+  heading: string
+  items: NavItem[]
+}
 
-const ownerMore: NavItem[] = [
-  { label: 'Customers', href: '/dashboard/customers', icon: Users },
-  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
-  { label: 'Materials', href: '/dashboard/materials', icon: Package },
-  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-  { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
-  { label: 'Estimating', href: '/dashboard/settings', icon: Settings },
+const ownerSections: NavSection[] = [
+  {
+    heading: 'Sales',
+    items: [
+      { label: 'Leads', href: '/dashboard/leads', icon: Inbox },
+      { label: 'Customers', href: '/dashboard/customers', icon: Users },
+      { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
+      { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    heading: 'Operations',
+    items: [
+      { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList },
+      { label: 'Materials', href: '/dashboard/materials', icon: Package },
+      { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
+    ],
+  },
+  {
+    heading: 'Estimation',
+    items: [
+      { label: 'Estimating Guidance', href: '/dashboard/settings', icon: Settings },
+    ],
+  },
 ]
 
 const installerPrimary: NavItem[] = [
@@ -54,9 +69,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   const supabase = createClient()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isOwner = profile.role === 'owner'
-  const [moreOpen, setMoreOpen] = useState(() =>
-    ownerMore.some((i) => pathname.startsWith(i.href))
-  )
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -87,7 +99,9 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     )
   }
 
-  const primary = isOwner ? ownerPrimary : installerPrimary
+  const homeItem: NavItem = isOwner
+    ? { label: 'Home', href: '/dashboard', icon: Home }
+    : installerPrimary[0]
 
   const navContent = (
     <>
@@ -99,30 +113,20 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         </span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {primary.map(renderItem)}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {renderItem(homeItem)}
 
-        {isOwner && (
-          <div className="pt-2 mt-2 border-t border-gray-700">
-            <button
-              type="button"
-              onClick={() => setMoreOpen((v) => !v)}
-              className="flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
-            >
-              <span className="flex items-center gap-3">
-                <Menu className="w-5 h-5" />
-                More
-              </span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {moreOpen && (
-              <div className="mt-1 ml-2 pl-3 border-l border-gray-700 space-y-1">
-                {ownerMore.map(renderItem)}
-              </div>
-            )}
-          </div>
+        {isOwner ? (
+          ownerSections.map((section) => (
+            <div key={section.heading} className="pt-4 mt-2">
+              <p className="px-3 mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                {section.heading}
+              </p>
+              <div className="space-y-1">{section.items.map(renderItem)}</div>
+            </div>
+          ))
+        ) : (
+          <div className="pt-2">{installerPrimary.slice(1).map(renderItem)}</div>
         )}
       </nav>
 

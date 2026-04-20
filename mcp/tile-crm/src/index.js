@@ -318,6 +318,18 @@ const tools = [
     },
   },
   {
+    name: 'create_estimate_link',
+    description:
+      'Generate a shareable public URL for a job\'s estimate. The customer opens the URL, sees a branded estimate page, and can accept + pay the 10% deposit via Stripe Checkout. Call this AFTER you have populated scope_notes, line_items, and estimated_cost on the job. Re-calling refreshes the "sent at" timestamp but keeps the same URL.',
+    inputSchema: {
+      type: 'object',
+      required: ['job_id'],
+      properties: {
+        job_id: { type: 'string' },
+      },
+    },
+  },
+  {
     name: 'add_log_entry',
     description:
       'Append one entry to a job\'s field log (for extra purchases, scope changes, surprises). Fetches current crew_log, prepends a new timestamped line, saves it back. Use this instead of update_job with crew_log unless you want to replace the whole log.',
@@ -439,6 +451,13 @@ async function callTool(name, args) {
       return request(`/api/jobs/${job_id}`, {
         method: 'PATCH',
         body: { line_items: items },
+      })
+    }
+
+    case 'create_estimate_link': {
+      const { job_id } = args
+      return request(`/api/jobs/${job_id}/estimate-link`, {
+        method: 'POST',
       })
     }
 

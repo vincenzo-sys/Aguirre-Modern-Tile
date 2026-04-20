@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -29,6 +30,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const { id } = await params
 
   try {
@@ -56,6 +60,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const { id } = await params
 
   try {

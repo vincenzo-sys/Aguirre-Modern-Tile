@@ -294,7 +294,7 @@ export default async function JobDetailPage({
 
       {/* Line Items */}
       <div className="mb-6">
-        <JobLineItems items={job.line_items ?? []} jobId={job.id} />
+        <JobLineItems items={job.line_items ?? []} jobId={job.id} isOwner={isOwner} />
       </div>
 
       {/* Estimate + Invoice Cards side by side */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,7 +11,10 @@ function getSupabaseAdmin() {
   return createClient(url, key)
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const { id } = await params
     const supabase = getSupabaseAdmin()
@@ -33,6 +37,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const { id } = await params
     const supabase = getSupabaseAdmin()

@@ -1,0 +1,19 @@
+{
+  "name": "tile-crm-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the Aguirre Modern Tile CRM — leads, customers, jobs, line items",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "tile-crm-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

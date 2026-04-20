@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -11,6 +12,9 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: NextRequest) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
     const supabase = getSupabaseAdmin()
     const body = await request.json()

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -11,6 +12,9 @@ function getSupabaseAdmin() {
 }
 
 export async function GET(request: NextRequest) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
   try {
   const { searchParams } = new URL(request.url)
   const q = searchParams.get('q') || ''
@@ -78,6 +82,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
   const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
   const { name, email, phone, address, city, state, zip, notes, source = 'manual' } = body

@@ -9,6 +9,7 @@ import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
 import JobEditForm from '@/components/dashboard/JobEditForm'
 import CrewLog from '@/components/dashboard/CrewLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
+import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -176,7 +177,8 @@ export default async function JobDetailPage({
             </div>
             <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isOwner && <DepositReceivedAction job={job} />}
             <StatusUpdateDropdown jobId={job.id} currentStatus={job.status} isOwner={isOwner} />
             {isOwner && <JobEditForm job={job} teamMembers={team} />}
             {isOwner && (

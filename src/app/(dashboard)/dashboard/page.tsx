@@ -4,6 +4,7 @@ import { demoJobs, demoProfile } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, QuoteRequest } from '@/lib/supabase/types'
 import InstallerJobCard from '@/components/dashboard/InstallerJobCard'
+import SalesWorklist from '@/components/dashboard/SalesWorklist'
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -67,7 +68,7 @@ export default async function DashboardHome() {
     supabase
       .from('jobs')
       .select('*')
-      .in('status', ['scheduled', 'in_progress', 'waiting_for_materials'])
+      .not('status', 'in', '("paid","cancelled")')
       .order('scheduled_start', { ascending: true, nullsFirst: false }),
     supabase
       .from('quote_requests')
@@ -351,6 +352,11 @@ function OwnerHome({
             Review new leads <ArrowRight className="w-3 h-3" />
           </Link>
         </section>
+      </div>
+
+      {/* Worklist */}
+      <div className="mt-6">
+        <SalesWorklist leads={leads} jobs={jobs} />
       </div>
     </div>
   )

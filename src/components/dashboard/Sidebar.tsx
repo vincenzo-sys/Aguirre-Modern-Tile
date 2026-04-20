@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   X,
+  ImageIcon,
 } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
@@ -38,6 +39,7 @@ const ownerSections: NavSection[] = [
     items: [
       { label: 'Leads', href: '/dashboard/leads', icon: Inbox },
       { label: 'Customers', href: '/dashboard/customers', icon: Users },
+      { label: 'Gallery', href: '/dashboard/gallery', icon: ImageIcon },
       { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
       { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     ],

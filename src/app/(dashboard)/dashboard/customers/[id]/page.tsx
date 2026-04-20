@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, FileText, DollarSign, Calendar, Inbox } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, DollarSign, Calendar } from 'lucide-react'
 import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
+import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -17,19 +18,6 @@ function formatDate(date: string): string {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const statusColors: Record<string, string> = {
-  lead: 'bg-gray-100 text-gray-600',
-  quoted: 'bg-blue-100 text-blue-700',
-  scheduled: 'bg-indigo-100 text-indigo-700',
-  in_progress: 'bg-yellow-100 text-yellow-700',
-  completed: 'bg-green-100 text-green-700',
-  paid: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-600',
-  draft: 'bg-gray-100 text-gray-600',
-  sent: 'bg-blue-100 text-blue-700',
-  overdue: 'bg-red-100 text-red-600',
-  void: 'bg-gray-100 text-gray-400',
-}
 
 export default async function CustomerDetailPage({
   params,
@@ -211,108 +199,8 @@ export default async function CustomerDetailPage({
         </div>
       )}
 
-      {/* Jobs Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-800">
-          <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-            <Briefcase className="w-4 h-4" />
-            Jobs ({jobs.length})
-          </h3>
-        </div>
-        {jobs.length === 0 ? (
-          <div className="p-6 text-center text-gray-400 text-sm">No jobs yet</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {jobs.map((job) => (
-              <Link
-                key={job.id}
-                href={`/dashboard/jobs/${job.id}`}
-                className="block px-4 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{job.title}</p>
-                    <p className="text-xs text-gray-500">
-                      #{job.job_number} &middot; {job.job_type ?? 'General'} &middot; {job.square_footage ? `${job.square_footage} sq ft` : '—'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {job.estimated_cost && (
-                      <span className="text-sm font-medium text-gray-700">{formatCurrency(job.estimated_cost)}</span>
-                    )}
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {job.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Invoices Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-800">
-          <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Invoices ({invoices.length})
-          </h3>
-        </div>
-        {invoices.length === 0 ? (
-          <div className="p-6 text-center text-gray-400 text-sm">No invoices yet</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {invoices.map((inv) => (
-              <Link
-                key={inv.id}
-                href={`/dashboard/invoices/${inv.id}`}
-                className="block px-4 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm">{inv.invoice_number}</p>
-                    <p className="text-xs text-gray-500">Due {formatDate(inv.due_date)}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(inv.amount)}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[inv.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {inv.status}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quotes Section */}
-      {quotes.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-800">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
-              <Inbox className="w-4 h-4" />
-              Quote Requests ({quotes.length})
-            </h3>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {quotes.map((q) => (
-              <div key={q.id} className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 text-sm capitalize">{q.project_type.replace('-', ' ')}</p>
-                    <p className="text-xs text-gray-500">{formatDate(q.created_at)}</p>
-                  </div>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[q.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {q.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Unified history timeline — leads + jobs + invoices in one place */}
+      <CustomerTimeline quotes={quotes} jobs={jobs} invoices={invoices} />
     </div>
   )
 }

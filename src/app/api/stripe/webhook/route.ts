@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
+import { sendSMS } from '@/lib/openphone'
+import { Resend } from 'resend'
 import type Stripe from 'stripe'
 
 // Stripe sends raw body — we need to disable Next.js body parsing
@@ -94,7 +96,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('status, scheduled_start, amount_paid')
+    .select('id, title, client_name, status, scheduled_start, amount_paid, estimated_cost')
     .eq('id', jobId)
     .single()
 
@@ -123,6 +125,45 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(
     `Estimate deposit $${depositDollars} recorded for job ${jobId} (session ${session.id})`
   )
+
+  // Fire-and-forget owner notifications so Vince knows the moment it lands
+  const dollars = `$${Math.round(depositDollars).toLocaleString()}`
+  const summary = `Deposit ${dollars} from ${job.client_name} for "${job.title}" received.`
+
+  if (process.env.OPENPHONE_API_KEY && process.env.OWNER_PHONE) {
+    sendSMS(process.env.OWNER_PHONE, summary).catch((err) =>
+      console.error('Owner SMS notification failed:', err)
+    )
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    const fromEmail =
+      process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
+    const toEmail = process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro'
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      resend.emails
+        .send({
+          from: fromEmail,
+          to: toEmail,
+          subject: `Deposit received: ${dollars} from ${job.client_name}`,
+          html: `
+            <h2>Deposit received</h2>
+            <p><strong>${job.client_name}</strong> just accepted the estimate for
+            <strong>${job.title}</strong> and paid a deposit of <strong>${dollars}</strong>.</p>
+            <ul>
+              <li>Job total: $${Number(job.estimated_cost ?? 0).toLocaleString()}</li>
+              <li>Balance remaining: $${Math.max(0, Number(job.estimated_cost ?? 0) - newAmountPaid).toLocaleString()}</li>
+              <li>Status: ${updates.status ?? job.status}</li>
+            </ul>
+            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}/dashboard/jobs/${jobId}">Open job →</a></p>
+          `,
+        })
+        .catch((err) => console.error('Owner email notification failed:', err))
+    } catch (err) {
+      console.error('Owner email notification failed:', err)
+    }
+  }
 }
 
 async function handleInvoicePaid(stripeInvoice: Stripe.Invoice) {

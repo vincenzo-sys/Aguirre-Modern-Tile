@@ -8,12 +8,13 @@ const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
 type TabKey = 'materials' | 'labor' | 'costs' | 'addons' | 'templates' | 'contacts'
 
+// Ordered by how often the tables get edited — most-edited first.
 const tabs: { key: TabKey; label: string; icon: React.ElementType; table: string }[] = [
   { key: 'materials', label: 'Materials', icon: Package, table: 'materials_pricing' },
+  { key: 'templates', label: 'Templates', icon: FileText, table: 'job_templates' },
   { key: 'labor', label: 'Labor Rates', icon: Wrench, table: 'labor_rates' },
-  { key: 'costs', label: 'Operating Costs', icon: Truck, table: 'operating_costs' },
   { key: 'addons', label: 'Add-Ons', icon: Sparkles, table: 'add_ons' },
-  { key: 'templates', label: 'Job Templates', icon: FileText, table: 'job_templates' },
+  { key: 'costs', label: 'Operating Costs', icon: Truck, table: 'operating_costs' },
   { key: 'contacts', label: 'Trade Contacts', icon: Users, table: 'trade_contacts' },
 ]
 

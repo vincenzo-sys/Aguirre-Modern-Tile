@@ -4,19 +4,48 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LayoutDashboard, ClipboardList, BarChart3, MapPin, FileText, LogOut, Menu, X, Inbox, Users, Settings, Package } from 'lucide-react'
+import {
+  Home,
+  Inbox,
+  ClipboardList,
+  CalendarDays,
+  Package,
+  Users,
+  FileText,
+  BarChart3,
+  MapPin,
+  Settings,
+  ChevronDown,
+  LogOut,
+  Menu,
+  X,
+} from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 
-const allNavItems = [
-  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, ownerOnly: false },
-  { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList, ownerOnly: false },
-  { label: 'Leads', href: '/dashboard/leads', icon: Inbox, ownerOnly: true },
-  { label: 'Customers', href: '/dashboard/customers', icon: Users, ownerOnly: true },
-  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText, ownerOnly: true },
-  { label: 'Materials', href: '/dashboard/materials', icon: Package, ownerOnly: false },
-  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, ownerOnly: false },
-  { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin, ownerOnly: false },
-  { label: 'Estimating', href: '/dashboard/settings', icon: Settings, ownerOnly: true },
+type NavItem = {
+  label: string
+  href: string
+  icon: typeof Home
+}
+
+const ownerPrimary: NavItem[] = [
+  { label: 'Home', href: '/dashboard', icon: Home },
+  { label: 'Leads', href: '/dashboard/leads', icon: Inbox },
+  { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList },
+]
+
+const ownerMore: NavItem[] = [
+  { label: 'Customers', href: '/dashboard/customers', icon: Users },
+  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
+  { label: 'Materials', href: '/dashboard/materials', icon: Package },
+  { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
+  { label: 'Estimating', href: '/dashboard/settings', icon: Settings },
+]
+
+const installerPrimary: NavItem[] = [
+  { label: 'Today', href: '/dashboard', icon: Home },
+  { label: 'Week', href: '/dashboard/jobs', icon: CalendarDays },
 ]
 
 export default function Sidebar({ profile }: { profile: Profile }) {
@@ -24,9 +53,9 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   const router = useRouter()
   const supabase = createClient()
   const [mobileOpen, setMobileOpen] = useState(false)
-
-  const navItems = allNavItems.filter(
-    (item) => !item.ownerOnly || profile.role === 'owner'
+  const isOwner = profile.role === 'owner'
+  const [moreOpen, setMoreOpen] = useState(() =>
+    ownerMore.some((i) => pathname.startsWith(i.href))
   )
 
   async function handleSignOut() {
@@ -36,14 +65,29 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   }
 
   function isActive(href: string) {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard'
-    }
-    if (href === '/dashboard/jobs') {
-      return pathname.startsWith('/dashboard/jobs')
-    }
+    if (href === '/dashboard') return pathname === '/dashboard'
+    if (href === '/dashboard/jobs') return pathname.startsWith('/dashboard/jobs')
     return pathname.startsWith(href)
   }
+
+  function renderItem(item: NavItem) {
+    const active = isActive(item.href)
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setMobileOpen(false)}
+        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+          active ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+        }`}
+      >
+        <item.icon className="w-5 h-5" />
+        {item.label}
+      </Link>
+    )
+  }
+
+  const primary = isOwner ? ownerPrimary : installerPrimary
 
   const navContent = (
     <>
@@ -56,24 +100,30 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => {
-          const active = isActive(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
+        {primary.map(renderItem)}
+
+        {isOwner && (
+          <div className="pt-2 mt-2 border-t border-gray-700">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              className="flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
             >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          )
-        })}
+              <span className="flex items-center gap-3">
+                <Menu className="w-5 h-5" />
+                More
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {moreOpen && (
+              <div className="mt-1 ml-2 pl-3 border-l border-gray-700 space-y-1">
+                {ownerMore.map(renderItem)}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="p-4 border-t border-gray-700">
@@ -90,7 +140,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   return (
     <>
-      {/* Mobile menu button */}
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-800 text-white shadow-lg"
@@ -98,7 +147,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -106,7 +154,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         />
       )}
 
-      {/* Mobile sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-800 transform transition-transform lg:hidden ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
@@ -121,7 +168,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <div className="flex flex-col h-full">{navContent}</div>
       </div>
 
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-col lg:w-64 lg:bg-gray-800 lg:shrink-0">
         {navContent}
       </div>

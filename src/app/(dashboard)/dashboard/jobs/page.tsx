@@ -98,7 +98,7 @@ export default async function JobsPage({
   }
 
   const { view: viewParam, status: statusFilter, type: typeFilter, q: searchFilter } = await searchParams
-  const view = viewParam || 'list'
+  const view = viewParam || 'kanban'
 
   // Apply filters
   const filtered = filterJobs(
@@ -142,14 +142,12 @@ export default async function JobsPage({
         </Suspense>
       </div>
 
-      {view === 'kanban' && (
-        <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />
-      )}
       {view === 'calendar' && <CalendarView jobs={filtered} />}
+      {view === 'list' && <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />}
       {view === 'crew' && <CrewWeekView jobs={filtered} team={team} />}
       {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
-      {(view === 'list' || !['kanban', 'calendar', 'crew', 'timeline'].includes(view)) && (
-        <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />
+      {!['calendar', 'list', 'crew', 'timeline'].includes(view) && (
+        <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />
       )}
     </div>
   )

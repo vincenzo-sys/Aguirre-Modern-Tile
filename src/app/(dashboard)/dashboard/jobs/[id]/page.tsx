@@ -282,12 +282,20 @@ export default async function JobDetailPage({
             </div>
           )}
 
-          {/* Internal Notes */}
+          {/* Internal Notes — collapsed by default */}
           {job.notes && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Internal Notes</h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.notes}</p>
-            </div>
+            <details className="bg-white rounded-xl shadow-sm border border-gray-200 group">
+              <summary className="cursor-pointer list-none p-4 flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Internal Notes
+                </h3>
+                <span className="text-xs text-gray-400 group-open:hidden">Show</span>
+                <span className="text-xs text-gray-400 hidden group-open:inline">Hide</span>
+              </summary>
+              <div className="px-4 pb-4 -mt-2">
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.notes}</p>
+              </div>
+            </details>
           )}
         </div>
       </div>
@@ -297,20 +305,29 @@ export default async function JobDetailPage({
         <JobLineItems items={job.line_items ?? []} jobId={job.id} isOwner={isOwner} />
       </div>
 
-      {/* Estimate + Invoice Cards side by side */}
-      <div className="mb-6">
-        <EstimateInvoiceCards job={job} invoices={invoices} />
-      </div>
+      {/* Estimate + Invoice — collapsed by default */}
+      <details className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 group">
+        <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Estimate &amp; Invoice</h3>
+          <span className="text-xs text-gray-400 group-open:hidden">Show</span>
+          <span className="text-xs text-gray-400 hidden group-open:inline">Hide</span>
+        </summary>
+        <div className="px-4 pb-4 -mt-2">
+          <EstimateInvoiceCards job={job} invoices={invoices} />
+        </div>
+      </details>
 
-      {/* Photos */}
+      {/* Photos — collapsed by default */}
       {photosWithUrls.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-          <div className="px-4 py-3 bg-gray-800">
+        <details id="photos" className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 group">
+          <summary className="cursor-pointer list-none px-4 py-3 bg-gray-800 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
               <ImageIcon className="w-4 h-4" />
               Photos ({photosWithUrls.length})
             </h3>
-          </div>
+            <span className="text-xs text-gray-300 group-open:hidden">Show</span>
+            <span className="text-xs text-gray-300 hidden group-open:inline">Hide</span>
+          </summary>
           <div className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {photosWithUrls.map((photo) => (
@@ -336,7 +353,7 @@ export default async function JobDetailPage({
               ))}
             </div>
           </div>
-        </div>
+        </details>
       )}
     </div>
   )

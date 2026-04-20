@@ -6,7 +6,7 @@ import { Inbox, ArrowRight, Archive, CheckCircle, Plus, Clock, AlertCircle } fro
 import { toast } from '@/components/Toast'
 import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
 
-type LeadTab = QuoteRequestStatus | 'all' | 'needs_follow_up'
+type LeadTab = 'active' | 'archive'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -36,7 +36,7 @@ function isFollowUpDue(lead: QuoteRequest): boolean {
 export default function LeadsPage() {
   const [leads, setLeads] = useState<QuoteRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<LeadTab>('all')
+  const [activeTab, setActiveTab] = useState<LeadTab>('active')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
 
   useEffect(() => {
@@ -103,26 +103,32 @@ export default function LeadsPage() {
     return Array.from(set).sort()
   }, [leads])
 
-  const tabs: { label: string; value: LeadTab; count?: number; emphasis?: boolean }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'New', value: 'new', count: newCount },
-    { label: 'Reviewed', value: 'reviewed' },
-    {
-      label: 'Needs follow-up',
-      value: 'needs_follow_up',
-      count: followUpCount,
-      emphasis: followUpCount > 0,
-    },
-    { label: 'Converted', value: 'converted' },
-    { label: 'Archived', value: 'archived' },
+  const activeCount = leads.filter((l) => l.status === 'new' || l.status === 'reviewed').length
+  const archiveCount = leads.length - activeCount
+
+  const tabs: { label: string; value: LeadTab; count?: number }[] = [
+    { label: 'Active', value: 'active', count: activeCount },
+    { label: 'Archive', value: 'archive', count: archiveCount },
   ]
 
-  const filtered = leads.filter((l) => {
-    if (activeTab === 'needs_follow_up' && !isFollowUpDue(l)) return false
-    if (activeTab !== 'all' && activeTab !== 'needs_follow_up' && l.status !== activeTab) return false
-    if (sourceFilter !== 'all' && (l.source ?? 'website') !== sourceFilter) return false
-    return true
-  })
+  const filtered = leads
+    .filter((l) => {
+      const isActiveRow = l.status === 'new' || l.status === 'reviewed'
+      if (activeTab === 'active' && !isActiveRow) return false
+      if (activeTab === 'archive' && isActiveRow) return false
+      if (sourceFilter !== 'all' && (l.source ?? 'website') !== sourceFilter) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (activeTab !== 'active') return b.created_at.localeCompare(a.created_at)
+      const aDue = isFollowUpDue(a) ? 0 : 1
+      const bDue = isFollowUpDue(b) ? 0 : 1
+      if (aDue !== bDue) return aDue - bDue
+      const aFollow = a.next_follow_up ?? '9999-12-31'
+      const bFollow = b.next_follow_up ?? '9999-12-31'
+      if (aFollow !== bFollow) return aFollow.localeCompare(bFollow)
+      return b.created_at.localeCompare(a.created_at)
+    })
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading leads...</div>
@@ -157,7 +163,7 @@ export default function LeadsPage() {
 
       {/* Tabs + source filter */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           {tabs.map((tab) => (
             <button
               key={tab.value}
@@ -165,16 +171,12 @@ export default function LeadsPage() {
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 activeTab === tab.value
                   ? 'bg-white text-gray-900 shadow-sm'
-                  : tab.emphasis
-                    ? 'text-red-600 hover:text-red-700'
-                    : 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
-                <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs rounded-full ${
-                  tab.emphasis ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-700'
-                }`}>
+                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs rounded-full bg-gray-200 text-gray-700">
                   {tab.count}
                 </span>
               )}

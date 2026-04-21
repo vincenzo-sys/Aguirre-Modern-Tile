@@ -102,26 +102,28 @@ export async function POST(req: NextRequest) {
       }
 
       // Push to OpenPhone (quo) as a named contact so incoming calls/
-      // texts show "Jane Doe" instead of an unknown number. Non-fatal,
-      // fire-and-forget. Skip if we already have a contact id cached.
+      // texts show "Jane Doe" instead of an unknown number. Awaited so
+      // Vercel doesn't kill the promise when the function returns.
+      // Own try/catch so OpenPhone outages can't block form submission.
       if (customerId && !existingOpenPhoneId) {
-        createOpenPhoneContact({
-          name,
-          email: email || null,
-          phone: phone || null,
-          source: 'aguirre-tile-website-quote',
-        })
-          .then(async (result) => {
-            if (result.success && result.contactId) {
-              await supabase
-                .from('customers')
-                .update({ openphone_contact_id: result.contactId })
-                .eq('id', customerId)
-            }
+        try {
+          console.log('[OpenPhone] Attempting to create contact for', name, 'apiKey set:', !!process.env.OPENPHONE_API_KEY)
+          const result = await createOpenPhoneContact({
+            name,
+            email: email || null,
+            phone: phone || null,
+            source: 'aguirre-tile-website-quote',
           })
-          .catch((err) => {
-            console.error('OpenPhone contact sync error:', err)
-          })
+          console.log('[OpenPhone] Result:', result)
+          if (result.success && result.contactId) {
+            await supabase
+              .from('customers')
+              .update({ openphone_contact_id: result.contactId })
+              .eq('id', customerId)
+          }
+        } catch (err) {
+          console.error('[OpenPhone] sync error (non-fatal):', err)
+        }
       }
 
       const { data, error } = await supabase

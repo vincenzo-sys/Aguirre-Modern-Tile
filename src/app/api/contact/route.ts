@@ -93,25 +93,27 @@ export async function POST(req: NextRequest) {
         }
 
         // Push to OpenPhone so the number shows a name on incoming
-        // calls/texts. Non-fatal. Skip if already synced.
+        // calls/texts. Awaited so serverless doesn't kill the promise.
+        // Own try/catch so OpenPhone outages can't block the form.
         if (customerId && !existingOpenPhoneId) {
-          createOpenPhoneContact({
-            name,
-            email: email || null,
-            phone: phone || null,
-            source: 'aguirre-tile-website-contact',
-          })
-            .then(async (result) => {
-              if (result.success && result.contactId) {
-                await supabase
-                  .from('customers')
-                  .update({ openphone_contact_id: result.contactId })
-                  .eq('id', customerId)
-              }
+          try {
+            console.log('[OpenPhone] Attempting to create contact for', name, 'apiKey set:', !!process.env.OPENPHONE_API_KEY)
+            const result = await createOpenPhoneContact({
+              name,
+              email: email || null,
+              phone: phone || null,
+              source: 'aguirre-tile-website-contact',
             })
-            .catch((err) => {
-              console.error('OpenPhone contact sync error:', err)
-            })
+            console.log('[OpenPhone] Result:', result)
+            if (result.success && result.contactId) {
+              await supabase
+                .from('customers')
+                .update({ openphone_contact_id: result.contactId })
+                .eq('id', customerId)
+            }
+          } catch (err) {
+            console.error('[OpenPhone] sync error (non-fatal):', err)
+          }
         }
 
         const answersWithDescription = {

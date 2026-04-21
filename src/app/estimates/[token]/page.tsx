@@ -161,19 +161,6 @@ export default async function EstimatePage({
                         <p className="text-xs text-gray-500">
                           {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
                         </p>
-                        {item.source_url && (
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Source:{' '}
-                            <a
-                              href={item.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-600 hover:text-primary-800 underline"
-                            >
-                              {item.source_name || 'View product'}
-                            </a>
-                          </p>
-                        )}
                       </div>
                       <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
                     </div>
@@ -196,19 +183,6 @@ export default async function EstimatePage({
                         <p className="text-xs text-gray-500">
                           {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
                         </p>
-                        {item.source_url && (
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Source:{' '}
-                            <a
-                              href={item.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary-600 hover:text-primary-800 underline"
-                            >
-                              {item.source_name || 'View product'}
-                            </a>
-                          </p>
-                        )}
                       </div>
                       <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
                     </div>

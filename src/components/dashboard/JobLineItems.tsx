@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, Save } from 'lucide-react'
+import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, Save, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobLineItem, MaterialStatus, MaterialPricing } from '@/lib/supabase/types'
 
@@ -22,8 +22,9 @@ const statusMeta: Record<MaterialStatus, { label: string; icon: typeof Package; 
 
 const statusOrder: MaterialStatus[] = ['needed', 'ordered', 'received', 'on_site']
 
-const MATERIAL_UNITS: JobLineItem['unit'][] = ['sq ft', 'ea', 'ln ft', 'bag', 'box']
-const LABOR_UNITS: JobLineItem['unit'][] = ['hr', 'ea', 'sq ft']
+const MATERIAL_UNITS: JobLineItem['unit'][] = ['sheet', 'bag', 'tube', 'kit', 'roll', 'box', 'sq ft', 'ln ft', 'ea']
+// Labor defaults to 'day' (2-man crew day rate). Use 'hr' for hourly carve-outs.
+const LABOR_UNITS: JobLineItem['unit'][] = ['day', 'hr', 'ea', 'sq ft']
 
 function calcAmount(qty: number, price: number): number {
   return Number((qty * price).toFixed(2))
@@ -114,9 +115,12 @@ export default function JobLineItems({
       category,
       description: '',
       quantity: 1,
-      unit: category === 'materials' ? 'sq ft' : 'hr',
-      unit_price: 0,
-      amount: 0,
+      // Labor: default to a 2-man crew day at $1,000/day (100% markup on
+      // $500/day cost). Edit inline for 1-man days ($500) or hourly work.
+      // Materials: default to 'sheet' since backer boards are the most common.
+      unit: category === 'materials' ? 'sheet' : 'day',
+      unit_price: category === 'labor' ? 1000 : 0,
+      amount: category === 'labor' ? 1000 : 0,
       ...(category === 'materials' ? { status: 'needed' as MaterialStatus } : {}),
     }
     await persist([...liveItems, defaults])
@@ -247,7 +251,20 @@ export default function JobLineItems({
                   return (
                     <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{item.description}</p>
+                        <p className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                          <span>{item.description}</span>
+                          {item.source_url && (
+                            <a
+                              href={item.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={item.source_name || 'Source'}
+                              className="text-gray-400 hover:text-primary-600"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500">
                           {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
                         </p>
@@ -401,66 +418,122 @@ function LineItemEditRow({
   const [description, setDescription] = useState(item.description)
   const [quantity, setQuantity] = useState(String(item.quantity))
   const [unitPrice, setUnitPrice] = useState(String(item.unit_price))
+  const [sourceUrl, setSourceUrl] = useState(item.source_url ?? '')
+  const [sourceName, setSourceName] = useState(item.source_name ?? '')
+  const [showSource, setShowSource] = useState(Boolean(item.source_url))
 
   useEffect(() => setDescription(item.description), [item.description])
   useEffect(() => setQuantity(String(item.quantity)), [item.quantity])
   useEffect(() => setUnitPrice(String(item.unit_price)), [item.unit_price])
+  useEffect(() => setSourceUrl(item.source_url ?? ''), [item.source_url])
+  useEffect(() => setSourceName(item.source_name ?? ''), [item.source_name])
 
   return (
-    <div className="px-4 py-3 grid grid-cols-12 gap-2 items-center">
-      <input
-        type="text"
-        list={catalogList}
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        onBlur={() => onDescriptionBlur(description)}
-        placeholder="Description"
-        disabled={disabled}
-        className="col-span-5 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
-      />
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        value={quantity}
-        onChange={(e) => setQuantity(e.target.value)}
-        onBlur={() => onPatch({ quantity: Number(quantity) || 0 })}
-        placeholder="Qty"
-        disabled={disabled}
-        className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
-      />
-      <select
-        value={item.unit}
-        onChange={(e) => onPatch({ unit: e.target.value as JobLineItem['unit'] })}
-        disabled={disabled}
-        className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
-      >
-        {unitOptions.map((u) => (
-          <option key={u} value={u}>
-            {u}
-          </option>
-        ))}
-      </select>
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        value={unitPrice}
-        onChange={(e) => setUnitPrice(e.target.value)}
-        onBlur={() => onPatch({ unit_price: Number(unitPrice) || 0 })}
-        placeholder="Price"
-        disabled={disabled}
-        className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
-      />
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={disabled}
-        className="col-span-1 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 justify-self-end"
-        title="Delete row"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+    <div className="px-4 py-3">
+      <div className="grid grid-cols-12 gap-2 items-center">
+        <input
+          type="text"
+          list={catalogList}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => onDescriptionBlur(description)}
+          placeholder="Description"
+          disabled={disabled}
+          className="col-span-5 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          onBlur={() => onPatch({ quantity: Number(quantity) || 0 })}
+          placeholder="Qty"
+          disabled={disabled}
+          className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <select
+          value={item.unit}
+          onChange={(e) => onPatch({ unit: e.target.value as JobLineItem['unit'] })}
+          disabled={disabled}
+          className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
+        >
+          {unitOptions.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={unitPrice}
+          onChange={(e) => setUnitPrice(e.target.value)}
+          onBlur={() => onPatch({ unit_price: Number(unitPrice) || 0 })}
+          placeholder="Price"
+          disabled={disabled}
+          className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={disabled}
+          className="col-span-1 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50 justify-self-end"
+          title="Delete row"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      {item.category === 'materials' && (
+        <div className="mt-1.5">
+          {showSource ? (
+            <div className="grid grid-cols-12 gap-2 items-center">
+              <input
+                type="url"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+                onBlur={() => onPatch({ source_url: sourceUrl.trim() || null })}
+                placeholder="Source URL (internal — not shown to customer)"
+                disabled={disabled}
+                className="col-span-7 px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <input
+                type="text"
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                onBlur={() => onPatch({ source_name: sourceName.trim() || null })}
+                placeholder="Source label"
+                disabled={disabled}
+                className="col-span-4 px-2 py-1 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSourceUrl('')
+                  setSourceName('')
+                  setShowSource(false)
+                  onPatch({ source_url: null, source_name: null })
+                }}
+                disabled={disabled}
+                className="col-span-1 p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-50 justify-self-end"
+                title="Remove source"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSource(true)}
+              disabled={disabled}
+              className="text-[11px] text-gray-400 hover:text-primary-600 inline-flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" /> add source link
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

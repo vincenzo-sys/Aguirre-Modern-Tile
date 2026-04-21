@@ -46,7 +46,7 @@ export interface JobLineItem {
   category: 'materials' | 'labor'
   description: string
   quantity: number
-  unit: 'sq ft' | 'hr' | 'ea' | 'ln ft' | 'bag' | 'box'
+  unit: 'sq ft' | 'hr' | 'ea' | 'ln ft' | 'bag' | 'box' | 'sheet' | 'tube' | 'roll' | 'kit' | 'day'
   unit_price: number
   amount: number
   status?: MaterialStatus

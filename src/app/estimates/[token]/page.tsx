@@ -87,7 +87,11 @@ function parseScopeNotes(notes: string | null): ParsedScope {
 
   const get = (name: string) => parts.find((p) => p.header === name)?.text ?? null
 
-  const scopeBody = get('SCOPE OF WORK')
+  // Prefer an explicit SCOPE OF WORK section, but fall back to the preamble
+  // text before the first recognized header — many estimator outputs describe
+  // the scope up front without labeling it.
+  const preamble = parts.find((p) => p.header === 'PREAMBLE')?.text ?? null
+  const scopeBody = get('SCOPE OF WORK') ?? preamble
   const warrantyText = get('WARRANTY')
   const includedText = get("WHAT'S INCLUDED")
   const notIncludedText = get("WHAT'S NOT INCLUDED")

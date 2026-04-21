@@ -14,9 +14,11 @@ function formatCurrency(amount: number): string {
 export default function AcceptAndPayButton({
   token,
   depositAmount,
+  compact = false,
 }: {
   token: string
   depositAmount: number
+  compact?: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -39,23 +41,28 @@ export default function AcceptAndPayButton({
     }
   }
 
+  const sizing = compact
+    ? 'px-4 py-3 text-sm'
+    : 'px-8 py-4 text-base'
+  const icon = compact ? 'w-4 h-4' : 'w-5 h-5'
+
   return (
     <div>
       <button
         type="button"
         onClick={accept}
         disabled={loading || depositAmount <= 0}
-        className="inline-flex items-center gap-2 px-8 py-4 bg-primary-600 text-white rounded-lg text-base font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+        className={`inline-flex items-center gap-2 ${sizing} bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50`}
       >
         {loading ? (
           <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Redirecting to payment...
+            <Loader2 className={`${icon} animate-spin`} />
+            {compact ? 'Redirecting…' : 'Redirecting to payment...'}
           </>
         ) : (
           <>
-            <CheckCircle2 className="w-5 h-5" />
-            Accept &amp; Pay {formatCurrency(depositAmount)} Deposit
+            <CheckCircle2 className={icon} />
+            {compact ? 'Accept & Pay' : `Accept & Pay ${formatCurrency(depositAmount)} Deposit`}
           </>
         )}
       </button>

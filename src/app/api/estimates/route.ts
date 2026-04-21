@@ -82,7 +82,8 @@ export async function GET(req: NextRequest) {
 
     const jobLineItems: Array<{
       category?: string; description?: string; quantity?: number;
-      unit?: string; unit_price?: number; amount?: number
+      unit?: string; unit_price?: number; amount?: number;
+      source_url?: string | null; source_name?: string | null;
     }> = Array.isArray((job as any).line_items) ? (job as any).line_items : []
 
     for (const item of jobLineItems) {
@@ -106,6 +107,10 @@ export async function GET(req: NextRequest) {
       if (item.category === 'materials') {
         const coverage = material?.coverage ? Number(material.coverage) : 1
         const yourCost = material ? Number(material.your_cost) * qty / coverage : amount * 0.6
+        // Prefer the source link stored directly on the line item (populated
+        // by the estimator or manually entered), fall back to fuzzy-matched
+        // catalog link, and surface nothing if neither is present.
+        const retailLink = item.source_url || material?.retail_link || null
 
         items.push({
           description: desc,
@@ -117,7 +122,7 @@ export async function GET(req: NextRequest) {
           price_to_customer: unitPrice,
           total_cost: yourCost,
           total_price: amount,
-          retail_link: material?.retail_link || null,
+          retail_link: retailLink,
         })
       } else {
         // Labor items — use labor rates

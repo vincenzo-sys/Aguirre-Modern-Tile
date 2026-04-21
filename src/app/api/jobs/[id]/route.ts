@@ -89,6 +89,18 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
+    // Keep estimated_cost in sync with line_items so the customer-facing
+    // estimate total (and Stripe deposit = 10% of it) always reflects the
+    // latest edits. Caller can override by explicitly setting estimated_cost
+    // in the same PATCH body.
+    if ('line_items' in updates && !('estimated_cost' in updates)) {
+      const items = Array.isArray(updates.line_items) ? updates.line_items : []
+      const sum = items.reduce((s: number, it: { amount?: number }) => {
+        return s + (Number(it?.amount) || 0)
+      }, 0)
+      updates.estimated_cost = Math.round(sum * 100) / 100
+    }
+
     // Get the old status before updating
     const { data: oldJob } = await supabase
       .from('jobs')

@@ -93,15 +93,36 @@ export async function GET(req: NextRequest) {
       const amount = Number(item.amount) || 0
       const unit = item.unit ?? 'ea'
 
-      // Try to match to a material in our pricing table
+      // Normalize-then-match against the materials catalog. Previous version
+      // matched on first-word-only ("Thinset" matched the first Thinset in
+      // the catalog regardless of grade), which pulled wrong costs into the
+      // internal estimate and flipped margins negative. Now: strip punctuation
+      // on both sides, sort catalog by length descending, require the
+      // material's significant words (>2 chars) to ALL appear in the
+      // description. Falls through to no-match (null) rather than a wrong match.
       let material: any = null
       try {
-        const descLower = desc.toLowerCase()
-        material = materials.find((m: any) => {
-          const mItem = (m.item ?? '').toLowerCase()
-          const firstWord = mItem.split(' ')[0]
-          return descLower.includes(firstWord) || mItem.includes(descLower.split(' ')[0])
-        })
+        const normalize = (s: string) =>
+          (s ?? '')
+            .toLowerCase()
+            .replace(/[^a-z0-9 ]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        const descNorm = normalize(desc)
+        const ranked = materials
+          .map((m: any) => ({ m, norm: normalize(m.item ?? '') }))
+          .sort((a, b) => b.norm.length - a.norm.length)
+
+        // Pass 1: full material name appears contiguously in the description
+        material = ranked.find((r) => r.norm && descNorm.includes(r.norm))?.m ?? null
+
+        // Pass 2: every significant word in the material name appears anywhere
+        if (!material) {
+          material = ranked.find((r) => {
+            const words = r.norm.split(' ').filter((w) => w.length > 2)
+            return words.length > 0 && words.every((w) => descNorm.includes(w))
+          })?.m ?? null
+        }
       } catch { /* fuzzy match failed, use defaults */ }
 
       if (item.category === 'materials') {

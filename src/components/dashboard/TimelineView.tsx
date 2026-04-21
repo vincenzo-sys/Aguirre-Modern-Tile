@@ -6,6 +6,8 @@ import type { JobWithAssignee, JobStatus, Profile } from '@/lib/supabase/types'
 const statusColors: Record<JobStatus, string> = {
   lead: 'bg-yellow-300',
   quoted: 'bg-blue-300',
+  estimate_revised: 'bg-indigo-300',
+  accepted_not_scheduled: 'bg-teal-300',
   scheduled: 'bg-purple-300',
   in_progress: 'bg-orange-300',
   waiting_for_materials: 'bg-amber-300',

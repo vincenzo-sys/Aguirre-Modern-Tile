@@ -3,6 +3,8 @@ import type { JobStatus } from '@/lib/supabase/types'
 const statusConfig: Record<JobStatus, { label: string; className: string }> = {
   lead: { label: 'Lead', className: 'bg-yellow-100 text-yellow-800' },
   quoted: { label: 'Quoted', className: 'bg-blue-100 text-blue-800' },
+  estimate_revised: { label: 'Estimate Revised', className: 'bg-indigo-100 text-indigo-800' },
+  accepted_not_scheduled: { label: 'Accepted — Pick Date', className: 'bg-teal-100 text-teal-800' },
   scheduled: { label: 'Scheduled', className: 'bg-purple-100 text-purple-800' },
   in_progress: { label: 'In Progress', className: 'bg-orange-100 text-orange-800' },
   waiting_for_materials: { label: 'Waiting for Materials', className: 'bg-amber-100 text-amber-800' },

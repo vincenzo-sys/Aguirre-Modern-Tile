@@ -3,7 +3,8 @@ import type { JobStatus } from '@/lib/supabase/types'
 const statusTabs: { value: string; statuses: JobStatus[] }[] = [
   { value: 'all', statuses: [] },
   { value: 'leads', statuses: ['lead'] },
-  { value: 'quoted', statuses: ['quoted'] },
+  { value: 'quoted', statuses: ['quoted', 'estimate_revised'] },
+  { value: 'awaiting_schedule', statuses: ['accepted_not_scheduled'] },
   { value: 'scheduled', statuses: ['scheduled'] },
   { value: 'active', statuses: ['in_progress', 'waiting_for_materials'] },
   { value: 'completed', statuses: ['completed'] },

@@ -106,8 +106,11 @@ export default function SalesWorklist({
   for (const job of jobs) {
     if (job.status === 'cancelled') continue
 
-    // Awaiting deposit
-    if ((job.status === 'lead' || job.status === 'quoted') && (job.amount_paid ?? 0) <= 0) {
+    // Awaiting deposit (quoted / revised estimate, no money in yet)
+    if (
+      (job.status === 'lead' || job.status === 'quoted' || job.status === 'estimate_revised') &&
+      (job.amount_paid ?? 0) <= 0
+    ) {
       items.push({
         bucket: 'awaiting_deposit',
         kind: 'job',
@@ -122,8 +125,11 @@ export default function SalesWorklist({
       continue
     }
 
-    // Needs scheduling — deposit received, no start date yet
-    if ((job.status === 'lead' || job.status === 'quoted') && !job.scheduled_start) {
+    // Needs scheduling — deposit received (or explicitly accepted), no start date yet
+    if (
+      job.status === 'accepted_not_scheduled' ||
+      ((job.status === 'lead' || job.status === 'quoted' || job.status === 'estimate_revised') && !job.scheduled_start)
+    ) {
       items.push({
         bucket: 'needs_scheduling',
         kind: 'job',

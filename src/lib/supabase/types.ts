@@ -1,5 +1,7 @@
 export type UserRole = 'owner' | 'lead'
-export type JobStatus = 'lead' | 'quoted' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
+export type JobStatus = 'lead' | 'quoted' | 'estimate_revised' | 'accepted_not_scheduled' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
+
+export type JobPriority = 'high' | 'medium' | 'low'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
 export type CustomerSource = 'website' | 'manual' | 'referral' | 'repeat'
 
@@ -88,6 +90,10 @@ export interface Job {
   estimate_sent_at: string | null
   estimate_viewed_at: string | null
   estimate_accepted_at: string | null
+  priority: JobPriority | null
+  follow_up_count: number
+  last_contact_at: string | null
+  next_contact_date: string | null
   created_by: string | null
   created_at: string
   updated_at: string

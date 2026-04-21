@@ -12,6 +12,17 @@ const ownerTransitions: Partial<Record<JobStatus, { label: string; next: JobStat
     { label: 'Cancel', next: 'cancelled' },
   ],
   quoted: [
+    { label: 'Mark as Revised', next: 'estimate_revised' },
+    { label: 'Deposit Received', next: 'accepted_not_scheduled' },
+    { label: 'Schedule Job', next: 'scheduled' },
+    { label: 'Cancel', next: 'cancelled' },
+  ],
+  estimate_revised: [
+    { label: 'Deposit Received', next: 'accepted_not_scheduled' },
+    { label: 'Schedule Job', next: 'scheduled' },
+    { label: 'Cancel', next: 'cancelled' },
+  ],
+  accepted_not_scheduled: [
     { label: 'Schedule Job', next: 'scheduled' },
     { label: 'Cancel', next: 'cancelled' },
   ],

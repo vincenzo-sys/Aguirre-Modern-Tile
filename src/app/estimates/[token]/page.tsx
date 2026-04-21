@@ -155,14 +155,27 @@ export default async function EstimatePage({
                 </div>
                 <div className="divide-y divide-gray-100">
                   {materials.map((item, i) => (
-                    <div key={i} className="px-6 py-3 flex items-center justify-between text-sm">
-                      <div>
+                    <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                      <div className="flex-1">
                         <p className="text-gray-900">{item.description}</p>
                         <p className="text-xs text-gray-500">
                           {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
                         </p>
+                        {item.source_url && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Source:{' '}
+                            <a
+                              href={item.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-600 hover:text-primary-800 underline"
+                            >
+                              {item.source_name || 'View product'}
+                            </a>
+                          </p>
+                        )}
                       </div>
-                      <span className="font-medium text-gray-900">{formatCurrency(item.amount)}</span>
+                      <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -177,14 +190,27 @@ export default async function EstimatePage({
                 </div>
                 <div className="divide-y divide-gray-100">
                   {labor.map((item, i) => (
-                    <div key={i} className="px-6 py-3 flex items-center justify-between text-sm">
-                      <div>
+                    <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                      <div className="flex-1">
                         <p className="text-gray-900">{item.description}</p>
                         <p className="text-xs text-gray-500">
                           {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
                         </p>
+                        {item.source_url && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Source:{' '}
+                            <a
+                              href={item.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary-600 hover:text-primary-800 underline"
+                            >
+                              {item.source_name || 'View product'}
+                            </a>
+                          </p>
+                        )}
                       </div>
-                      <span className="font-medium text-gray-900">{formatCurrency(item.amount)}</span>
+                      <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
                     </div>
                   ))}
                 </div>

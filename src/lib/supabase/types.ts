@@ -50,6 +50,8 @@ export interface JobLineItem {
   unit_price: number
   amount: number
   status?: MaterialStatus
+  source_url?: string | null
+  source_name?: string | null
 }
 
 export interface Job {

@@ -105,8 +105,21 @@ export async function GET(req: NextRequest) {
       } catch { /* fuzzy match failed, use defaults */ }
 
       if (item.category === 'materials') {
-        const coverage = material?.coverage ? Number(material.coverage) : 1
-        const yourCost = material ? Number(material.your_cost) * qty / coverage : amount * 0.6
+        // Line items store qty in the material's native unit (sheet/bag/tube/
+        // kit/etc.), and materials_pricing.your_cost is per-unit in the same
+        // unit. So total_cost = qty * your_cost. No coverage division — that
+        // was a leftover from when qty was tracked in sq ft.
+        let costPerUnit: number
+        if (material && Number(material.your_cost)) {
+          costPerUnit = Number(material.your_cost)
+        } else {
+          // Fallback: back out cost from the customer price assuming the
+          // standard 20% markup (cost = price / 1.20). Rough but better than
+          // nothing for one-off items not in the catalog.
+          costPerUnit = unitPrice > 0 ? unitPrice / 1.20 : 0
+        }
+        const totalCost = costPerUnit * qty
+        const markupPct = unitPrice > 0 ? (unitPrice - costPerUnit) / unitPrice : 0
         // Prefer the source link stored directly on the line item (populated
         // by the estimator or manually entered), fall back to fuzzy-matched
         // catalog link, and surface nothing if neither is present.
@@ -117,35 +130,49 @@ export async function GET(req: NextRequest) {
           category: 'materials',
           quantity: qty,
           unit,
-          your_cost: yourCost,
-          markup_percent: material ? Number(material.markup_percent) || 0.20 : 0.20,
+          your_cost: costPerUnit,
+          markup_percent: markupPct,
           price_to_customer: unitPrice,
-          total_cost: yourCost,
+          total_cost: totalCost,
           total_price: amount,
           retail_link: retailLink,
         })
       } else {
-        // Labor items — use labor rates
-        const dailyRate = laborRates.find((r: any) => r.setting === 'Day Rate (per tiler)')
-        const crewSize = laborRates.find((r: any) => r.setting === 'Standard Crew Size')
-        const multiplier = laborRates.find((r: any) => r.setting === 'Install Multiplier')
+        // Labor cost depends on the unit:
+        //   'day' — cost is the 2-man crew day rate ($250/tiler × crewSize)
+        //   'hr'  — cost is the hourly rate ($250/8/tiler × crewSize)
+        //   anything else ('ea' for trash, transport, flat-fee items) — treat
+        //           as a pass-through: cost ~= price (no internal markup tracked).
+        //           Vince can override by editing the real cost via the dashboard
+        //           once line items support a per-line cost field.
+        const dailyRatePerTiler = laborRates.find((r: any) => r.setting === 'Day Rate (per tiler)')
+        const crewSizeRate = laborRates.find((r: any) => r.setting === 'Standard Crew Size')
+        const ratePerTiler = dailyRatePerTiler ? Number(dailyRatePerTiler.value) : 250
+        const crewCount = crewSizeRate ? Number(crewSizeRate.value) : 2
 
-        const costPerHour = dailyRate ? Number(dailyRate.value) / 8 : 31.25
-        const crewCount = crewSize ? Number(crewSize.value) : 2
-        const markup = multiplier ? Number(multiplier.value) : 1.9
-
-        const hourlyCount = unit === 'hr' ? qty : qty / 8
-        const laborCost = hourlyCount * costPerHour * crewCount
+        let costPerUnit: number
+        let totalCost: number
+        if (unit === 'day') {
+          costPerUnit = ratePerTiler * crewCount // e.g. 2 × $250 = $500/day
+          totalCost = costPerUnit * qty
+        } else if (unit === 'hr') {
+          costPerUnit = (ratePerTiler / 8) * crewCount // e.g. 2 × $31.25 = $62.50/hr
+          totalCost = costPerUnit * qty
+        } else {
+          costPerUnit = unitPrice // pass-through: treat as zero-margin
+          totalCost = amount
+        }
+        const markupPct = unitPrice > 0 ? (unitPrice - costPerUnit) / unitPrice : 0
 
         items.push({
           description: desc,
           category: 'labor',
           quantity: qty,
           unit,
-          your_cost: costPerHour * crewCount,
-          markup_percent: (markup - 1),
+          your_cost: costPerUnit,
+          markup_percent: markupPct,
           price_to_customer: unitPrice,
-          total_cost: laborCost,
+          total_cost: totalCost,
           total_price: amount,
         })
       }

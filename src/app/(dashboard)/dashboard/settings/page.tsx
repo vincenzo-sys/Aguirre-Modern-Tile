@@ -151,34 +151,145 @@ export default function SettingsPage() {
 }
 
 function MaterialsTable({ data }: { data: any[] }) {
+  // Editable in place: change Your Cost, Customer Price, or Markup %.
+  // Changing cost recomputes price at current markup. Changing markup recomputes
+  // price at current cost. Changing price recomputes markup at current cost.
+  // Blur to save. Markup is enforced at a 20% floor — anything lower is bumped.
+  const [rows, setRows] = useState(data)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  useEffect(() => setRows(data), [data])
+
+  function markup(r: any): number {
+    if (!r.your_cost || r.your_cost <= 0) return 0
+    return (r.price_to_customer - r.your_cost) / r.your_cost
+  }
+
+  async function patch(id: string, updates: Record<string, unknown>) {
+    setSaving(id)
+    try {
+      const res = await fetch(`/api/reference/materials_pricing/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (!res.ok) throw new Error('save failed')
+      toast('Saved', 'success')
+    } catch {
+      toast('Save failed', 'error')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  function updateField(id: string, field: 'your_cost' | 'price_to_customer' | 'markup', value: number) {
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r
+        const next = { ...r }
+        if (field === 'your_cost') {
+          next.your_cost = value
+          // Keep current markup, recompute price (floored at 20%)
+          const mk = Math.max(markup(r), 0.20)
+          next.price_to_customer = Number((value * (1 + mk)).toFixed(2))
+          next.markup_percent = mk
+        } else if (field === 'markup') {
+          const mk = Math.max(value, 0.20)
+          next.markup_percent = mk
+          next.price_to_customer = Number((r.your_cost * (1 + mk)).toFixed(2))
+        } else {
+          // Price edit — enforce 20% minimum above cost
+          const min = r.your_cost * 1.20
+          next.price_to_customer = Math.max(value, min)
+          next.markup_percent = r.your_cost > 0 ? (next.price_to_customer - r.your_cost) / r.your_cost : 0
+        }
+        patch(id, {
+          your_cost: next.your_cost,
+          price_to_customer: next.price_to_customer,
+          markup_percent: next.markup_percent,
+        })
+        return next
+      })
+    )
+  }
+
   return (
     <div className="overflow-x-auto">
+      <div className="px-4 py-2 bg-blue-50 text-xs text-blue-900 border-b border-blue-200">
+        Edit Your Cost, Markup %, or Customer Price — the other fields auto-recalculate. Markup floor is 20% on cost.
+      </div>
       <table className="w-full">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Item</th>
             <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Category</th>
             <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Your Cost</th>
-            <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Markup</th>
+            <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Markup %</th>
             <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Customer Price</th>
             <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Coverage</th>
             <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Unit</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {data.map((row) => (
-            <tr key={row.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.item}</td>
-              <td className="px-4 py-3">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{row.category}</span>
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(row.your_cost)}</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-500">{Math.round(row.markup_percent * 100)}%</td>
-              <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{formatCurrency(row.price_to_customer)}</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-500">{row.coverage}</td>
-              <td className="px-4 py-3 text-xs text-gray-500">{row.unit}</td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const mk = markup(row)
+            const underFloor = mk < 0.1999
+            return (
+              <tr key={row.id} className={`hover:bg-gray-50 ${saving === row.id ? 'opacity-60' : ''}`}>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.item}</td>
+                <td className="px-4 py-3">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{row.category}</span>
+                </td>
+                <td className="px-4 py-3 text-sm text-right">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={row.your_cost}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (v !== row.your_cost) updateField(row.id, 'your_cost', v)
+                    }}
+                    className="w-24 text-right px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </td>
+                <td className="px-4 py-3 text-sm text-right">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="20"
+                    defaultValue={(mk * 100).toFixed(1)}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value) / 100
+                      if (Math.abs(v - mk) > 0.001) updateField(row.id, 'markup', v)
+                    }}
+                    className={`w-20 text-right px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-primary-500 ${underFloor ? 'border-red-300 text-red-700' : 'border-gray-200'}`}
+                  />
+                </td>
+                <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={row.price_to_customer}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, price_to_customer: v } : r)))
+                    }}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value)
+                      if (Math.abs(v - row.price_to_customer) > 0.001 || v !== data.find(d => d.id === row.id)?.price_to_customer) {
+                        updateField(row.id, 'price_to_customer', v)
+                      }
+                    }}
+                    className="w-24 text-right px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                </td>
+                <td className="px-4 py-3 text-sm text-right text-gray-500">{row.coverage}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{row.unit}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

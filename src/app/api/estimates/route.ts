@@ -119,7 +119,9 @@ export async function GET(req: NextRequest) {
           costPerUnit = unitPrice > 0 ? unitPrice / 1.20 : 0
         }
         const totalCost = costPerUnit * qty
-        const markupPct = unitPrice > 0 ? (unitPrice - costPerUnit) / unitPrice : 0
+        // Markup-on-cost: (price - cost) / cost. Contractors think in this
+        // convention (e.g. "20% on top of our cost"), not markup-as-%-of-price.
+        const markupPct = costPerUnit > 0 ? (unitPrice - costPerUnit) / costPerUnit : 0
         // Prefer the source link stored directly on the line item (populated
         // by the estimator or manually entered), fall back to fuzzy-matched
         // catalog link, and surface nothing if neither is present.
@@ -162,7 +164,9 @@ export async function GET(req: NextRequest) {
           costPerUnit = unitPrice // pass-through: treat as zero-margin
           totalCost = amount
         }
-        const markupPct = unitPrice > 0 ? (unitPrice - costPerUnit) / unitPrice : 0
+        // Markup-on-cost: (price - cost) / cost. Contractors think in this
+        // convention (e.g. "20% on top of our cost"), not markup-as-%-of-price.
+        const markupPct = costPerUnit > 0 ? (unitPrice - costPerUnit) / costPerUnit : 0
 
         items.push({
           description: desc,

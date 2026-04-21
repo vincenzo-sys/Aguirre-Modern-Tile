@@ -122,17 +122,29 @@ export default function JobLineItems({
     await persist([...liveItems, defaults])
   }
 
-  // When a description matches a material in the catalog, auto-fill price/unit
+  // When a description matches a material in the catalog, auto-fill price,
+  // source link, and source name so the customer-facing estimate shows the
+  // retail link alongside the line.
   function onDescriptionBlur(index: number, value: string) {
     const match = materialsCatalog.find((m) => m.item.toLowerCase() === value.trim().toLowerCase())
     if (!match) {
       updateRow(index, { description: value })
       return
     }
-    updateRow(index, {
+    const updates: Partial<JobLineItem> = {
       description: match.item,
       unit_price: Number(match.price_to_customer) || 0,
-    })
+    }
+    if (match.retail_link) {
+      updates.source_url = match.retail_link
+      try {
+        const host = new URL(match.retail_link).hostname.replace(/^www\./, '')
+        updates.source_name = `${match.item} at ${host}`
+      } catch {
+        updates.source_name = match.item
+      }
+    }
+    updateRow(index, updates)
   }
 
   const materialStatusCounts: Record<MaterialStatus, number> = {

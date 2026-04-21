@@ -1,27 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { requireApiAuth } from '@/lib/apiAuth'
 
-async function getSupabase() {
-  const cookieStore = await cookies()
-  return createServerClient(
+// Admin client — auth is already enforced upstream by requireApiAuth (which
+// accepts either a session cookie or X-API-Key). Using the service-role client
+// here lets API-key callers bypass RLS consistently, matching the pattern used
+// by /api/customers/[id]. Previously this route used a cookie-bound client and
+// silently returned 404 for API-key requests because RLS blocked the read.
+function getSupabase() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch { /* Server Component context */ }
-        },
-      },
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
 
@@ -36,7 +26,7 @@ export async function GET(
   const { id } = await params
 
   try {
-    const supabase = await getSupabase()
+    const supabase = getSupabase()
 
     const { data: job, error } = await supabase
       .from('jobs')
@@ -66,7 +56,7 @@ export async function PATCH(
   const { id } = await params
 
   try {
-    const supabase = await getSupabase()
+    const supabase = getSupabase()
     const body = await req.json()
 
     // Allowed fields that can be updated

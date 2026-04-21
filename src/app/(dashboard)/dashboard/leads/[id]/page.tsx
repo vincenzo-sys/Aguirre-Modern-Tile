@@ -3,9 +3,9 @@
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive, CheckCircle, MapPin } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive, CheckCircle, MapPin, ImageIcon } from 'lucide-react'
 import { toast } from '@/components/Toast'
-import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
+import type { QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -27,6 +27,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params)
   const router = useRouter()
   const [lead, setLead] = useState<QuoteRequest | null>(null)
+  const [photos, setPhotos] = useState<QuoteRequestPhoto[]>([])
+  const [lightbox, setLightbox] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notes, setNotes] = useState('')
@@ -38,13 +40,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/leads/${id}`)
-      if (!res.ok) {
+      const [leadRes, photoRes] = await Promise.all([
+        fetch(`/api/leads/${id}`),
+        fetch(`/api/quotes/${id}/photos`),
+      ])
+
+      if (!leadRes.ok) {
         toast('Failed to load lead', 'error')
         setLoading(false)
         return
       }
-      const data = (await res.json()) as QuoteRequest
+      const data = (await leadRes.json()) as QuoteRequest
       setLead(data)
       setNotes(data.notes ?? '')
       setNextFollowUp(data.next_follow_up ?? '')
@@ -54,6 +60,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         data.site_visit_at ? new Date(data.site_visit_at).toISOString().slice(0, 16) : ''
       )
       setSiteVisitNotes(data.site_visit_notes ?? '')
+
+      if (photoRes.ok) {
+        const photoList = (await photoRes.json()) as QuoteRequestPhoto[]
+        setPhotos(Array.isArray(photoList) ? photoList : [])
+      }
+
       setLoading(false)
     }
     load()
@@ -223,6 +235,44 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
 
+          {/* Customer-provided photos */}
+          {photos.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-gray-400" />
+                Photos from customer ({photos.length})
+              </h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {photos.map((photo) => (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    onClick={() => photo.url && setLightbox(photo.url)}
+                    className="aspect-square overflow-hidden rounded-lg bg-gray-100 hover:opacity-90 transition-opacity"
+                    title={photo.file_name}
+                  >
+                    {photo.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={photo.url}
+                        alt={photo.file_name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                        Preview unavailable
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Uploaded with the original quote request. Click to enlarge.
+              </p>
+            </div>
+          )}
+
           {/* In-person estimate visit */}
           <div className="bg-white rounded-lg border border-gray-200 p-5">
             <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -346,6 +396,20 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
       </div>
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6 cursor-zoom-out"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt="Lead photo"
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+          />
+        </div>
+      )}
     </div>
   )
 }

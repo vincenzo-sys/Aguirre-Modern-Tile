@@ -137,6 +137,18 @@ export interface InvoiceWithJob extends Invoice {
   job?: Job | null
 }
 
+export interface QuoteRequestPhoto {
+  id: string
+  quote_request_id: string
+  storage_path: string
+  file_name: string
+  mime_type: string | null
+  size_bytes: number | null
+  caption: string | null
+  created_at: string
+  url?: string | null
+}
+
 export type QuoteRequestStatus = 'new' | 'reviewed' | 'converted' | 'archived'
 
 export type QuoteRequestSource = 'website' | 'phone' | 'referral' | 'walk-in' | 'repeat' | 'other'

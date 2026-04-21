@@ -105,6 +105,25 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
 
       if (!emailRes.ok && !quoteRes.ok) throw new Error('Failed to send')
 
+      // Upload photos if the quote row was created. Non-fatal — if this
+      // fails the lead is still saved and the user isn't blocked.
+      if (files.length > 0 && quoteRes.ok) {
+        try {
+          const quoteData = await quoteRes.clone().json()
+          const quoteId = quoteData?.id as string | undefined
+          if (quoteId) {
+            const fd = new FormData()
+            files.forEach((file) => fd.append('photos', file))
+            await fetch(`/api/quotes/${quoteId}/photos`, {
+              method: 'POST',
+              body: fd,
+            })
+          }
+        } catch (err) {
+          console.error('Photo upload failed:', err)
+        }
+      }
+
       setIsSubmitting(false)
       setIsSubmitted(true)
       localStorage.removeItem('leadContact')

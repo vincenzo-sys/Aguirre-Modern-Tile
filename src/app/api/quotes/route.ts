@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
 import { createNotionJob } from '@/lib/notion'
+import { createOpenPhoneContact } from '@/lib/openphone'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -51,27 +52,34 @@ export async function POST(req: NextRequest) {
 
       // Find or create customer record
       let customerId: string | null = null
+      let existingOpenPhoneId: string | null = null
       try {
         // Try email match first
         if (email) {
           const { data: existing } = await supabase
             .from('customers')
-            .select('id')
+            .select('id, openphone_contact_id')
             .ilike('email', email)
             .limit(1)
             .single()
-          if (existing) customerId = existing.id
+          if (existing) {
+            customerId = existing.id
+            existingOpenPhoneId = existing.openphone_contact_id
+          }
         }
 
         // Try phone match if no email match
         if (!customerId && phone) {
           const { data: existing } = await supabase
             .from('customers')
-            .select('id')
+            .select('id, openphone_contact_id')
             .eq('phone', phone)
             .limit(1)
             .single()
-          if (existing) customerId = existing.id
+          if (existing) {
+            customerId = existing.id
+            existingOpenPhoneId = existing.openphone_contact_id
+          }
         }
 
         // Create new customer if no match found
@@ -91,6 +99,29 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         // Non-fatal: quote still saves even if customer creation fails
         console.error('Customer find-or-create error:', err)
+      }
+
+      // Push to OpenPhone (quo) as a named contact so incoming calls/
+      // texts show "Jane Doe" instead of an unknown number. Non-fatal,
+      // fire-and-forget. Skip if we already have a contact id cached.
+      if (customerId && !existingOpenPhoneId) {
+        createOpenPhoneContact({
+          name,
+          email: email || null,
+          phone: phone || null,
+          source: 'aguirre-tile-website-quote',
+        })
+          .then(async (result) => {
+            if (result.success && result.contactId) {
+              await supabase
+                .from('customers')
+                .update({ openphone_contact_id: result.contactId })
+                .eq('id', customerId)
+            }
+          })
+          .catch((err) => {
+            console.error('OpenPhone contact sync error:', err)
+          })
       }
 
       const { data, error } = await supabase

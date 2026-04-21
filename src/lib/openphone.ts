@@ -57,6 +57,88 @@ export async function sendSMS(to: string, body: string): Promise<{ success: bool
   }
 }
 
+// Normalize a US phone number to E.164 (+1XXXXXXXXXX). Returns null if
+// we can't confidently produce an E.164 number (OpenPhone requires it).
+export function toE164(raw: string): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('+')) {
+    const digits = trimmed.replace(/\D/g, '')
+    return digits.length >= 10 ? `+${digits}` : null
+  }
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return null
+}
+
+function splitName(full: string): { firstName: string; lastName: string } {
+  const parts = full.trim().split(/\s+/)
+  if (parts.length === 1) return { firstName: parts[0] || '', lastName: '' }
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
+}
+
+// Create a contact in OpenPhone so incoming calls/texts show a name.
+// Non-fatal: callers should ignore failures. Requires OPENPHONE_API_KEY.
+// Optionally reads OPENPHONE_USER_ID to set createdByUserId (some workspace
+// configs require it — if your workspace doesn't, leave it unset).
+export async function createOpenPhoneContact(input: {
+  name: string
+  email?: string | null
+  phone?: string | null
+  source?: string
+}): Promise<{ success: boolean; contactId?: string; error?: string }> {
+  try {
+    if (!process.env.OPENPHONE_API_KEY) {
+      return { success: false, error: 'OPENPHONE_API_KEY not set' }
+    }
+
+    const e164 = input.phone ? toE164(input.phone) : null
+    if (!e164 && !input.email) {
+      return { success: false, error: 'No phone (E.164) or email to register' }
+    }
+
+    const { firstName, lastName } = splitName(input.name || '')
+
+    const defaultFields: Record<string, unknown> = {
+      firstName: firstName || 'Website',
+      lastName: lastName || 'Lead',
+    }
+    if (e164) {
+      defaultFields.phoneNumbers = [{ name: 'Mobile', value: e164 }]
+    }
+    if (input.email) {
+      defaultFields.emails = [{ name: 'Email', value: input.email }]
+    }
+
+    const body: Record<string, unknown> = {
+      defaultFields,
+      source: input.source || 'aguirre-tile-website',
+    }
+    if (process.env.OPENPHONE_USER_ID) {
+      body.createdByUserId = process.env.OPENPHONE_USER_ID
+    }
+
+    const res = await openphoneFetch('/contacts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.error('OpenPhone createContact error:', res.status, text)
+      return { success: false, error: `OpenPhone API error: ${res.status}` }
+    }
+
+    const data = await res.json()
+    return { success: true, contactId: data?.data?.id }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('OpenPhone createContact error:', message)
+    return { success: false, error: message }
+  }
+}
+
 // Auto-text templates
 export const AUTO_MESSAGES = {
   missed_call: `Hi! Thanks for calling Aguirre Modern Tile. We missed your call but we'll get back to you shortly. For a quick quote, visit aguirremoderntile.com/quote`,

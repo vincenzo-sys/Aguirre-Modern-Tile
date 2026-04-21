@@ -29,6 +29,7 @@ export interface Customer {
   source: CustomerSource
   stripe_customer_id: string | null
   notion_page_id: string | null
+  openphone_contact_id: string | null
   created_at: string
   updated_at: string
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
+import { createOpenPhoneContact } from '@/lib/openphone'
 
 const RESEND_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
@@ -52,23 +53,30 @@ export async function POST(req: NextRequest) {
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
         let customerId: string | null = null
+        let existingOpenPhoneId: string | null = null
         if (email) {
           const { data: existing } = await supabase
             .from('customers')
-            .select('id')
+            .select('id, openphone_contact_id')
             .ilike('email', email)
             .limit(1)
             .single()
-          if (existing) customerId = existing.id
+          if (existing) {
+            customerId = existing.id
+            existingOpenPhoneId = existing.openphone_contact_id
+          }
         }
         if (!customerId && phone) {
           const { data: existing } = await supabase
             .from('customers')
-            .select('id')
+            .select('id, openphone_contact_id')
             .eq('phone', phone)
             .limit(1)
             .single()
-          if (existing) customerId = existing.id
+          if (existing) {
+            customerId = existing.id
+            existingOpenPhoneId = existing.openphone_contact_id
+          }
         }
         if (!customerId) {
           const { data: newCustomer } = await supabase
@@ -82,6 +90,28 @@ export async function POST(req: NextRequest) {
             .select('id')
             .single()
           if (newCustomer) customerId = newCustomer.id
+        }
+
+        // Push to OpenPhone so the number shows a name on incoming
+        // calls/texts. Non-fatal. Skip if already synced.
+        if (customerId && !existingOpenPhoneId) {
+          createOpenPhoneContact({
+            name,
+            email: email || null,
+            phone: phone || null,
+            source: 'aguirre-tile-website-contact',
+          })
+            .then(async (result) => {
+              if (result.success && result.contactId) {
+                await supabase
+                  .from('customers')
+                  .update({ openphone_contact_id: result.contactId })
+                  .eq('id', customerId)
+              }
+            })
+            .catch((err) => {
+              console.error('OpenPhone contact sync error:', err)
+            })
         }
 
         const answersWithDescription = {

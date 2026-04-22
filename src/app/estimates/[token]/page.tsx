@@ -170,6 +170,27 @@ export default async function EstimatePage({
   const laborTotal = labor.reduce((s, i) => s + (i.amount ?? 0), 0)
   const total = estimate.estimated_cost ?? materialsTotal + laborTotal
 
+  // Multi-section grouping. Sections appear in the order they first show up
+  // in line_items; an explicit "Project-wide" section (or any item with no
+  // section set) is sorted to the end so per-room costs come first and
+  // shared costs (trash, transport) come last.
+  const PROJECTWIDE_LABEL = 'Project-wide'
+  const sectionOrder: string[] = []
+  const sectionMap = new Map<string, JobLineItem[]>()
+  for (const item of estimate.line_items) {
+    const key = item.section || PROJECTWIDE_LABEL
+    if (!sectionMap.has(key)) {
+      sectionMap.set(key, [])
+      sectionOrder.push(key)
+    }
+    sectionMap.get(key)!.push(item)
+  }
+  const namedSections = sectionOrder.filter((s) => s !== PROJECTWIDE_LABEL)
+  const hasNamedSections = namedSections.length > 0
+  const orderedSectionKeys = hasNamedSections
+    ? [...namedSections, ...(sectionMap.has(PROJECTWIDE_LABEL) ? [PROJECTWIDE_LABEL] : [])]
+    : []
+
   const parsed = parseScopeNotes(estimate.scope_notes)
   const warrantyLabel = parsed.warrantyYears
     ? `${parsed.warrantyYears}-year labor warranty`
@@ -336,48 +357,113 @@ export default async function EstimatePage({
               </h3>
             </div>
 
-            {labor.length > 0 && (
-              <div>
-                <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
-                  <span className="text-xs text-gray-500">{formatCurrency(laborTotal)}</span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {labor.map((item, i) => (
-                    <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                      <div className="flex-1">
-                        <p className="text-gray-900">{friendlyLaborDescription(item.description)}</p>
-                        <p className="text-xs text-gray-500">
-                          {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                        </p>
-                      </div>
-                      <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+            {hasNamedSections ? (
+              // Multi-section layout: section header + per-section labor/materials
+              orderedSectionKeys.map((sectionKey, sIdx) => {
+                const sectionItems = sectionMap.get(sectionKey)!
+                const sLabor = sectionItems.filter((i) => i.category === 'labor')
+                const sMats = sectionItems.filter((i) => i.category === 'materials')
+                const sLaborTotal = sLabor.reduce((s, i) => s + (i.amount ?? 0), 0)
+                const sMatsTotal = sMats.reduce((s, i) => s + (i.amount ?? 0), 0)
+                const sSubtotal = sLaborTotal + sMatsTotal
+                return (
+                  <div key={sectionKey} className={sIdx > 0 ? 'border-t-4 border-gray-100' : ''}>
+                    <div className="px-6 py-3 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-primary-900 uppercase tracking-wider">{sectionKey}</span>
+                      <span className="text-sm font-semibold text-primary-900">{formatCurrency(sSubtotal)}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    {sLabor.length > 0 && (
+                      <div>
+                        <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
+                          <span className="text-xs text-gray-500">{formatCurrency(sLaborTotal)}</span>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {sLabor.map((item, i) => (
+                            <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                              <div className="flex-1">
+                                <p className="text-gray-900">{friendlyLaborDescription(item.description)}</p>
+                                <p className="text-xs text-gray-500">
+                                  {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
+                                </p>
+                              </div>
+                              <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {sMats.length > 0 && (
+                      <div>
+                        <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
+                          <span className="text-xs text-gray-500">{formatCurrency(sMatsTotal)}</span>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {sMats.map((item, i) => (
+                            <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                              <div className="flex-1">
+                                <p className="text-gray-900">{item.description}</p>
+                                <p className="text-xs text-gray-500">
+                                  {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
+                                </p>
+                              </div>
+                              <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            ) : (
+              // Classic flat layout (single-section / legacy jobs)
+              <>
+                {labor.length > 0 && (
+                  <div>
+                    <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
+                      <span className="text-xs text-gray-500">{formatCurrency(laborTotal)}</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {labor.map((item, i) => (
+                        <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                          <div className="flex-1">
+                            <p className="text-gray-900">{friendlyLaborDescription(item.description)}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
+                            </p>
+                          </div>
+                          <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {materials.length > 0 && (
-              <div>
-                <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
-                  <span className="text-xs text-gray-500">{formatCurrency(materialsTotal)}</span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {materials.map((item, i) => (
-                    <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                      <div className="flex-1">
-                        <p className="text-gray-900">{item.description}</p>
-                        <p className="text-xs text-gray-500">
-                          {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                        </p>
-                      </div>
-                      <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                {materials.length > 0 && (
+                  <div>
+                    <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
+                      <span className="text-xs text-gray-500">{formatCurrency(materialsTotal)}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div className="divide-y divide-gray-100">
+                      {materials.map((item, i) => (
+                        <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+                          <div className="flex-1">
+                            <p className="text-gray-900">{item.description}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
+                            </p>
+                          </div>
+                          <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

@@ -153,4 +153,14 @@ export const AUTO_MESSAGES = {
 
   invoice_sent: (amount: string, invoiceNumber: string) =>
     `Invoice ${invoiceNumber} for ${amount} has been sent to your email. Thank you! - Aguirre Modern Tile`,
+
+  estimate_viewed_nudge: (estimateUrl: string, nudgeNumber: number) => {
+    const opener =
+      nudgeNumber === 1
+        ? 'Just checking in'
+        : nudgeNumber === 2
+          ? 'Wanted to follow up'
+          : 'Last check-in from me'
+    return `${opener} on your tile estimate — any questions I can answer? You can review and pay the 10% deposit here: ${estimateUrl}. Happy to hop on a quick call too. - Vince, Aguirre Modern Tile`
+  },
 } as const

@@ -3,5 +3,11 @@
     "src/app/api/stripe/**/*.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/daily-nurture",
+      "schedule": "0 13 * * *"
+    }
+  ]
 }

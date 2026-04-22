@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
+import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -23,6 +24,15 @@ export async function POST(req: NextRequest) {
       case 'call.completed':
       case 'call.ringing':
         await handleCall(body)
+        break
+      case 'call.transcript.completed':
+      case 'call.recording.completed':
+        // OpenPhone fires call.transcript.completed when the AI transcript
+        // finishes processing (typically a few seconds to a few minutes
+        // after the call ends). We also catch call.recording.completed in
+        // case the transcript event isn't enabled — the transcript API
+        // works off the same callId either way.
+        await handleTranscriptReady(body)
         break
       case 'message.received':
         await handleIncomingMessage(body)
@@ -106,6 +116,41 @@ async function handleCall(body: any) {
       openphone_message_id: smsResult.messageId || null,
       status: smsResult.success ? 'sent' : 'failed',
     })
+  }
+}
+
+async function handleTranscriptReady(body: any) {
+  const supabase = getSupabaseAdmin()
+  const data = body.data?.object || body.data || body
+  const openphoneCallId = data.callId || data.id
+  if (!openphoneCallId) {
+    console.warn('[OpenPhone transcript] no callId on payload')
+    return
+  }
+
+  try {
+    const transcript = await fetchOpenPhoneTranscript(openphoneCallId)
+    if (!transcript || !transcript.text) {
+      console.log(`[OpenPhone transcript] empty for ${openphoneCallId}, skipping`)
+      return
+    }
+    const { data: updated, error } = await supabase
+      .from('call_log')
+      .update({ transcript: transcript.text })
+      .eq('openphone_call_id', openphoneCallId)
+      .select('id')
+      .maybeSingle()
+    if (error) {
+      console.error(`[OpenPhone transcript] update failed for ${openphoneCallId}:`, error.message)
+      return
+    }
+    if (!updated) {
+      console.warn(`[OpenPhone transcript] no call_log row for ${openphoneCallId} yet — cron will pick up`)
+      return
+    }
+    console.log(`[OpenPhone transcript] saved for call ${openphoneCallId} (${transcript.text.length} chars)`)
+  } catch (err) {
+    console.error(`[OpenPhone transcript] fetch error for ${openphoneCallId}:`, err)
   }
 }
 

@@ -5,6 +5,7 @@ import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
 import ReferralRewardToggle from '@/components/dashboard/ReferralRewardToggle'
+import CallHistory, { type CallLogEntry } from '@/components/dashboard/CallHistory'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -32,6 +33,7 @@ export default async function CustomerDetailPage({
   let quotes: QuoteRequest[] = []
   let referrer: { id: string; name: string } | null = null
   let referralsGiven: { id: string; name: string }[] = []
+  let calls: CallLogEntry[] = []
 
   const useDemo = await shouldUseDemoData()
 
@@ -101,6 +103,15 @@ export default async function CustomerDetailPage({
     } catch {
       quotes = []
     }
+
+    // Call history with transcripts (migration 010 + transcript cron feed this)
+    const { data: callsData } = await supabase
+      .from('call_log')
+      .select('id, phone_number, direction, status, duration, recording_url, transcript, openphone_call_id, created_at')
+      .eq('customer_id', id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    calls = (callsData ?? []) as CallLogEntry[]
   }
 
   const totalRevenue = invoices
@@ -268,6 +279,9 @@ export default async function CustomerDetailPage({
           </div>
         </div>
       )}
+
+      {/* Call history with expandable transcripts (fed by OpenPhone webhook + cron) */}
+      <CallHistory calls={calls} />
 
       {/* Unified history timeline — leads + jobs + invoices in one place */}
       <CustomerTimeline quotes={quotes} jobs={jobs} invoices={invoices} />

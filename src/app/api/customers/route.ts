@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   const supabaseAdmin = getSupabaseAdmin()
   const body = await request.json()
-  const { name, email, phone, address, city, state, zip, notes, source = 'manual' } = body
+  const { name, email, phone, address, city, state, zip, notes, source = 'manual', referred_by_customer_id } = body
 
   if (!name) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 
   const { data: customer, error } = await supabaseAdmin
     .from('customers')
-    .insert({ name, email: email || null, phone: phone || null, address: address || null, city: city || null, state: state || null, zip: zip || null, notes: notes || null, source })
+    .insert({ name, email: email || null, phone: phone || null, address: address || null, city: city || null, state: state || null, zip: zip || null, notes: notes || null, source, referred_by_customer_id: referred_by_customer_id || null })
     .select()
     .single()
 

@@ -67,11 +67,17 @@ export async function PATCH(
   const { id } = await params
   const body = await request.json()
 
-  const allowedFields = ['name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'notes', 'source']
-  const updates: Record<string, string | null> = {}
-  for (const field of allowedFields) {
+  const textFields = ['name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'notes', 'source', 'referred_by_customer_id']
+  const booleanFields = ['referral_reward_paid']
+  const updates: Record<string, string | boolean | null> = {}
+  for (const field of textFields) {
     if (field in body) {
       updates[field] = body[field] || null
+    }
+  }
+  for (const field of booleanFields) {
+    if (field in body) {
+      updates[field] = Boolean(body[field])
     }
   }
 

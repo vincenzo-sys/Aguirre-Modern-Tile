@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, DollarSign, Calendar } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, DollarSign, Calendar, Users } from 'lucide-react'
 import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
+import ReferralRewardToggle from '@/components/dashboard/ReferralRewardToggle'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -29,6 +30,8 @@ export default async function CustomerDetailPage({
   let jobs: Job[] = []
   let invoices: Invoice[] = []
   let quotes: QuoteRequest[] = []
+  let referrer: { id: string; name: string } | null = null
+  let referralsGiven: { id: string; name: string }[] = []
 
   const useDemo = await shouldUseDemoData()
 
@@ -70,6 +73,22 @@ export default async function CustomerDetailPage({
       .eq('customer_id', id)
       .order('created_at', { ascending: false })
     invoices = (invData ?? []) as Invoice[]
+
+    if (customer.referred_by_customer_id) {
+      const { data: ref } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('id', customer.referred_by_customer_id)
+        .single()
+      if (ref) referrer = ref as { id: string; name: string }
+    }
+
+    const { data: given } = await supabase
+      .from('customers')
+      .select('id, name')
+      .eq('referred_by_customer_id', id)
+      .order('created_at', { ascending: false })
+    referralsGiven = (given ?? []) as { id: string; name: string }[]
 
     // quote_requests may not have customer_id column yet — don't crash
     try {
@@ -196,6 +215,57 @@ export default async function CustomerDetailPage({
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</h3>
           <p className="text-sm text-gray-700">{customer.notes}</p>
+        </div>
+      )}
+
+      {/* Referrals */}
+      {(referrer || referralsGiven.length > 0) && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+          <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">
+            <Users className="w-3.5 h-3.5" />
+            Referrals
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {referrer && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Referred by</p>
+                <div className="flex items-center justify-between gap-4">
+                  <Link
+                    href={`/dashboard/customers/${referrer.id}`}
+                    className="text-sm font-medium text-primary-700 hover:text-primary-800"
+                  >
+                    {referrer.name}
+                  </Link>
+                  <ReferralRewardToggle
+                    customerId={customer.id}
+                    initial={customer.referral_reward_paid}
+                  />
+                </div>
+              </div>
+            )}
+            {referralsGiven.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Has referred {referralsGiven.length}
+                </p>
+                <ul className="text-sm text-gray-700 space-y-0.5">
+                  {referralsGiven.slice(0, 5).map((c) => (
+                    <li key={c.id}>
+                      <Link
+                        href={`/dashboard/customers/${c.id}`}
+                        className="text-primary-700 hover:text-primary-800"
+                      >
+                        {c.name}
+                      </Link>
+                    </li>
+                  ))}
+                  {referralsGiven.length > 5 && (
+                    <li className="text-xs text-gray-400">+ {referralsGiven.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

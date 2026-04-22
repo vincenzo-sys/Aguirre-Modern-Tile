@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import ReferrerPicker from '@/components/dashboard/ReferrerPicker'
 
 export default function NewCustomerPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [referredBy, setReferredBy] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -37,7 +39,7 @@ export default function NewCustomerPage() {
       const res = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, referred_by_customer_id: referredBy }),
       })
 
       if (!res.ok) {
@@ -166,6 +168,17 @@ export default function NewCustomerPage() {
             <option value="referral">Referral</option>
             <option value="repeat">Repeat</option>
           </select>
+        </div>
+
+        {/* Referred by (optional; if source = referral, strongly suggested) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Referred by <span className="text-gray-400">(optional)</span>
+          </label>
+          <ReferrerPicker value={referredBy} onChange={setReferredBy} />
+          <p className="text-xs text-gray-500 mt-1">
+            Pick an existing customer. Enables the referrals tracker on their profile.
+          </p>
         </div>
 
         {/* Notes */}

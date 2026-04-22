@@ -32,6 +32,8 @@ export interface Customer {
   stripe_customer_id: string | null
   notion_page_id: string | null
   openphone_contact_id: string | null
+  referred_by_customer_id: string | null
+  referral_reward_paid: boolean
   created_at: string
   updated_at: string
 }

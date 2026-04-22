@@ -35,13 +35,17 @@ function nextActionFor(status: JobStatus): { next: JobStatus; label: string; ico
   return null
 }
 
+const MATERIAL_STATUSES: MaterialStatus[] = ['needed', 'ordered', 'received', 'on_site']
+
 export default function InstallerJobCard({ job }: { job: Job }) {
   const router = useRouter()
   const [status, setStatus] = useState<JobStatus>(job.status)
   const [updating, setUpdating] = useState(false)
+  const [lineItems, setLineItems] = useState<JobLineItem[]>(job.line_items ?? [])
+  const [materialSaving, setMaterialSaving] = useState<number | null>(null)
 
   const action = nextActionFor(status)
-  const materials = (job.line_items ?? []).filter(
+  const materials = lineItems.filter(
     (i): i is JobLineItem => i.category === 'materials'
   )
   const needingCount = materials.filter((m) => (m.status ?? 'needed') === 'needed').length
@@ -65,6 +69,37 @@ export default function InstallerJobCard({ job }: { job: Job }) {
       toast('Could not update status', 'error')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  async function updateMaterialStatus(materialIndex: number, next: MaterialStatus) {
+    // Map back from the filtered materials array to the full line_items array
+    let runningMaterialIdx = -1
+    const nextItems = lineItems.map((item) => {
+      if (item.category !== 'materials') return item
+      runningMaterialIdx += 1
+      if (runningMaterialIdx !== materialIndex) return item
+      return { ...item, status: next }
+    })
+
+    const previous = lineItems
+    setLineItems(nextItems)
+    setMaterialSaving(materialIndex)
+
+    try {
+      const res = await fetch(`/api/jobs/${job.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_items: nextItems }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      toast(`Marked ${next.replace('_', ' ')}`)
+      router.refresh()
+    } catch {
+      setLineItems(previous)
+      toast('Could not update material', 'error')
+    } finally {
+      setMaterialSaving(null)
     }
   }
 
@@ -170,7 +205,9 @@ export default function InstallerJobCard({ job }: { job: Job }) {
             </div>
             <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
               {materials.map((m, i) => {
-                const meta = statusMetaFor[m.status ?? 'needed']
+                const currentStatus = m.status ?? 'needed'
+                const meta = statusMetaFor[currentStatus]
+                const saving = materialSaving === i
                 return (
                   <li
                     key={i}
@@ -182,11 +219,19 @@ export default function InstallerJobCard({ job }: { job: Job }) {
                         {m.quantity} {m.unit}
                       </p>
                     </div>
-                    <span
-                      className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${meta.className} shrink-0`}
+                    <select
+                      value={currentStatus}
+                      onChange={(e) => updateMaterialStatus(i, e.target.value as MaterialStatus)}
+                      disabled={saving}
+                      className={`text-[11px] font-medium px-2 py-1 rounded-full border-0 focus:ring-2 focus:ring-primary-500 shrink-0 cursor-pointer disabled:opacity-60 ${meta.className}`}
+                      aria-label={`Update status for ${m.description}`}
                     >
-                      {meta.label}
-                    </span>
+                      {MATERIAL_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {statusMetaFor[s].label}
+                        </option>
+                      ))}
+                    </select>
                   </li>
                 )
               })}

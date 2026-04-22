@@ -181,7 +181,7 @@ export async function DELETE(
 
     const { data: job, error: fetchErr } = await supabase
       .from('jobs')
-      .select('id, job_number, title, status, amount_paid, client_name')
+      .select('id, job_number, title, status, amount_paid, client_name, estimate_sent_at, estimate_viewed_at')
       .eq('id', id)
       .single()
 
@@ -189,13 +189,24 @@ export async function DELETE(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
+    // Safety guards — each triggers a required force:true. The original
+    // guard only caught paid jobs, but a delete is just as destructive for
+    // a job with a live customer-facing estimate URL, whether or not
+    // money's moved yet. Learned this the hard way on 2026-04-22.
     const amountPaid = Number(job.amount_paid ?? 0)
-    if (amountPaid > 0 && !force) {
+    const reasons: string[] = []
+    if (amountPaid > 0) reasons.push(`amount_paid=$${amountPaid.toFixed(2)}`)
+    if (job.estimate_sent_at) reasons.push(`estimate has been sent to the customer`)
+    if (job.estimate_viewed_at) reasons.push(`customer has opened the estimate page`)
+
+    if (reasons.length > 0 && !force) {
       return NextResponse.json(
         {
-          error: 'Job has payments on record. Pass force:true to delete anyway.',
+          error: `Job is not safe to delete silently: ${reasons.join('; ')}. Pass force:true to proceed.`,
           amount_paid: amountPaid,
           status: job.status,
+          estimate_sent_at: job.estimate_sent_at,
+          estimate_viewed_at: job.estimate_viewed_at,
         },
         { status: 409 }
       )

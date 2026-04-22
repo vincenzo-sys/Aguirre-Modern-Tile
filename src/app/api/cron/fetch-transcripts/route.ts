@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
 
-// Catch-up cron — runs every 30 min via vercel.json. Finds completed
-// calls from the last 48 hours that don't have a transcript yet and
-// tries to pull one from OpenPhone. Belt-and-suspenders for the
-// webhook-driven path: if a webhook drops or OpenPhone's transcript
-// wasn't ready when call.completed fired, the next cron run picks it up.
+// Catch-up cron — runs daily at 13:30 UTC (8:30 AM ET) via vercel.json.
+// Finds completed calls from the last 48 hours that don't have a
+// transcript yet and tries to pull one from OpenPhone. Belt-and-suspenders
+// for the webhook-driven path: if a webhook drops or OpenPhone's
+// transcript wasn't ready when call.completed fired, the next cron run
+// picks it up. Vercel's Hobby plan limits crons to daily, so this is the
+// max frequency we can run — upgrade to Pro if we ever need more.
 
 function getSupabase() {
   return createClient(

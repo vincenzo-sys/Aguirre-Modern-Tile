@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/fetch-transcripts",
-      "schedule": "*/30 * * * *"
+      "schedule": "30 13 * * *"
     }
   ]
 }

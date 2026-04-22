@@ -56,18 +56,7 @@ export default function LeadsPage() {
         }
         throw new Error(data.error || 'Failed to convert')
       }
-      const s = data.summary
-      if (data.auto_estimated === false) {
-        toast(
-          `Converted — ${s.message}. Review the job before quoting.`,
-          'success'
-        )
-      } else {
-        toast(
-          `Converted + estimate seeded: $${s.total.toFixed(2)} (${s.labor_days}d, ${s.margin_percent}% margin)`,
-          'success'
-        )
-      }
+      toast('Job created — pick a template, use Claude Desktop, or edit line items', 'success')
       router.push(`/dashboard/jobs/${data.job.id}`)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
@@ -327,7 +316,7 @@ export default function LeadsPage() {
                         }}
                         disabled={convertingId === lead.id}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
-                        title="Convert to job + auto-seed estimate"
+                        title="Convert to a job (pricing is set later)"
                       >
                         {convertingId === lead.id ? (
                           <>

@@ -12,6 +12,7 @@ import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
+import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -336,7 +337,8 @@ export default async function JobDetailPage({
       {/* Line Items */}
       <div className="mb-6">
         {isOwner && (
-          <div className="mb-3 flex justify-end">
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <CopyContextButton jobId={job.id} size="sm" />
             <GenerateEstimateModal
               jobId={job.id}
               hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}

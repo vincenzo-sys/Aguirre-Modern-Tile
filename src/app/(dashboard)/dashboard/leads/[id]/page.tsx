@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive, CheckCircle, MapPin, ImageIcon } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import type { QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
@@ -148,6 +149,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="flex items-center gap-2">
+          <CopyContextButton leadId={id} />
           {lead.status === 'new' && (
             <button
               onClick={() => updateStatus('reviewed')}

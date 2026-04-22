@@ -5,6 +5,7 @@ import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, Profile, QuoteRequest } from '@/lib/supabase/types'
 import InstallerJobCard from '@/components/dashboard/InstallerJobCard'
 import SalesWorklist from '@/components/dashboard/SalesWorklist'
+import MorningBriefing from '@/components/dashboard/MorningBriefing'
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -172,6 +173,8 @@ function OwnerHome({
           </p>
         </div>
       )}
+
+      <MorningBriefing jobs={jobs} leads={leads} todayStr={todayStr} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Follow up today */}

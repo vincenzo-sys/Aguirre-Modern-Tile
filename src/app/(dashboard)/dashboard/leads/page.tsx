@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Inbox, ArrowRight, Archive, CheckCircle, Plus, Clock, AlertCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Inbox, ArrowRight, Archive, CheckCircle, Plus, Clock, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
 
@@ -34,10 +35,38 @@ function isFollowUpDue(lead: QuoteRequest): boolean {
 }
 
 export default function LeadsPage() {
+  const router = useRouter()
   const [leads, setLeads] = useState<QuoteRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<LeadTab>('active')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+
+  async function convertLead(leadId: string) {
+    setConvertingId(leadId)
+    try {
+      const res = await fetch(`/api/leads/${leadId}/convert`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        // Already converted? Jump to the existing job.
+        if (res.status === 409 && data.existing_job_id) {
+          toast('Lead already converted — opening job', 'success')
+          router.push(`/dashboard/jobs/${data.existing_job_id}`)
+          return
+        }
+        throw new Error(data.error || 'Failed to convert')
+      }
+      const s = data.summary
+      toast(
+        `Converted + estimate seeded: $${s.total.toFixed(2)} (${s.labor_days}d, ${s.margin_percent}% margin)`,
+        'success'
+      )
+      router.push(`/dashboard/jobs/${data.job.id}`)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
+      setConvertingId(null)
+    }
+  }
 
   useEffect(() => {
     if (isDemoMode) {
@@ -283,14 +312,35 @@ export default function LeadsPage() {
                   )}
                   {(lead.status === 'new' || lead.status === 'reviewed') && (
                     <>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          convertLead(lead.id)
+                        }}
+                        disabled={convertingId === lead.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
+                        title="Convert to job + auto-seed estimate"
+                      >
+                        {convertingId === lead.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Converting…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            Convert
+                          </>
+                        )}
+                      </button>
                       <Link
                         href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}${lead.customer_id ? `&customer_id=${lead.customer_id}` : ''}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                        title="Convert to job"
+                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+                        title="Create job manually (no auto-estimate)"
                       >
                         <ArrowRight className="w-4 h-4" />
-                        Convert
                       </Link>
                       <button
                         onClick={(e) => {

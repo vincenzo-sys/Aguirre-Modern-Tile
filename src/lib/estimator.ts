@@ -99,12 +99,16 @@ const TEMPLATE_MATERIALS: Record<TemplateName, Array<{ item: string; qty: number
   ],
   'Standard Tub Surround': [
     { item: 'GoBoard 1/2" (3x5)', qty: 6 },
+    { item: 'GoBoard Sealant', qty: 2 },
+    { item: 'GoBoard Caps & Screws', qty: 1 },
     { item: 'Thinset - 253 Gold (50 lb)', qty: 2 },
     { item: 'Grout 25 lb (bag)', qty: 1 },
     { item: 'Caulking', qty: 2 },
   ],
   'Tub Surround + Bathroom Floor': [
     { item: 'GoBoard 1/2" (3x5)', qty: 6 },
+    { item: 'GoBoard Sealant', qty: 3 },
+    { item: 'GoBoard Caps & Screws', qty: 1 },
     { item: 'Cement Board 1/2" (3x5)', qty: 4 },
     { item: 'Thinset - 253 Gold (50 lb)', qty: 3 },
     { item: 'Grout 25 lb (bag)', qty: 2 },
@@ -112,12 +116,16 @@ const TEMPLATE_MATERIALS: Record<TemplateName, Array<{ item: string; qty: number
   ],
   'Walk-in Shower (Small)': [
     { item: 'GoBoard 1/2" (3x5)', qty: 10 },
+    { item: 'GoBoard Sealant', qty: 3 },
+    { item: 'GoBoard Caps & Screws', qty: 2 },
     { item: 'Thinset - 253 Gold (50 lb)', qty: 2 },
     { item: 'Grout 25 lb (bag)', qty: 1 },
     { item: 'Caulking', qty: 2 },
   ],
   'Walk-in Shower (Large)': [
     { item: 'GoBoard 1/2" (3x5)', qty: 14 },
+    { item: 'GoBoard Sealant', qty: 4 },
+    { item: 'GoBoard Caps & Screws', qty: 2 },
     { item: 'Thinset - 253 Gold (50 lb)', qty: 3 },
     { item: 'Grout 25 lb (bag)', qty: 1 },
     { item: 'Caulking', qty: 3 },

@@ -11,6 +11,7 @@ import CrewLog from '@/components/dashboard/CrewLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
+import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -334,6 +335,15 @@ export default async function JobDetailPage({
 
       {/* Line Items */}
       <div className="mb-6">
+        {isOwner && (
+          <div className="mb-3 flex justify-end">
+            <GenerateEstimateModal
+              jobId={job.id}
+              hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
+              initialSqft={job.square_footage}
+            />
+          </div>
+        )}
         <JobLineItems items={job.line_items ?? []} jobId={job.id} isOwner={isOwner} />
       </div>
 

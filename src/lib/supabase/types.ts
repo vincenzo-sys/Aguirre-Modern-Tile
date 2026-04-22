@@ -96,6 +96,11 @@ export interface Job {
   follow_up_count: number
   last_contact_at: string | null
   next_contact_date: string | null
+  final_payment_at: string | null
+  final_payment_amount: number | null
+  final_payment_method: 'cash' | 'check' | 'stripe' | 'zelle' | 'venmo' | 'other' | null
+  final_payment_note: string | null
+  final_payment_by_profile_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string

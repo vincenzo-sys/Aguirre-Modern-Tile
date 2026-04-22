@@ -13,6 +13,8 @@ import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
+import DeleteJobButton from '@/components/dashboard/DeleteJobButton'
+import FinalPaymentButton from '@/components/dashboard/FinalPaymentButton'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
@@ -182,8 +184,24 @@ export default async function JobDetailPage({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {isOwner && <DepositReceivedAction job={job} />}
+            {(job.status === 'in_progress' || job.status === 'completed' || job.status === 'paid') && (
+              <FinalPaymentButton
+                jobId={job.id}
+                estimatedCost={job.estimated_cost}
+                amountPaid={Number(job.amount_paid ?? 0)}
+                alreadyReceived={Boolean(job.final_payment_at)}
+              />
+            )}
             <StatusUpdateDropdown jobId={job.id} currentStatus={job.status} isOwner={isOwner} />
             {isOwner && <JobEditForm job={job} teamMembers={team} />}
+            {isOwner && (
+              <DeleteJobButton
+                jobId={job.id}
+                jobNumber={job.job_number}
+                jobTitle={job.title}
+                amountPaid={Number(job.amount_paid ?? 0)}
+              />
+            )}
             {isOwner && (
               <Link
                 href={`/dashboard/jobs/${job.id}/estimate`}

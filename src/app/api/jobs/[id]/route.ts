@@ -154,3 +154,65 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// DELETE /api/jobs/[id] — Remove a job.
+// FKs are already set up to do the right thing:
+//   - job_photos, invoices: CASCADE (deleted with the job)
+//   - call_log, message_log: SET NULL (history preserved, just unlinked)
+//   - quote_requests.converted_job_id: SET NULL (the lead becomes active again)
+//
+// Guard: if amount_paid > 0, require `force: true` in body to proceed.
+// This prevents a routine-looking delete from destroying the record of a
+// paid job by accident. The owner can still force it if they really want.
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
+  const { id } = await params
+
+  try {
+    const supabase = getSupabase()
+
+    const body = await req.json().catch(() => ({}))
+    const force = Boolean((body as { force?: boolean }).force)
+
+    const { data: job, error: fetchErr } = await supabase
+      .from('jobs')
+      .select('id, job_number, title, status, amount_paid, client_name')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    const amountPaid = Number(job.amount_paid ?? 0)
+    if (amountPaid > 0 && !force) {
+      return NextResponse.json(
+        {
+          error: 'Job has payments on record. Pass force:true to delete anyway.',
+          amount_paid: amountPaid,
+          status: job.status,
+        },
+        { status: 409 }
+      )
+    }
+
+    const { error: delErr } = await supabase.from('jobs').delete().eq('id', id)
+    if (delErr) {
+      return NextResponse.json({ error: delErr.message }, { status: 500 })
+    }
+
+    console.log(
+      `[Jobs] Deleted #${job.job_number} "${job.title}" (${id}) — status=${job.status} amount_paid=$${amountPaid} force=${force}`
+    )
+
+    return NextResponse.json({ deleted: true, job_number: job.job_number })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

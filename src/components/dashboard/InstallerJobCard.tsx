@@ -16,6 +16,7 @@ import {
   UserCheck,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import FinalPaymentButton from '@/components/dashboard/FinalPaymentButton'
 import type { Job, JobLineItem, JobStatus, MaterialStatus } from '@/lib/supabase/types'
 
 const statusMetaFor: Record<MaterialStatus, { label: string; className: string }> = {
@@ -154,6 +155,19 @@ export default function InstallerJobCard({ job }: { job: Job }) {
             <action.icon className="w-5 h-5" />
             {updating ? 'Saving...' : action.label}
           </button>
+        )}
+
+        {/* Final payment — any crew can record when cash/check changes hands on site */}
+        {(status === 'in_progress' || status === 'completed' || status === 'paid') && (
+          <div className="mb-4 grid grid-cols-1">
+            <FinalPaymentButton
+              jobId={job.id}
+              estimatedCost={job.estimated_cost}
+              amountPaid={Number(job.amount_paid ?? 0)}
+              alreadyReceived={Boolean(job.final_payment_at)}
+              variant="compact"
+            />
+          </div>
         )}
 
         {/* Customer providing — critical so Christian doesn't duplicate-buy */}

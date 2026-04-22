@@ -160,20 +160,27 @@ export async function POST(req: NextRequest) {
     `
 
     if (!RESEND_KEY) {
+      console.warn(`[Contact] RESEND_API_KEY not set — email NOT sent for ${name} (${email}). Returning demo:true.`)
       return NextResponse.json({ success: true, demo: true })
     }
 
     const resend = new Resend(RESEND_KEY)
 
-    await resend.emails.send({
+    console.log(`[Contact] Sending lead email via Resend: from=${FROM_EMAIL} to=${TO_EMAIL} replyTo=${email} subject="${subject}"`)
+    const sendResult = await resend.emails.send({
       from: FROM_EMAIL,
       to: TO_EMAIL,
       replyTo: email,
       subject,
       html,
     })
+    if (sendResult.error) {
+      console.error(`[Contact] Resend returned error for ${name}:`, sendResult.error)
+      return NextResponse.json({ success: false, error: sendResult.error }, { status: 500 })
+    }
+    console.log(`[Contact] Lead email sent to ${TO_EMAIL}, Resend id=${sendResult.data?.id}`)
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, email_id: sendResult.data?.id })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Contact API error:', message)

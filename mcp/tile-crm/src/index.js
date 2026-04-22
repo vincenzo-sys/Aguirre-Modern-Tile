@@ -276,7 +276,7 @@ const tools = [
   {
     name: 'update_job',
     description:
-      'Update a job\'s fields. Status changes to scheduled/in_progress/completed auto-send customer SMS via OpenPhone.',
+      'Update a job\'s fields. Supports bulk-replacing line_items (the PATCH auto-syncs estimated_cost from the sum unless you also pass estimated_cost). Status changes to scheduled/in_progress/completed auto-send customer SMS via OpenPhone.',
     inputSchema: {
       type: 'object',
       required: ['id'],
@@ -314,6 +314,95 @@ const tools = [
         client_phone: { type: 'string' },
         client_email: { type: 'string' },
         client_address: { type: 'string' },
+        line_items: {
+          type: 'array',
+          description:
+            'Replace the entire line_items array on the job. Each item must include category, description, quantity, unit, unit_price, amount. Use this to bulk-apply a full estimate you\'ve composed. The PATCH auto-syncs estimated_cost = sum(amount) unless you set estimated_cost explicitly.',
+          items: {
+            type: 'object',
+            required: ['category', 'description', 'quantity', 'unit', 'unit_price', 'amount'],
+            properties: {
+              category: { type: 'string', enum: ['materials', 'labor'] },
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unit: {
+                type: 'string',
+                enum: ['sq ft', 'hr', 'ea', 'ln ft', 'bag', 'box', 'sheet', 'tube', 'roll', 'kit', 'day'],
+              },
+              unit_price: { type: 'number' },
+              amount: { type: 'number' },
+              status: {
+                type: 'string',
+                enum: ['needed', 'ordered', 'received', 'on_site'],
+              },
+              source_url: { type: 'string' },
+              source_name: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: 'list_materials',
+    description:
+      'Read the materials pricing catalog. Each row has item, category, your_cost, price_to_customer, unit, coverage, retail_link. Use this to pick materials when composing a line_items array.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_templates',
+    description:
+      'Read the job templates table. Each template has demo_days, install_days, typical_sqft_low/high. Used as a starting point for standard job types (Tub Surround, Bathroom Floor, Walk-in Shower, Backsplash, etc.).',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_labor_rates',
+    description:
+      'Read the labor_rates settings. Contains per-day customer rates for demo/install and the standard crew size.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_operating_costs',
+    description:
+      'Read the operating_costs settings. Contains trash disposal, transportation, HQ location. Flat-fee costs that appear on most jobs.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'generate_estimate',
+    description:
+      'One-shot: given a job_id and a template_name (and optional sqft), seed the job\'s line_items + scope_notes + estimated_cost from the catalog using the template-based TS estimator. Fails with 409 if the job already has line_items unless overwrite is true. Use this for standard jobs before customizing. For non-standard scopes, compose line_items manually and call update_job with line_items instead.',
+    inputSchema: {
+      type: 'object',
+      required: ['job_id', 'template_name'],
+      properties: {
+        job_id: { type: 'string' },
+        template_name: {
+          type: 'string',
+          description: 'Exact template name from job_templates (use list_templates to see options).',
+        },
+        sqft: { type: 'number', description: 'Overrides the template default; optional.' },
+        customer_provides: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Items the customer is supplying, e.g. ["tile"].',
+        },
+        overwrite: {
+          type: 'boolean',
+          description: 'Replace existing line_items. Default false.',
+          default: false,
+        },
+      },
+    },
+  },
+  {
+    name: 'remove_line_item',
+    description: 'Delete one line item from a job by zero-based index.',
+    inputSchema: {
+      type: 'object',
+      required: ['job_id', 'index'],
+      properties: {
+        job_id: { type: 'string' },
+        index: { type: 'number' },
       },
     },
   },
@@ -361,7 +450,10 @@ const tools = [
         category: { type: 'string', enum: ['materials', 'labor'] },
         description: { type: 'string' },
         quantity: { type: 'number' },
-        unit: { type: 'string', enum: ['sq ft', 'hr', 'ea', 'ln ft', 'bag', 'box'] },
+        unit: {
+          type: 'string',
+          enum: ['sq ft', 'hr', 'ea', 'ln ft', 'bag', 'box', 'sheet', 'tube', 'roll', 'kit', 'day'],
+        },
         unit_price: { type: 'number' },
         status: {
           type: 'string',
@@ -495,6 +587,38 @@ async function callTool(name, args) {
         body: { line_items: items },
       })
     }
+
+    case 'remove_line_item': {
+      const { job_id, index } = args
+      const job = await request(`/api/jobs/${job_id}`)
+      const items = Array.isArray(job.line_items) ? [...job.line_items] : []
+      if (index < 0 || index >= items.length) {
+        throw new Error(`Line item index ${index} out of range (0..${items.length - 1})`)
+      }
+      items.splice(index, 1)
+      return request(`/api/jobs/${job_id}`, {
+        method: 'PATCH',
+        body: { line_items: items },
+      })
+    }
+
+    case 'list_materials':
+      return request('/api/reference?table=materials_pricing')
+
+    case 'list_templates':
+      return request('/api/reference?table=job_templates')
+
+    case 'list_labor_rates':
+      return request('/api/reference?table=labor_rates')
+
+    case 'list_operating_costs':
+      return request('/api/reference?table=operating_costs')
+
+    case 'generate_estimate':
+      return request('/api/estimates/generate', {
+        method: 'POST',
+        body: args,
+      })
 
     default:
       throw new Error(`Unknown tool: ${name}`)

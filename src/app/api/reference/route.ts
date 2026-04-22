@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -27,6 +28,9 @@ function isValidTable(table: string): table is RefTable {
 // GET /api/reference?table=materials_pricing
 // Returns all rows from the specified reference table
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const table = req.nextUrl.searchParams.get('table')
 
   if (!table || !isValidTable(table)) {
@@ -52,6 +56,9 @@ export async function GET(req: NextRequest) {
 // POST /api/reference?table=materials_pricing
 // Create a new row in the specified reference table
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const table = req.nextUrl.searchParams.get('table')
 
   if (!table || !isValidTable(table)) {
@@ -80,6 +87,9 @@ export async function POST(req: NextRequest) {
 // PATCH /api/reference?table=materials_pricing&id=uuid
 // Update a row in the specified reference table
 export async function PATCH(req: NextRequest) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const table = req.nextUrl.searchParams.get('table')
   const id = req.nextUrl.searchParams.get('id')
 
@@ -109,6 +119,9 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/reference?table=materials_pricing&id=uuid
 export async function DELETE(req: NextRequest) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const table = req.nextUrl.searchParams.get('table')
   const id = req.nextUrl.searchParams.get('id')
 

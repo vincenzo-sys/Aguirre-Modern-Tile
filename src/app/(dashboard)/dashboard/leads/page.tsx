@@ -57,10 +57,17 @@ export default function LeadsPage() {
         throw new Error(data.error || 'Failed to convert')
       }
       const s = data.summary
-      toast(
-        `Converted + estimate seeded: $${s.total.toFixed(2)} (${s.labor_days}d, ${s.margin_percent}% margin)`,
-        'success'
-      )
+      if (data.auto_estimated === false) {
+        toast(
+          `Converted — ${s.message}. Review the job before quoting.`,
+          'success'
+        )
+      } else {
+        toast(
+          `Converted + estimate seeded: $${s.total.toFixed(2)} (${s.labor_days}d, ${s.margin_percent}% margin)`,
+          'success'
+        )
+      }
       router.push(`/dashboard/jobs/${data.job.id}`)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Conversion failed', 'error')

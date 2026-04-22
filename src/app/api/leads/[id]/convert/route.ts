@@ -23,18 +23,57 @@ type LeadAnswers = {
   size?: string
   existingTile?: string
   extras?: string
+  description?: string
 } & Record<string, string>
 
-// Infer a sensible Generate-Estimate template from a quote_request's
-// project_type + answers. Ambiguity falls back to the nearest common
-// template for that project type so we always produce *something*.
+type InferResult =
+  | { kind: 'confident'; template: TemplateName; sqft: number }
+  | { kind: 'needs_site_visit'; reason: string }
+  | { kind: 'no_template'; reason: string }
+
+// Detect free-text signals that a lead describes a repair / site-visit
+// situation rather than a standard project we can template against.
+// Dorothy's lead (2026-04-22) was the canonical case that taught us this.
+function detectRepairKeywords(text: string): string | null {
+  const t = text.toLowerCase()
+  const repairHits = ['regrout', 're-grout', 'crumbling', 'grout is', 'grout loose', 'grout missing']
+  const visitHits = ['assessment', 'come take a look', 'in-person', 'in person', 'look at it', 'look it over']
+  const movementHits = ['creaking', 'moving', 'movement', 'loose tile', 'loose tiles', 'tile came up', 'tiles came up']
+
+  for (const h of repairHits) if (t.includes(h)) return `mentions repair/regrout ("${h}")`
+  for (const h of movementHits) if (t.includes(h)) return `mentions tile movement ("${h}")`
+  for (const h of visitHits) if (t.includes(h)) return `customer requested in-person visit ("${h}")`
+  return null
+}
+
+// Decide if we have enough structured data to auto-estimate. If not, we
+// refuse to run the estimator — the lead lands as a regular job with an
+// empty line_items array, so Vince can review before committing numbers.
 function inferTemplate(
   projectType: string | null,
   answers: LeadAnswers
-): { template: TemplateName; sqft: number } {
+): InferResult {
   const scope = (answers.projectScope ?? '').toLowerCase()
   const shower = (answers.showerIncluded ?? '').toLowerCase()
   const size = (answers.size ?? '').toLowerCase()
+  const type = (projectType ?? '').toLowerCase()
+  const description = (answers.description ?? answers.extras ?? '').toLowerCase()
+
+  // Gate 1: repair / site-visit keywords in free text → refuse auto-estimate
+  const repairReason = detectRepairKeywords(description)
+  if (repairReason) {
+    return { kind: 'needs_site_visit', reason: repairReason }
+  }
+
+  // Gate 2: no structured data AND not a clear project_type → refuse
+  const hasStructured = Boolean(scope || shower || size)
+  const hasClearType = ['bathroom', 'shower', 'backsplash', 'kitchen-floor'].includes(type)
+  if (!hasStructured && !hasClearType) {
+    return {
+      kind: 'no_template',
+      reason: `project_type='${projectType ?? 'none'}' with no structured answers — can't pick a template safely`,
+    }
+  }
 
   const sqftBySize: Record<string, number> = {
     small: 50,
@@ -45,37 +84,37 @@ function inferTemplate(
   }
   const sqft = sqftBySize[size] ?? 100
 
-  const type = (projectType ?? '').toLowerCase()
-
   if (type === 'backsplash') {
     const template: TemplateName =
       sqft > 35 ? 'Backsplash (Large/Complex)' : 'Backsplash (Standard)'
-    return { template, sqft }
+    return { kind: 'confident', template, sqft }
   }
 
   if (type === 'kitchen-floor' || scope === 'floor-only') {
     const template: TemplateName =
       sqft > 50 ? 'Bathroom Floor (Medium)' : 'Bathroom Floor (Small)'
-    return { template, sqft }
+    return { kind: 'confident', template, sqft }
   }
 
   if (type === 'shower' || scope === 'walls-only' || shower === 'shower-only') {
     const template: TemplateName = sqft > 130 ? 'Walk-in Shower (Large)' : 'Walk-in Shower (Small)'
-    return { template, sqft }
+    return { kind: 'confident', template, sqft }
   }
 
-  // Bathroom full-remodel / floor-and-walls / default
   if (shower === 'yes' || scope === 'full-remodel' || scope === 'floor-and-walls') {
-    return { template: 'Tub Surround + Bathroom Floor', sqft: Math.max(sqft, 120) }
+    return { kind: 'confident', template: 'Tub Surround + Bathroom Floor', sqft: Math.max(sqft, 120) }
   }
 
-  // Walls + no shower means tub surround
   if (scope === 'walls-only') {
-    return { template: 'Standard Tub Surround', sqft: Math.max(sqft, 80) }
+    return { kind: 'confident', template: 'Standard Tub Surround', sqft: Math.max(sqft, 80) }
   }
 
-  // Safe default
-  return { template: 'Tub Surround + Bathroom Floor', sqft }
+  // Bathroom type with some structured data but ambiguous combo → still
+  // refuse. Better to show the lead detail than invent a number.
+  return {
+    kind: 'no_template',
+    reason: 'bathroom type but projectScope/shower not specific enough',
+  }
 }
 
 function mapProjectTypeToJobType(projectType: string | null): string {
@@ -127,7 +166,8 @@ export async function POST(
   }
 
   const answers = (lead.answers ?? {}) as LeadAnswers
-  const { template, sqft } = inferTemplate(lead.project_type, answers)
+  const inference = inferTemplate(lead.project_type, answers)
+  const canAutoEstimate = inference.kind === 'confident'
 
   // Customer: prefer explicit lead.customer_id; else find-or-create by phone/email
   let customerId: string | null = lead.customer_id ?? null
@@ -165,7 +205,87 @@ export async function POST(
     }
   }
 
-  // Load estimator inputs in parallel
+  const projectTypeLabel = mapProjectTypeToJobType(lead.project_type)
+  const baseTitle = `${titleCase(lead.client_name ?? 'New')} — ${projectTypeLabel}`
+
+  // If we can't confidently pick a template, create the job *without* an
+  // auto-estimate. Vince can click Generate Estimate on the job detail
+  // once he's reviewed the lead or done a site visit.
+  if (!canAutoEstimate) {
+    const isRepair = inference.kind === 'needs_site_visit'
+    const title = isRepair
+      ? `${baseTitle.replace(/ — .*/, '')} — Assessment Needed`
+      : baseTitle
+    const reasonLine =
+      inference.kind === 'needs_site_visit'
+        ? `Flagged: ${inference.reason}. Customer likely wants an in-person assessment before an estimate.`
+        : `Flagged: ${inference.reason}. Not enough structured data to auto-seed an estimate.`
+
+    const baseScope = [
+      'NEEDS REVIEW',
+      '',
+      reasonLine,
+      '',
+      answers.description ? `Customer said:\n"${answers.description}"` : '',
+      '',
+      'No line items seeded. Open this job and click "Generate estimate" once scope is clear, or schedule a site visit first.',
+    ]
+      .filter((l) => l !== '')
+      .join('\n')
+
+    const { data: job, error: jobErr } = await supabase
+      .from('jobs')
+      .insert({
+        title,
+        client_name: lead.client_name,
+        client_phone: lead.client_phone,
+        client_email: lead.client_email,
+        customer_id: customerId,
+        job_type: isRepair ? 'Repair' : (projectTypeLabel.split(' ')[0] ?? 'Tile'),
+        status: 'lead',
+        scope_notes: baseScope,
+        next_contact_date: new Date().toISOString().slice(0, 10),
+      })
+      .select()
+      .single()
+
+    if (jobErr || !job) {
+      return NextResponse.json(
+        { error: jobErr?.message ?? 'Failed to create job' },
+        { status: 500 }
+      )
+    }
+
+    await supabase
+      .from('quote_requests')
+      .update({
+        converted_job_id: job.id,
+        status: 'reviewed',
+        last_contact_at: new Date().toISOString(),
+      })
+      .eq('id', leadId)
+
+    return NextResponse.json({
+      job,
+      template_used: null,
+      auto_estimated: false,
+      reason: inference.reason,
+      summary: {
+        total: 0,
+        deposit: 0,
+        labor_days: 0,
+        margin_percent: 0,
+        line_item_count: 0,
+        message:
+          inference.kind === 'needs_site_visit'
+            ? 'Site visit recommended before estimating'
+            : 'Review needed — not enough info to auto-estimate',
+      },
+    })
+  }
+
+  // Confident path — run the estimator as before
+  const { template, sqft } = inference
   const [templateRes, catalogRes, laborRes, costsRes] = await Promise.all([
     supabase
       .from('job_templates')
@@ -194,13 +314,10 @@ export async function POST(
     { sqft, customer_provides: ['tile'], warranty_years: 3 }
   )
 
-  const projectTypeLabel = mapProjectTypeToJobType(lead.project_type)
-  const jobTitle = `${titleCase(lead.client_name ?? 'New')} — ${projectTypeLabel}`
-
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .insert({
-      title: jobTitle,
+      title: baseTitle,
       client_name: lead.client_name,
       client_phone: lead.client_phone,
       client_email: lead.client_email,
@@ -224,7 +341,6 @@ export async function POST(
     )
   }
 
-  // Mark the lead converted + reviewed
   await supabase
     .from('quote_requests')
     .update({
@@ -237,6 +353,7 @@ export async function POST(
   return NextResponse.json({
     job,
     template_used: template,
+    auto_estimated: true,
     summary: {
       total: result.total,
       deposit: result.deposit,

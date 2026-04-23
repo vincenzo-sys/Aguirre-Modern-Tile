@@ -1,10 +1,11 @@
 import type { JobStatus } from '@/lib/supabase/types'
 
-// Tabs for the operational Jobs page. The "all" default hides cancelled
-// (visible only via its dedicated tab); lead-stage statuses don't appear
-// here at all — they live on the Leads page.
+// Tabs for the operational Jobs page. The "all" default shows only
+// ready-to-go work (jobs that need scheduling or are actively in flight).
+// Completed / paid / cancelled live in their own tabs but don't clutter the
+// default view — finished work is history, not the daily worklist.
 const statusTabs: { value: string; statuses: JobStatus[] }[] = [
-  { value: 'all', statuses: ['accepted_not_scheduled', 'scheduled', 'in_progress', 'waiting_for_materials', 'completed', 'paid'] },
+  { value: 'all', statuses: ['accepted_not_scheduled', 'scheduled', 'in_progress', 'waiting_for_materials'] },
   { value: 'awaiting_schedule', statuses: ['accepted_not_scheduled'] },
   { value: 'scheduled', statuses: ['scheduled'] },
   { value: 'active', statuses: ['in_progress', 'waiting_for_materials'] },

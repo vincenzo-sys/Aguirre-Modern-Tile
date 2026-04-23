@@ -23,6 +23,11 @@ export type PipelineStage =
 export type PipelineItem = {
   kind: 'quote_request' | 'job'
   id: string
+  // Project name shown as the primary column in the leads table. For jobs
+  // this is job.title; for quote_requests we synthesize one from project_type
+  // + the customer's description (the closest thing to a "project name" the
+  // intake form gives us).
+  project_name: string
   client_name: string
   client_phone: string | null
   client_email: string | null
@@ -105,7 +110,7 @@ export async function GET(req: NextRequest) {
         .order('created_at', { ascending: false }),
       supabase
         .from('jobs')
-        .select('id, job_number, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, created_at, updated_at')
+        .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, created_at, updated_at')
         .in('status', ['lead', 'quoted', 'estimate_revised'])
         .order('created_at', { ascending: false }),
     ])
@@ -125,10 +130,17 @@ export async function GET(req: NextRequest) {
         : q.status === 'reviewed'
           ? 'reviewed'
           : 'new'
-      const answers = (q.answers ?? {}) as { address?: string }
+      const answers = (q.answers ?? {}) as { address?: string; description?: string; projectDescription?: string; bathroomSize?: string; tileType?: string }
+      // Synthesize a project name from the intake form fields. Falls back to
+      // a generic "<type> project" if there's nothing to riff on.
+      const desc = (answers.description ?? answers.projectDescription ?? '').trim()
+      const project_name = desc
+        ? (desc.length > 70 ? desc.slice(0, 67) + '…' : desc)
+        : `${(q.project_type ?? 'Other').charAt(0).toUpperCase()}${(q.project_type ?? 'Other').slice(1)} project`
       items.push({
         kind: 'quote_request',
         id: q.id,
+        project_name,
         client_name: q.client_name,
         client_phone: q.client_phone,
         client_email: q.client_email,
@@ -160,6 +172,7 @@ export async function GET(req: NextRequest) {
       items.push({
         kind: 'job',
         id: j.id,
+        project_name: j.title || `${j.client_name} — Project`,
         client_name: j.client_name,
         client_phone: j.client_phone,
         client_email: j.client_email,

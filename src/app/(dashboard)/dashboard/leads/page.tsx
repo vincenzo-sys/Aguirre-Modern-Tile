@@ -208,129 +208,165 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Items */}
-      <div className="space-y-3">
-        {filtered.map((item) => {
-          const meta = stageMeta[item.stage]
-          const StageIcon = meta.icon
-          const urgency = urgencyBadge(item)
-          const detailHref = item.kind === 'quote_request'
-            ? `/dashboard/leads/${item.id}`
-            : `/dashboard/jobs/${item.id}`
-
-          return (
-            <Link
-              key={`${item.kind}-${item.id}`}
-              href={detailHref}
-              className="block bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:border-primary-300 hover:shadow-md transition-all"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h3 className="font-semibold text-gray-900">{item.client_name}</h3>
-                    {item.kind === 'job' && item.job_number != null && (
-                      <span className="text-xs text-gray-400">#{item.job_number}</span>
-                    )}
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${meta.color}`}>
-                      <StageIcon className="w-3 h-3" />
-                      {meta.label}
-                    </span>
-                    {urgency && (
-                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${urgency.className}`}>
-                        <AlertCircle className="w-3 h-3" />
-                        {urgency.label}
-                      </span>
-                    )}
-                    {item.source && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {sourceLabels[item.source] ?? item.source}
-                      </span>
-                    )}
-                  </div>
-
-                  {item.project_type && (
-                    <p className="text-sm text-gray-600 capitalize">{item.project_type} project</p>
-                  )}
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
-                    {item.client_phone && (
-                      <a
-                        href={`tel:${item.client_phone}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:text-primary-600"
-                      >
-                        {item.client_phone}
-                      </a>
-                    )}
-                    {item.client_email && (
-                      <a
-                        href={`mailto:${item.client_email}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:text-primary-600 truncate max-w-[260px]"
-                      >
-                        {item.client_email}
-                      </a>
-                    )}
-                    {item.estimated_cost != null && item.estimated_cost > 0 && (
-                      <span className="font-medium text-gray-700">
-                        ${item.estimated_cost.toLocaleString()}
-                      </span>
-                    )}
-                    <span>Added {formatDateShort(item.created_at)}</span>
-                    {item.site_visit_at && (
-                      <span className="inline-flex items-center gap-1 text-amber-700">
-                        <Calendar className="w-3 h-3" />
-                        Visit {formatVisitDateTime(item.site_visit_at)}
-                      </span>
-                    )}
-                    {item.next_follow_up && (
-                      <span className={`inline-flex items-center gap-1 ${item.urgency >= 100 ? 'text-red-600' : 'text-gray-500'}`}>
-                        <Clock className="w-3 h-3" />
-                        Follow up {formatDateShort(item.next_follow_up)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions — only meaningful for quote_requests */}
-                {item.kind === 'quote_request' && (
-                  <div
-                    className="flex items-center gap-2 shrink-0"
-                    onClick={(e) => e.stopPropagation()}
+      {/* Compact table view */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-4 py-2.5">Customer</th>
+                <th className="text-left px-4 py-2.5">Stage</th>
+                <th className="text-left px-4 py-2.5">Project</th>
+                <th className="text-left px-4 py-2.5">Last contact</th>
+                <th className="text-left px-4 py-2.5">Next follow-up</th>
+                <th className="text-right px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map((item) => {
+                const meta = stageMeta[item.stage]
+                const StageIcon = meta.icon
+                const urgency = urgencyBadge(item)
+                // Both quote_requests and lead-stage jobs land in the leads
+                // workspace — that's the whole point of the redesign.
+                const detailHref = `/dashboard/leads/${item.id}`
+                return (
+                  <tr
+                    key={`${item.kind}-${item.id}`}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(detailHref)}
                   >
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        convertLead(item.id)
-                      }}
-                      disabled={convertingId === item.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
-                      title="Convert to a job"
-                    >
-                      {convertingId === item.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Converting…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          Convert
-                        </>
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        {item.client_name}
+                        {item.kind === 'job' && item.job_number != null && (
+                          <span className="text-[11px] text-gray-400">#{item.job_number}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                        {item.client_phone && (
+                          <a
+                            href={`tel:${item.client_phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:text-primary-600"
+                          >
+                            {item.client_phone}
+                          </a>
+                        )}
+                        {item.source && (
+                          <span className="text-gray-400">· {sourceLabels[item.source] ?? item.source}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.color}`}>
+                        <StageIcon className="w-3 h-3" />
+                        {meta.label}
+                      </span>
+                      {urgency && (
+                        <div className="mt-1">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${urgency.className}`}>
+                            <AlertCircle className="w-2.5 h-2.5" />
+                            {urgency.label}
+                          </span>
+                        </div>
                       )}
-                    </button>
+                    </td>
+                    <td className="px-4 py-3 align-top text-gray-700">
+                      <div className="capitalize">{item.project_type ?? '—'}</div>
+                      {item.estimated_cost != null && item.estimated_cost > 0 && (
+                        <div className="text-xs text-gray-500 mt-0.5">${item.estimated_cost.toLocaleString()}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-gray-600">
+                      {formatDateShort(item.last_contact_at) ?? <span className="text-gray-300">never</span>}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {item.next_follow_up ? (
+                        <span className={item.urgency >= 100 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                          {formatDateShort(item.next_follow_up)}
+                        </span>
+                      ) : item.site_visit_at ? (
+                        <span className="text-amber-700 inline-flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Visit {formatDateShort(item.site_visit_at)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td
+                      className="px-4 py-3 align-top text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {item.kind === 'quote_request' ? (
+                        <button
+                          onClick={() => convertLead(item.id)}
+                          disabled={convertingId === item.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-60"
+                        >
+                          {convertingId === item.id ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Working…
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3 h-3" />
+                              Start working
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <ArrowRight className="w-4 h-4 text-gray-300 inline" />
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {filtered.map((item) => {
+            const meta = stageMeta[item.stage]
+            const StageIcon = meta.icon
+            const urgency = urgencyBadge(item)
+            const detailHref = `/dashboard/leads/${item.id}`
+            return (
+              <Link
+                key={`${item.kind}-${item.id}`}
+                href={detailHref}
+                className="block px-4 py-3 hover:bg-gray-50"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900 truncate">{item.client_name}</div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full ${meta.color}`}>
+                        <StageIcon className="w-3 h-3" />
+                        {meta.label}
+                      </span>
+                      {urgency && (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${urgency.className}`}>
+                          {urgency.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.project_type && <span className="capitalize">{item.project_type}</span>}
+                      {item.next_follow_up && <span className="ml-2">· Follow {formatDateShort(item.next_follow_up)}</span>}
+                    </div>
                   </div>
-                )}
-                {item.kind === 'job' && (
-                  <div className="shrink-0 flex items-center text-gray-400">
-                    <ArrowRight className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-            </Link>
-          )
-        })}
+                  <ArrowRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
+                </div>
+              </Link>
+            )
+          })}
+        </div>
 
         {filtered.length === 0 && (
           <div className="text-center py-12">

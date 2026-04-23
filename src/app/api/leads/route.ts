@@ -11,6 +11,31 @@ function getSupabaseAdmin() {
   return createClient(url, key)
 }
 
+// GET /api/leads — list leads, optionally filter by ?converted_job_id=<uuid>.
+// The lead workspace uses this to find the source quote_request for a job
+// when the user lands on /dashboard/leads/[job_id].
+export async function GET(request: NextRequest) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
+  const url = new URL(request.url)
+  const convertedJobId = url.searchParams.get('converted_job_id')
+
+  try {
+    const supabase = getSupabaseAdmin()
+    let query = supabase.from('quote_requests').select('*').order('created_at', { ascending: false })
+    if (convertedJobId) query = query.eq('converted_job_id', convertedJobId)
+    const { data, error } = await query
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    return NextResponse.json(data ?? [])
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   const unauthorized = await requireApiAuth(request)
   if (unauthorized) return unauthorized

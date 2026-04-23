@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, User, Ruler, Clock, ImageIcon, DollarSign } from 'lucide-react'
 import JobStatusBadge from '@/components/dashboard/JobStatusBadge'
@@ -95,6 +95,14 @@ export default async function JobDetailPage({
         .single()
 
       if (!jobData) notFound()
+      // Lead-stage jobs (lead/quoted/estimate_revised) belong on the Leads
+      // workspace, not here. Redirect rather than render two views of the
+      // same record. Once the deal is "Sent to Jobs" (status moves to
+      // accepted_not_scheduled), the operations view at this URL is the right
+      // surface and the redirect stops firing.
+      if (['lead', 'quoted', 'estimate_revised'].includes(jobData.status)) {
+        redirect(`/dashboard/leads/${id}`)
+      }
       job = { ...jobData, line_items: jobData.line_items ?? [] } as Job
 
       // Fetch related data in parallel

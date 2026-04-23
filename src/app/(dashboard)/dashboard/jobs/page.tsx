@@ -14,15 +14,18 @@ import CrewWeekView from '@/components/dashboard/CrewWeekView'
 import TimelineView from '@/components/dashboard/TimelineView'
 import TodayUpcomingJobs from '@/components/dashboard/TodayUpcomingJobs'
 
-const statusTabMap: Record<string, JobStatus[]> = {
-  leads: ['lead'],
-  quoted: ['quoted'],
-  scheduled: ['scheduled'],
-  active: ['in_progress', 'waiting_for_materials'],
-  completed: ['completed'],
-  paid: ['paid'],
-  cancelled: ['cancelled'],
-}
+// Statuses considered "operational" — past the sales pipeline. The Jobs page
+// only shows these. Lead-stage statuses (lead/quoted/estimate_revised) live
+// on the Leads page now since they're still active sales work.
+const OPERATIONAL_STATUSES: JobStatus[] = [
+  'accepted_not_scheduled',
+  'scheduled',
+  'in_progress',
+  'waiting_for_materials',
+  'completed',
+  'paid',
+  'cancelled',
+]
 
 export default async function JobsPage({
   searchParams,
@@ -64,6 +67,7 @@ export default async function JobsPage({
     let jobsQuery = supabase
       .from('jobs')
       .select('*')
+      .in('status', OPERATIONAL_STATUSES)
       .order('scheduled_start', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
 

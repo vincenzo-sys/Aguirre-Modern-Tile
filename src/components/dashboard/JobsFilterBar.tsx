@@ -5,10 +5,12 @@ import { Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { JobStatus } from '@/lib/supabase/types'
 
+// "All" intentionally excludes cancelled — see filterJobs.ts. Lead-stage
+// statuses (lead/quoted/estimate_revised) are hidden entirely; those live
+// on the Leads page now.
 const statusTabs: { label: string; value: string; statuses: JobStatus[] }[] = [
   { label: 'All', value: 'all', statuses: [] },
-  { label: 'Leads', value: 'leads', statuses: ['lead'] },
-  { label: 'Quoted', value: 'quoted', statuses: ['quoted'] },
+  { label: 'Awaiting schedule', value: 'awaiting_schedule', statuses: ['accepted_not_scheduled'] },
   { label: 'Scheduled', value: 'scheduled', statuses: ['scheduled'] },
   { label: 'Active', value: 'active', statuses: ['in_progress', 'waiting_for_materials'] },
   { label: 'Completed', value: 'completed', statuses: ['completed'] },

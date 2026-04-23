@@ -3,17 +3,46 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Inbox, ArrowRight, Archive, CheckCircle, Plus, Clock, AlertCircle, Sparkles, Loader2 } from 'lucide-react'
+import {
+  Inbox, ArrowRight, AlertCircle, Sparkles, Loader2, Plus, Clock,
+  Calendar, FileText, FilePlus, FileCheck,
+} from 'lucide-react'
 import { toast } from '@/components/Toast'
-import type { QuoteRequest, QuoteRequestStatus } from '@/lib/supabase/types'
 
-type LeadTab = 'active' | 'archive'
+// Mirrors PipelineItem in /api/pipeline/route.ts.
+type PipelineStage =
+  | 'new' | 'reviewed' | 'visit_scheduled'
+  | 'lead_in_progress' | 'estimate_sent' | 'estimate_revised'
 
-const statusColors: Record<QuoteRequestStatus, string> = {
-  new: 'bg-blue-100 text-blue-700',
-  reviewed: 'bg-yellow-100 text-yellow-700',
-  converted: 'bg-green-100 text-green-700',
-  archived: 'bg-gray-100 text-gray-500',
+type PipelineItem = {
+  kind: 'quote_request' | 'job'
+  id: string
+  client_name: string
+  client_phone: string | null
+  client_email: string | null
+  client_address: string | null
+  source: string | null
+  stage: PipelineStage
+  estimated_cost: number | null
+  site_visit_at: string | null
+  next_follow_up: string | null
+  last_contact_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  urgency: number
+  job_number?: number
+  job_status?: string
+  project_type?: string
+}
+
+const stageMeta: Record<PipelineStage, { label: string; color: string; icon: typeof Inbox }> = {
+  new: { label: 'New inquiry', color: 'bg-blue-100 text-blue-700', icon: Inbox },
+  reviewed: { label: 'Reviewed', color: 'bg-yellow-100 text-yellow-800', icon: FileText },
+  visit_scheduled: { label: 'Visit scheduled', color: 'bg-amber-100 text-amber-800', icon: Calendar },
+  lead_in_progress: { label: 'Active lead', color: 'bg-indigo-100 text-indigo-800', icon: FileText },
+  estimate_sent: { label: 'Estimate sent', color: 'bg-purple-100 text-purple-800', icon: FilePlus },
+  estimate_revised: { label: 'Estimate revised', color: 'bg-pink-100 text-pink-800', icon: FileCheck },
 }
 
 const sourceLabels: Record<string, string> = {
@@ -23,24 +52,49 @@ const sourceLabels: Record<string, string> = {
   'walk-in': 'Walk-in',
   repeat: 'Repeat',
   other: 'Other',
+  notion_import: 'Notion import',
 }
 
-const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+function urgencyBadge(item: PipelineItem): { label: string; className: string } | null {
+  if (item.urgency >= 100) return { label: 'Follow-up overdue', className: 'bg-red-50 text-red-700 border border-red-200' }
+  if (item.urgency >= 95) return { label: 'Visit was yesterday', className: 'bg-red-50 text-red-700 border border-red-200' }
+  if (item.urgency >= 90) return { label: 'Visit today', className: 'bg-orange-50 text-orange-700 border border-orange-200' }
+  if (item.urgency >= 70) return { label: 'Stale (2+ weeks)', className: 'bg-amber-50 text-amber-700 border border-amber-200' }
+  if (item.urgency >= 60) return { label: 'Just arrived', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
+  if (item.urgency >= 50) return { label: 'Stale (1+ week)', className: 'bg-yellow-50 text-yellow-700 border border-yellow-200' }
+  return null
+}
 
-function isFollowUpDue(lead: QuoteRequest): boolean {
-  if (!lead.next_follow_up) return false
-  if (lead.status === 'converted' || lead.status === 'archived') return false
-  const today = new Date().toISOString().slice(0, 10)
-  return lead.next_follow_up <= today
+function formatDateShort(iso: string | null): string | null {
+  if (!iso) return null
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatVisitDateTime(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
 }
 
 export default function LeadsPage() {
   const router = useRouter()
-  const [leads, setLeads] = useState<QuoteRequest[]>([])
+  const [items, setItems] = useState<PipelineItem[]>([])
+  const [counts, setCounts] = useState({ total: 0, quote_requests: 0, jobs: 0 })
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<LeadTab>('active')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [stageFilter, setStageFilter] = useState<'all' | PipelineStage>('all')
   const [convertingId, setConvertingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/pipeline')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data) => {
+        setItems(data.items as PipelineItem[])
+        setCounts(data.counts)
+      })
+      .catch(() => toast('Failed to load pipeline', 'error'))
+      .finally(() => setLoading(false))
+  }, [])
 
   async function convertLead(leadId: string) {
     setConvertingId(leadId)
@@ -48,7 +102,6 @@ export default function LeadsPage() {
       const res = await fetch(`/api/leads/${leadId}/convert`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
-        // Already converted? Jump to the existing job.
         if (res.status === 409 && data.existing_job_id) {
           toast('Lead already converted — opening job', 'success')
           router.push(`/dashboard/jobs/${data.existing_job_id}`)
@@ -56,7 +109,7 @@ export default function LeadsPage() {
         }
         throw new Error(data.error || 'Failed to convert')
       }
-      toast('Job created — pick a template, use Claude Desktop, or edit line items', 'success')
+      toast('Job created — pick a template, use Claude, or edit line items', 'success')
       router.push(`/dashboard/jobs/${data.job.id}`)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
@@ -64,109 +117,42 @@ export default function LeadsPage() {
     }
   }
 
-  useEffect(() => {
-    if (isDemoMode) {
-      setLeads(demoLeads)
-      setLoading(false)
-      return
-    }
-
-    async function loadLeads() {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from('quote_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Failed to load leads:', error.message)
-        toast('Failed to load leads', 'error')
-      }
-
-      setLeads((data ?? []) as QuoteRequest[])
-      setLoading(false)
-    }
-
-    loadLeads()
-  }, [])
-
-  async function updateStatus(id: string, newStatus: QuoteRequestStatus) {
-    if (isDemoMode) {
-      toast(`Demo mode: Lead would be marked as "${newStatus}".`)
-      return
-    }
-
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('quote_requests')
-      .update({ status: newStatus })
-      .eq('id', id)
-
-    if (error) {
-      toast('Failed to update status', 'error')
-      return
-    }
-
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l))
-    )
-    toast(`Lead marked as ${newStatus}`)
-  }
-
-  const followUpCount = leads.filter(isFollowUpDue).length
-  const newCount = leads.filter((l) => l.status === 'new').length
-
   const availableSources = useMemo(() => {
     const set = new Set<string>()
-    for (const l of leads) {
-      if (l.source) set.add(l.source)
-    }
+    for (const i of items) if (i.source) set.add(i.source)
     return Array.from(set).sort()
-  }, [leads])
+  }, [items])
 
-  const activeCount = leads.filter((l) => l.status === 'new' || l.status === 'reviewed').length
-  const archiveCount = leads.length - activeCount
+  const stageCounts = useMemo(() => {
+    const map = new Map<PipelineStage, number>()
+    for (const i of items) map.set(i.stage, (map.get(i.stage) ?? 0) + 1)
+    return map
+  }, [items])
 
-  const tabs: { label: string; value: LeadTab; count?: number }[] = [
-    { label: 'Active', value: 'active', count: activeCount },
-    { label: 'Archive', value: 'archive', count: archiveCount },
-  ]
+  const overdueCount = items.filter((i) => i.urgency >= 100).length
 
-  const filtered = leads
-    .filter((l) => {
-      const isActiveRow = l.status === 'new' || l.status === 'reviewed'
-      if (activeTab === 'active' && !isActiveRow) return false
-      if (activeTab === 'archive' && isActiveRow) return false
-      if (sourceFilter !== 'all' && (l.source ?? 'website') !== sourceFilter) return false
+  const filtered = useMemo(() => {
+    return items.filter((i) => {
+      if (stageFilter !== 'all' && i.stage !== stageFilter) return false
+      if (sourceFilter !== 'all' && (i.source ?? 'website') !== sourceFilter) return false
       return true
     })
-    .sort((a, b) => {
-      if (activeTab !== 'active') return b.created_at.localeCompare(a.created_at)
-      const aDue = isFollowUpDue(a) ? 0 : 1
-      const bDue = isFollowUpDue(b) ? 0 : 1
-      if (aDue !== bDue) return aDue - bDue
-      const aFollow = a.next_follow_up ?? '9999-12-31'
-      const bFollow = b.next_follow_up ?? '9999-12-31'
-      if (aFollow !== bFollow) return aFollow.localeCompare(bFollow)
-      return b.created_at.localeCompare(a.created_at)
-    })
+  }, [items, stageFilter, sourceFilter])
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading leads...</div>
+    return <div className="text-center py-12 text-gray-500">Loading pipeline…</div>
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {leads.length} total{newCount > 0 && ` · ${newCount} new`}
-            {followUpCount > 0 && ` · ${followUpCount} need follow-up`}
+            {counts.total} active in pipeline · {counts.quote_requests} new inquiries · {counts.jobs} active leads
+            {overdueCount > 0 && (
+              <span className="text-red-600 font-medium"> · {overdueCount} overdue</span>
+            )}
           </p>
         </div>
         <Link
@@ -178,38 +164,37 @@ export default function LeadsPage() {
         </Link>
       </div>
 
-      {isDemoMode && (
-        <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 p-3">
-          <p className="text-sm text-amber-800">
-            <strong>Demo Mode</strong> — Viewing sample data. Quote form submissions will appear here when Supabase is connected.
-          </p>
-        </div>
-      )}
-
-      {/* Tabs + source filter */}
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {tabs.map((tab) => (
+      {/* Stage filter chips */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 overflow-x-auto">
+        <button
+          onClick={() => setStageFilter('all')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            stageFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          All ({items.length})
+        </button>
+        {(Object.keys(stageMeta) as PipelineStage[]).map((stage) => {
+          const count = stageCounts.get(stage) ?? 0
+          if (count === 0) return null
+          const meta = stageMeta[stage]
+          return (
             <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                activeTab === tab.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+              key={stage}
+              onClick={() => setStageFilter(stage)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+                stageFilter === stage ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs rounded-full bg-gray-200 text-gray-700">
-                  {tab.count}
-                </span>
-              )}
+              {meta.label} ({count})
             </button>
-          ))}
-        </div>
+          )
+        })}
+      </div>
 
-        {availableSources.length > 0 && (
+      {/* Source filter (right-aligned) */}
+      {availableSources.length > 0 && (
+        <div className="flex justify-end mb-3">
           <select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
@@ -217,140 +202,131 @@ export default function LeadsPage() {
           >
             <option value="all">All sources</option>
             {availableSources.map((s) => (
-              <option key={s} value={s}>
-                {sourceLabels[s] ?? s}
-              </option>
+              <option key={s} value={s}>{sourceLabels[s] ?? s}</option>
             ))}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Lead cards */}
+      {/* Items */}
       <div className="space-y-3">
-        {filtered.map((lead) => {
-          const overdue = isFollowUpDue(lead)
+        {filtered.map((item) => {
+          const meta = stageMeta[item.stage]
+          const StageIcon = meta.icon
+          const urgency = urgencyBadge(item)
+          const detailHref = item.kind === 'quote_request'
+            ? `/dashboard/leads/${item.id}`
+            : `/dashboard/jobs/${item.id}`
+
           return (
             <Link
-              key={lead.id}
-              href={`/dashboard/leads/${lead.id}`}
+              key={`${item.kind}-${item.id}`}
+              href={detailHref}
               className="block bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:border-primary-300 hover:shadow-md transition-all"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1 flex-wrap">
-                    <h3 className="font-semibold text-gray-900">{lead.client_name}</h3>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lead.status]}`}>
-                      {lead.status}
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="font-semibold text-gray-900">{item.client_name}</h3>
+                    {item.kind === 'job' && item.job_number != null && (
+                      <span className="text-xs text-gray-400">#{item.job_number}</span>
+                    )}
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${meta.color}`}>
+                      <StageIcon className="w-3 h-3" />
+                      {meta.label}
                     </span>
-                    {lead.source && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {sourceLabels[lead.source] ?? lead.source}
+                    {urgency && (
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${urgency.className}`}>
+                        <AlertCircle className="w-3 h-3" />
+                        {urgency.label}
                       </span>
                     )}
-                    {overdue && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 px-2 py-0.5 rounded-full">
-                        <AlertCircle className="w-3 h-3" />
-                        Follow-up due
+                    {item.source && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {sourceLabels[item.source] ?? item.source}
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 capitalize">{lead.project_type} project</p>
+
+                  {item.project_type && (
+                    <p className="text-sm text-gray-600 capitalize">{item.project_type} project</p>
+                  )}
+
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
-                    {lead.client_phone && (
+                    {item.client_phone && (
                       <a
-                        href={`tel:${lead.client_phone}`}
+                        href={`tel:${item.client_phone}`}
                         onClick={(e) => e.stopPropagation()}
                         className="hover:text-primary-600"
                       >
-                        {lead.client_phone}
+                        {item.client_phone}
                       </a>
                     )}
-                    {lead.client_email && (
+                    {item.client_email && (
                       <a
-                        href={`mailto:${lead.client_email}`}
+                        href={`mailto:${item.client_email}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="hover:text-primary-600"
+                        className="hover:text-primary-600 truncate max-w-[260px]"
                       >
-                        {lead.client_email}
+                        {item.client_email}
                       </a>
                     )}
-                    <span>
-                      {new Date(lead.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </span>
-                    {lead.next_follow_up && (
-                      <span className={`inline-flex items-center gap-1 ${overdue ? 'text-red-600' : 'text-gray-500'}`}>
+                    {item.estimated_cost != null && item.estimated_cost > 0 && (
+                      <span className="font-medium text-gray-700">
+                        ${item.estimated_cost.toLocaleString()}
+                      </span>
+                    )}
+                    <span>Added {formatDateShort(item.created_at)}</span>
+                    {item.site_visit_at && (
+                      <span className="inline-flex items-center gap-1 text-amber-700">
+                        <Calendar className="w-3 h-3" />
+                        Visit {formatVisitDateTime(item.site_visit_at)}
+                      </span>
+                    )}
+                    {item.next_follow_up && (
+                      <span className={`inline-flex items-center gap-1 ${item.urgency >= 100 ? 'text-red-600' : 'text-gray-500'}`}>
                         <Clock className="w-3 h-3" />
-                        Follow up {new Date(lead.next_follow_up).toLocaleDateString()}
+                        Follow up {formatDateShort(item.next_follow_up)}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div
-                  className="flex items-center gap-2 shrink-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {lead.status === 'new' && (
+                {/* Actions — only meaningful for quote_requests */}
+                {item.kind === 'quote_request' && (
+                  <div
+                    className="flex items-center gap-2 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       onClick={(e) => {
                         e.preventDefault()
-                        updateStatus(lead.id, 'reviewed')
+                        e.stopPropagation()
+                        convertLead(item.id)
                       }}
-                      className="p-2 text-gray-400 hover:text-yellow-600 rounded-md hover:bg-yellow-50"
-                      title="Mark reviewed"
+                      disabled={convertingId === item.id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
+                      title="Convert to a job"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      {convertingId === item.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Converting…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Convert
+                        </>
+                      )}
                     </button>
-                  )}
-                  {(lead.status === 'new' || lead.status === 'reviewed') && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          convertLead(lead.id)
-                        }}
-                        disabled={convertingId === lead.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
-                        title="Convert to a job (pricing is set later)"
-                      >
-                        {convertingId === lead.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Converting…
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-4 h-4" />
-                            Convert
-                          </>
-                        )}
-                      </button>
-                      <Link
-                        href={`/dashboard/jobs/new?from_lead=${lead.id}&name=${encodeURIComponent(lead.client_name)}&phone=${encodeURIComponent(lead.client_phone)}&email=${encodeURIComponent(lead.client_email)}&type=${encodeURIComponent(lead.project_type)}&notes=${encodeURIComponent(formatAnswers(lead.answers))}${lead.customer_id ? `&customer_id=${lead.customer_id}` : ''}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-                        title="Create job manually (no auto-estimate)"
-                      >
-                        <ArrowRight className="w-4 h-4" />
-                      </Link>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          updateStatus(lead.id, 'archived')
-                        }}
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-                        title="Archive"
-                      >
-                        <Archive className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
+                  </div>
+                )}
+                {item.kind === 'job' && (
+                  <div className="shrink-0 flex items-center text-gray-400">
+                    <ArrowRight className="w-5 h-5" />
+                  </div>
+                )}
               </div>
             </Link>
           )
@@ -359,97 +335,13 @@ export default function LeadsPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Inbox className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No leads found.</p>
-            <p className="text-sm text-gray-400 mt-1">Click "New Lead" to add one manually, or quote form submissions will land here.</p>
+            <p className="text-gray-500">No leads in this view.</p>
+            <p className="text-sm text-gray-400 mt-1">
+              Click &quot;New Lead&quot; to add one, or quote-form submissions land here automatically.
+            </p>
           </div>
         )}
       </div>
     </div>
   )
 }
-
-function formatAnswers(answers: Record<string, string>): string {
-  return Object.entries(answers)
-    .filter(([, v]) => v)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join('\n')
-}
-
-// Demo data for preview
-const demoLeads: QuoteRequest[] = [
-  {
-    id: 'demo-lead-1',
-    status: 'new',
-    customer_id: null,
-    client_name: 'Sarah Johnson',
-    client_email: 'sarah@example.com',
-    client_phone: '(617) 555-0142',
-    project_type: 'bathroom',
-    answers: {
-      bathroomSize: 'medium',
-      tileType: 'ceramic',
-      includesFloor: 'yes',
-      timeline: 'within-month',
-      additionalNotes: 'Want a modern look with subway tiles. Budget around $5,000.',
-    },
-    converted_job_id: null,
-    source: 'website',
-    last_contact_at: null,
-    next_follow_up: null,
-    lost_reason: null,
-    notes: null,
-    site_visit_at: null,
-    site_visit_notes: null,
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'demo-lead-2',
-    status: 'reviewed',
-    customer_id: null,
-    client_name: 'Michael Torres',
-    client_email: 'mtorres@example.com',
-    client_phone: '(781) 555-0298',
-    project_type: 'shower',
-    answers: {
-      showerType: 'walk-in',
-      waterproofing: 'needed',
-      tilePreference: 'porcelain',
-      additionalNotes: 'Replacing old fiberglass insert with custom tile.',
-    },
-    converted_job_id: null,
-    source: 'phone',
-    last_contact_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    next_follow_up: new Date().toISOString().slice(0, 10),
-    lost_reason: null,
-    notes: 'Called Tuesday, wants quote by Friday.',
-    site_visit_at: null,
-    site_visit_notes: null,
-    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'demo-lead-3',
-    status: 'converted',
-    customer_id: null,
-    client_name: 'Lisa Chen',
-    client_email: 'lchen@example.com',
-    client_phone: '(617) 555-0376',
-    project_type: 'kitchen-floor',
-    answers: {
-      floorArea: '200-sqft',
-      currentFloor: 'vinyl',
-      tileType: 'porcelain',
-    },
-    converted_job_id: 'demo-job-4',
-    source: 'referral',
-    last_contact_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    next_follow_up: null,
-    lost_reason: null,
-    notes: null,
-    site_visit_at: null,
-    site_visit_notes: null,
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-]

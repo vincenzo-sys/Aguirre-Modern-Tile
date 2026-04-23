@@ -47,6 +47,7 @@ const ownerSections: NavSection[] = [
   {
     heading: 'Operations',
     items: [
+      { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays },
       { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList },
       { label: 'Materials', href: '/dashboard/materials', icon: Package },
       { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },

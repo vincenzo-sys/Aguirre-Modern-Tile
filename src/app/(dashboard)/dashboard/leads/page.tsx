@@ -8,6 +8,7 @@ import {
   Calendar, FileText, FilePlus, FileCheck,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { EditableDateCell, EditableNotesCell } from '@/components/dashboard/InlineEditCells'
 
 // Mirrors PipelineItem in /api/pipeline/route.ts.
 type PipelineStage =
@@ -34,6 +35,7 @@ type PipelineItem = {
   urgency: number
   job_number?: number
   job_status?: string
+  linked_quote_request_id?: string | null
   project_type?: string
 }
 
@@ -115,6 +117,48 @@ export default function LeadsPage() {
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
       setConvertingId(null)
+    }
+  }
+
+  // Update a row optimistically and then PATCH the right backend record.
+  // Date fields live on quote_requests; for jobs we route through the linked
+  // QR if present (jobs without one have read-only date cells). Notes can be
+  // PATCHed on either record.
+  function updateItemLocally(itemId: string, kind: 'quote_request' | 'job', patch: Partial<PipelineItem>) {
+    setItems((prev) =>
+      prev.map((it) => (it.id === itemId && it.kind === kind ? { ...it, ...patch } : it))
+    )
+  }
+
+  async function saveDate(item: PipelineItem, field: 'last_contact_at' | 'next_follow_up', newValue: string | null) {
+    const targetQrId = item.kind === 'quote_request' ? item.id : item.linked_quote_request_id
+    if (!targetQrId) throw new Error('No editable lead record for this row')
+    // Optimistic update first
+    updateItemLocally(item.id, item.kind, { [field]: newValue } as Partial<PipelineItem>)
+    const res = await fetch(`/api/leads/${targetQrId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: newValue }),
+    })
+    if (!res.ok) {
+      // Rollback
+      updateItemLocally(item.id, item.kind, { [field]: item[field] } as Partial<PipelineItem>)
+      throw new Error(`Save failed: ${res.status}`)
+    }
+  }
+
+  async function saveNotes(item: PipelineItem, newValue: string | null) {
+    // Notes route to the underlying record kind
+    const path = item.kind === 'quote_request' ? `/api/leads/${item.id}` : `/api/jobs/${item.id}`
+    updateItemLocally(item.id, item.kind, { notes: newValue })
+    const res = await fetch(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: newValue }),
+    })
+    if (!res.ok) {
+      updateItemLocally(item.id, item.kind, { notes: item.notes })
+      throw new Error(`Save failed: ${res.status}`)
     }
   }
 
@@ -219,7 +263,9 @@ export default function LeadsPage() {
                 <th className="text-left px-4 py-2">Project</th>
                 <th className="text-left px-4 py-2">Customer</th>
                 <th className="text-left px-4 py-2">Stage</th>
-                <th className="text-left px-4 py-2">Activity</th>
+                <th className="text-left px-4 py-2 whitespace-nowrap">Last contact</th>
+                <th className="text-left px-4 py-2 whitespace-nowrap">Next follow-up</th>
+                <th className="text-left px-4 py-2 min-w-[180px]">Notes / brainstorm</th>
                 <th className="text-right px-4 py-2 w-px"></th>
               </tr>
             </thead>
@@ -228,36 +274,29 @@ export default function LeadsPage() {
                 const meta = stageMeta[item.stage]
                 const StageIcon = meta.icon
                 const urgency = urgencyBadge(item)
+                // Open detail by clicking the project name; everything else
+                // is in-place editable so the row itself isn't navigation.
                 const detailHref = `/dashboard/leads/${item.id}`
-                // Activity = the most recent or most relevant time signal
-                const activityLine =
-                  item.next_follow_up && item.urgency >= 100
-                    ? { label: `Follow ${formatDateShort(item.next_follow_up)}`, className: 'text-red-600 font-medium' }
-                    : item.site_visit_at
-                      ? { label: `Visit ${formatDateShort(item.site_visit_at)}`, className: 'text-amber-700' }
-                      : item.next_follow_up
-                        ? { label: `Follow ${formatDateShort(item.next_follow_up)}`, className: 'text-gray-600' }
-                        : item.last_contact_at
-                          ? { label: `${formatDateShort(item.last_contact_at)} contact`, className: 'text-gray-500' }
-                          : { label: `Added ${formatDateShort(item.created_at)}`, className: 'text-gray-400' }
+                const dateEditable =
+                  item.kind === 'quote_request' || !!item.linked_quote_request_id
                 return (
-                  <tr
-                    key={`${item.kind}-${item.id}`}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(detailHref)}
-                  >
-                    {/* PROJECT — primary column */}
-                    <td className="px-4 py-2.5 align-middle">
-                      <div className="font-medium text-gray-900 truncate max-w-[360px]">
+                  <tr key={`${item.kind}-${item.id}`} className="hover:bg-gray-50">
+                    {/* PROJECT — primary column, click to open detail */}
+                    <td className="px-4 py-2.5 align-top">
+                      <Link
+                        href={detailHref}
+                        className="block font-medium text-gray-900 hover:text-primary-700 truncate max-w-[300px]"
+                        title={item.project_name}
+                      >
                         {item.project_name}
-                      </div>
+                      </Link>
                       {item.estimated_cost != null && item.estimated_cost > 0 && (
                         <div className="text-[11px] text-gray-500 mt-0.5">${item.estimated_cost.toLocaleString()}</div>
                       )}
                     </td>
 
-                    {/* CUSTOMER — explicit assignment */}
-                    <td className="px-4 py-2.5 align-middle">
+                    {/* CUSTOMER */}
+                    <td className="px-4 py-2.5 align-top">
                       <div className="text-gray-900">{item.client_name}</div>
                       {item.client_phone && (
                         <a
@@ -271,7 +310,7 @@ export default function LeadsPage() {
                     </td>
 
                     {/* STAGE */}
-                    <td className="px-4 py-2.5 align-middle">
+                    <td className="px-4 py-2.5 align-top">
                       <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.color}`}>
                         <StageIcon className="w-3 h-3" />
                         {meta.label}
@@ -286,16 +325,35 @@ export default function LeadsPage() {
                       )}
                     </td>
 
-                    {/* ACTIVITY */}
-                    <td className={`px-4 py-2.5 align-middle text-xs ${activityLine.className}`}>
-                      {activityLine.label}
+                    {/* LAST CONTACT — inline editable */}
+                    <td className="px-4 py-2.5 align-top text-xs">
+                      <EditableDateCell
+                        value={item.last_contact_at ? item.last_contact_at.slice(0, 10) : null}
+                        disabled={!dateEditable}
+                        onSave={(v) => saveDate(item, 'last_contact_at', v ? new Date(v).toISOString() : null)}
+                      />
+                    </td>
+
+                    {/* NEXT FOLLOW-UP — inline editable */}
+                    <td className="px-4 py-2.5 align-top text-xs">
+                      <EditableDateCell
+                        value={item.next_follow_up ? item.next_follow_up.slice(0, 10) : null}
+                        highlight={item.urgency >= 100}
+                        disabled={!dateEditable}
+                        onSave={(v) => saveDate(item, 'next_follow_up', v)}
+                      />
+                    </td>
+
+                    {/* NOTES / BRAINSTORM — inline editable, expands to textarea */}
+                    <td className="px-4 py-2.5 align-top">
+                      <EditableNotesCell
+                        value={item.notes}
+                        onSave={(v) => saveNotes(item, v)}
+                      />
                     </td>
 
                     {/* ACTION */}
-                    <td
-                      className="px-4 py-2.5 align-middle text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <td className="px-4 py-2.5 align-top text-right">
                       {item.kind === 'quote_request' ? (
                         <button
                           onClick={() => convertLead(item.id)}
@@ -315,7 +373,12 @@ export default function LeadsPage() {
                           )}
                         </button>
                       ) : (
-                        <ArrowRight className="w-4 h-4 text-gray-300 inline" />
+                        <Link
+                          href={detailHref}
+                          className="inline-flex items-center text-gray-300 hover:text-primary-600 p-1"
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </Link>
                       )}
                     </td>
                   </tr>

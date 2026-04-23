@@ -45,6 +45,10 @@ export type PipelineItem = {
   // Job-only:
   job_number?: number
   job_status?: string
+  // Set on jobs that came from a website quote_request — lets the inline
+  // editor route date-field updates to the source quote_request (where those
+  // fields actually live in the schema).
+  linked_quote_request_id?: string | null
   // Quote-request-only:
   project_type?: string
 }
@@ -101,8 +105,10 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getSupabase()
 
-    // Fetch in parallel
-    const [quoteRes, jobRes] = await Promise.all([
+    // Fetch in parallel: active quote_requests + lead-stage jobs + the
+    // mapping from job_id -> source quote_request (so we can route inline
+    // date edits on a job row to the QR record where those fields live).
+    const [quoteRes, jobRes, qrLinkRes] = await Promise.all([
       supabase
         .from('quote_requests')
         .select('id, status, client_name, client_email, client_phone, project_type, source, last_contact_at, next_follow_up, site_visit_at, notes, converted_job_id, created_at, updated_at, answers')
@@ -113,6 +119,10 @@ export async function GET(req: NextRequest) {
         .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, created_at, updated_at')
         .in('status', ['lead', 'quoted', 'estimate_revised'])
         .order('created_at', { ascending: false }),
+      supabase
+        .from('quote_requests')
+        .select('id, converted_job_id, last_contact_at, next_follow_up, site_visit_at')
+        .not('converted_job_id', 'is', null),
     ])
 
     if (quoteRes.error) {
@@ -120,6 +130,19 @@ export async function GET(req: NextRequest) {
     }
     if (jobRes.error) {
       return NextResponse.json({ error: jobRes.error.message }, { status: 500 })
+    }
+
+    // Build job_id -> source QR snapshot for inline-edit routing
+    const jobToQr = new Map<string, { id: string; last_contact_at: string | null; next_follow_up: string | null; site_visit_at: string | null }>()
+    for (const link of qrLinkRes.data ?? []) {
+      if (link.converted_job_id) {
+        jobToQr.set(link.converted_job_id, {
+          id: link.id,
+          last_contact_at: link.last_contact_at,
+          next_follow_up: link.next_follow_up,
+          site_visit_at: link.site_visit_at,
+        })
+      }
     }
 
     const items: PipelineItem[] = []
@@ -169,6 +192,7 @@ export async function GET(req: NextRequest) {
         j.status === 'quoted' ? 'estimate_sent'
         : j.status === 'estimate_revised' ? 'estimate_revised'
         : 'lead_in_progress'
+      const linkedQr = jobToQr.get(j.id)
       items.push({
         kind: 'job',
         id: j.id,
@@ -180,17 +204,20 @@ export async function GET(req: NextRequest) {
         source: null,
         stage,
         estimated_cost: j.estimated_cost,
-        site_visit_at: null,
-        next_follow_up: null,
-        last_contact_at: null,
+        // Pull date fields from linked QR when present (the schema keeps
+        // last_contact_at / next_follow_up / site_visit_at on quote_requests)
+        site_visit_at: linkedQr?.site_visit_at ?? null,
+        next_follow_up: linkedQr?.next_follow_up ?? null,
+        last_contact_at: linkedQr?.last_contact_at ?? null,
         notes: j.notes,
         created_at: j.created_at,
         updated_at: j.updated_at,
+        linked_quote_request_id: linkedQr?.id ?? null,
         urgency: computeUrgency({
-          next_follow_up: null,
-          last_contact_at: null,
+          next_follow_up: linkedQr?.next_follow_up ?? null,
+          last_contact_at: linkedQr?.last_contact_at ?? null,
           created_at: j.created_at,
-          site_visit_at: null,
+          site_visit_at: linkedQr?.site_visit_at ?? null,
         }),
         job_number: j.job_number,
         job_status: j.status,

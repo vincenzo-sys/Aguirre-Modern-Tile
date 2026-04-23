@@ -56,12 +56,7 @@ export interface JobLineItem {
   status?: MaterialStatus
   source_url?: string | null
   source_name?: string | null
-  // Optional grouping label for multi-section estimates ("Bathroom 1",
-  // "Kitchen Backsplash", "Project-wide", etc.). When present, the customer-
-  // facing estimate page groups line items by section with per-section
-  // subtotals. When absent (or all items lack it), the page renders the
-  // classic flat labor + materials layout — keeps single-section jobs
-  // backwards compatible.
+  // Grouping label for multi-section estimates; empty/missing = project-wide.
   section?: string | null
 }
 

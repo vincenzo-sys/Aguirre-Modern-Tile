@@ -40,6 +40,38 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+function renderLineItemGroup(
+  label: string,
+  items: JobLineItem[],
+  total: number,
+  transformDescription?: (raw: string) => string,
+) {
+  if (items.length === 0) return null
+  return (
+    <div>
+      <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
+        <span className="text-xs text-gray-500">{formatCurrency(total)}</span>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {items.map((item, i) => (
+          <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
+            <div className="flex-1">
+              <p className="text-gray-900">
+                {transformDescription ? transformDescription(item.description) : item.description}
+              </p>
+              <p className="text-xs text-gray-500">
+                {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
+              </p>
+            </div>
+            <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function friendlyLaborDescription(raw: string): string {
   const s = raw.toLowerCase()
   if (s.startsWith('demolition')) {
@@ -164,32 +196,31 @@ export default async function EstimatePage({
   const depositSuccess = deposit === 'success' || estimate.accepted
   const depositCancelled = deposit === 'cancelled'
 
-  const materials = estimate.line_items.filter((i) => i.category === 'materials')
-  const labor = estimate.line_items.filter((i) => i.category === 'labor')
-  const materialsTotal = materials.reduce((s, i) => s + (i.amount ?? 0), 0)
-  const laborTotal = labor.reduce((s, i) => s + (i.amount ?? 0), 0)
-  const total = estimate.estimated_cost ?? materialsTotal + laborTotal
-
-  // Multi-section grouping. Sections appear in the order they first show up
-  // in line_items; an explicit "Project-wide" section (or any item with no
-  // section set) is sorted to the end so per-room costs come first and
-  // shared costs (trash, transport) come last.
+  // Must match PROJECTWIDE_LABEL in generate_dashboard_estimate.py.
   const PROJECTWIDE_LABEL = 'Project-wide'
-  const sectionOrder: string[] = []
+
+  // Group items by section in the order sections first appear, then float
+  // the implicit "Project-wide" bucket (unsectioned items, trash, transport)
+  // to the end so per-room costs come first. Single-section legacy jobs
+  // land entirely in Project-wide and render without a section header.
   const sectionMap = new Map<string, JobLineItem[]>()
   for (const item of estimate.line_items) {
     const key = item.section || PROJECTWIDE_LABEL
-    if (!sectionMap.has(key)) {
-      sectionMap.set(key, [])
-      sectionOrder.push(key)
-    }
+    if (!sectionMap.has(key)) sectionMap.set(key, [])
     sectionMap.get(key)!.push(item)
   }
-  const namedSections = sectionOrder.filter((s) => s !== PROJECTWIDE_LABEL)
-  const hasNamedSections = namedSections.length > 0
-  const orderedSectionKeys = hasNamedSections
-    ? [...namedSections, ...(sectionMap.has(PROJECTWIDE_LABEL) ? [PROJECTWIDE_LABEL] : [])]
-    : []
+  const orderedSections = [
+    ...Array.from(sectionMap.entries()).filter(([k]) => k !== PROJECTWIDE_LABEL),
+    ...(sectionMap.has(PROJECTWIDE_LABEL)
+      ? [[PROJECTWIDE_LABEL, sectionMap.get(PROJECTWIDE_LABEL)!] as const]
+      : []),
+  ]
+  const showSectionHeaders =
+    orderedSections.length > 1 || orderedSections[0]?.[0] !== PROJECTWIDE_LABEL
+
+  const total =
+    estimate.estimated_cost ??
+    estimate.line_items.reduce((s, i) => s + (i.amount ?? 0), 0)
 
   const parsed = parseScopeNotes(estimate.scope_notes)
   const warrantyLabel = parsed.warrantyYears
@@ -357,114 +388,33 @@ export default async function EstimatePage({
               </h3>
             </div>
 
-            {hasNamedSections ? (
-              // Multi-section layout: section header + per-section labor/materials
-              orderedSectionKeys.map((sectionKey, sIdx) => {
-                const sectionItems = sectionMap.get(sectionKey)!
-                const sLabor = sectionItems.filter((i) => i.category === 'labor')
-                const sMats = sectionItems.filter((i) => i.category === 'materials')
-                const sLaborTotal = sLabor.reduce((s, i) => s + (i.amount ?? 0), 0)
-                const sMatsTotal = sMats.reduce((s, i) => s + (i.amount ?? 0), 0)
-                const sSubtotal = sLaborTotal + sMatsTotal
-                return (
-                  <div key={sectionKey} className={sIdx > 0 ? 'border-t-4 border-gray-100' : ''}>
-                    <div className="px-6 py-3 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-primary-900 uppercase tracking-wider">{sectionKey}</span>
-                      <span className="text-sm font-semibold text-primary-900">{formatCurrency(sSubtotal)}</span>
+            {orderedSections.map(([sectionKey, sectionItems], sIdx) => {
+              const labor = sectionItems.filter((i) => i.category === 'labor')
+              const materials = sectionItems.filter((i) => i.category === 'materials')
+              const laborTotal = labor.reduce((s, i) => s + (i.amount ?? 0), 0)
+              const materialsTotal = materials.reduce((s, i) => s + (i.amount ?? 0), 0)
+              const subtotal = laborTotal + materialsTotal
+              return (
+                <div key={sectionKey}>
+                  {showSectionHeaders && (
+                    <div
+                      className={`px-6 py-3 bg-primary-50 border-b border-primary-100 flex items-center justify-between ${
+                        sIdx > 0 ? 'border-t-4 border-t-gray-100' : ''
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-primary-900 uppercase tracking-wider">
+                        {sectionKey}
+                      </span>
+                      <span className="text-sm font-semibold text-primary-900">
+                        {formatCurrency(subtotal)}
+                      </span>
                     </div>
-                    {sLabor.length > 0 && (
-                      <div>
-                        <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
-                          <span className="text-xs text-gray-500">{formatCurrency(sLaborTotal)}</span>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {sLabor.map((item, i) => (
-                            <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                              <div className="flex-1">
-                                <p className="text-gray-900">{friendlyLaborDescription(item.description)}</p>
-                                <p className="text-xs text-gray-500">
-                                  {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                                </p>
-                              </div>
-                              <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {sMats.length > 0 && (
-                      <div>
-                        <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
-                          <span className="text-xs text-gray-500">{formatCurrency(sMatsTotal)}</span>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {sMats.map((item, i) => (
-                            <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                              <div className="flex-1">
-                                <p className="text-gray-900">{item.description}</p>
-                                <p className="text-xs text-gray-500">
-                                  {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                                </p>
-                              </div>
-                              <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            ) : (
-              // Classic flat layout (single-section / legacy jobs)
-              <>
-                {labor.length > 0 && (
-                  <div>
-                    <div className="px-6 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
-                      <span className="text-xs text-gray-500">{formatCurrency(laborTotal)}</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {labor.map((item, i) => (
-                        <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                          <div className="flex-1">
-                            <p className="text-gray-900">{friendlyLaborDescription(item.description)}</p>
-                            <p className="text-xs text-gray-500">
-                              {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                            </p>
-                          </div>
-                          <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {materials.length > 0 && (
-                  <div>
-                    <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
-                      <span className="text-xs text-gray-500">{formatCurrency(materialsTotal)}</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {materials.map((item, i) => (
-                        <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-                          <div className="flex-1">
-                            <p className="text-gray-900">{item.description}</p>
-                            <p className="text-xs text-gray-500">
-                              {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-                            </p>
-                          </div>
-                          <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+                  )}
+                  {renderLineItemGroup('Labor', labor, laborTotal, friendlyLaborDescription)}
+                  {renderLineItemGroup('Materials', materials, materialsTotal)}
+                </div>
+              )
+            })}
           </section>
         )}
 

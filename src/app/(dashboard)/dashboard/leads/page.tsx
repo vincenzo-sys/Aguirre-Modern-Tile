@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Inbox, ArrowRight, AlertCircle, Sparkles, Loader2, Plus, Clock,
-  Calendar, FileText, FilePlus, FileCheck,
+  Calendar, FileText, FilePlus, FileCheck, Archive, Send, ChevronRight,
+  ChevronDown, MapPin, Phone, Mail,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { EditableDateCell, EditableNotesCell } from '@/components/dashboard/InlineEditCells'
@@ -37,6 +38,10 @@ type PipelineItem = {
   job_status?: string
   linked_quote_request_id?: string | null
   project_type?: string
+  description?: string | null
+  site_visit_notes?: string | null
+  customer_answers?: Record<string, string> | null
+  scope_notes_excerpt?: string | null
 }
 
 const stageMeta: Record<PipelineStage, { label: string; color: string; icon: typeof Inbox }> = {
@@ -162,6 +167,71 @@ export default function LeadsPage() {
     }
   }
 
+  // ── Quick actions ──────────────────────────────────────────────────
+  // Each one is an optimistic local update + PATCH; failures roll back.
+
+  async function markContactedNow(item: PipelineItem) {
+    const targetQrId = item.kind === 'quote_request' ? item.id : item.linked_quote_request_id
+    if (!targetQrId) {
+      toast('No editable lead record for this row', 'error')
+      return
+    }
+    const now = new Date().toISOString()
+    updateItemLocally(item.id, item.kind, { last_contact_at: now })
+    const res = await fetch(`/api/leads/${targetQrId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_contact_at: now }),
+    })
+    if (!res.ok) {
+      updateItemLocally(item.id, item.kind, { last_contact_at: item.last_contact_at })
+      toast('Failed to mark contacted', 'error')
+      return
+    }
+    toast('Marked contacted just now', 'success')
+  }
+
+  async function archiveLead(item: PipelineItem) {
+    if (item.kind !== 'quote_request') return
+    if (!confirm(`Archive ${item.client_name}'s inquiry? They'll move out of the active pipeline.`)) return
+    setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'quote_request')))
+    const res = await fetch(`/api/leads/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'archived' }),
+    })
+    if (!res.ok) {
+      toast('Failed to archive — refresh to recover', 'error')
+      return
+    }
+    toast('Archived', 'success')
+  }
+
+  async function sendToJobs(item: PipelineItem) {
+    if (item.kind !== 'job') return
+    if (!confirm(`Send ${item.project_name} to Jobs? This locks the deal as accepted and moves it to the operations workflow.`)) return
+    // Optimistic: remove from pipeline (it'll show on Jobs page)
+    setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'job')))
+    const res = await fetch(`/api/jobs/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'accepted_not_scheduled' }),
+    })
+    if (!res.ok) {
+      toast('Failed to advance — refresh to recover', 'error')
+      return
+    }
+    toast('Sent to Jobs', 'success')
+    router.push(`/dashboard/jobs/${item.id}`)
+  }
+
+  // ── Expandable row state ───────────────────────────────────────────
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  function toggleExpand(item: PipelineItem) {
+    const key = `${item.kind}-${item.id}`
+    setExpandedKey((prev) => (prev === key ? null : key))
+  }
+
   const availableSources = useMemo(() => {
     const set = new Set<string>()
     for (const i of items) if (i.source) set.add(i.source)
@@ -260,13 +330,14 @@ export default function LeadsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
               <tr>
+                <th className="w-px px-2 py-2"></th>
                 <th className="text-left px-4 py-2">Project</th>
                 <th className="text-left px-4 py-2">Customer</th>
                 <th className="text-left px-4 py-2">Stage</th>
                 <th className="text-left px-4 py-2 whitespace-nowrap">Last contact</th>
                 <th className="text-left px-4 py-2 whitespace-nowrap">Next follow-up</th>
                 <th className="text-left px-4 py-2 min-w-[180px]">Notes / brainstorm</th>
-                <th className="text-right px-4 py-2 w-px"></th>
+                <th className="text-right px-4 py-2 w-px">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -279,8 +350,22 @@ export default function LeadsPage() {
                 const detailHref = `/dashboard/leads/${item.id}`
                 const dateEditable =
                   item.kind === 'quote_request' || !!item.linked_quote_request_id
+                const expanded = expandedKey === `${item.kind}-${item.id}`
                 return (
-                  <tr key={`${item.kind}-${item.id}`} className="hover:bg-gray-50">
+                  <Fragment key={`${item.kind}-${item.id}`}>
+                  <tr className="hover:bg-gray-50">
+                    {/* EXPAND CHEVRON */}
+                    <td className="px-2 py-2.5 align-top">
+                      <button
+                        onClick={() => toggleExpand(item)}
+                        className="p-0.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
+                        title={expanded ? 'Collapse' : 'Expand'}
+                        aria-label={expanded ? 'Collapse row' : 'Expand row'}
+                      >
+                        {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </button>
+                    </td>
+
                     {/* PROJECT — primary column, click to open detail */}
                     <td className="px-4 py-2.5 align-top">
                       <Link
@@ -352,36 +437,76 @@ export default function LeadsPage() {
                       />
                     </td>
 
-                    {/* ACTION */}
-                    <td className="px-4 py-2.5 align-top text-right">
-                      {item.kind === 'quote_request' ? (
+                    {/* ACTIONS — quick icons + primary CTA */}
+                    <td className="px-4 py-2.5 align-top text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-0.5">
                         <button
-                          onClick={() => convertLead(item.id)}
-                          disabled={convertingId === item.id}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-60 whitespace-nowrap"
+                          onClick={() => markContactedNow(item)}
+                          disabled={item.kind === 'job' && !item.linked_quote_request_id}
+                          className="p-1.5 rounded text-gray-400 hover:text-primary-600 hover:bg-primary-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                          title="Mark contacted just now"
                         >
-                          {convertingId === item.id ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Working…
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3 h-3" />
-                              Start
-                            </>
-                          )}
+                          <Clock className="w-4 h-4" />
                         </button>
-                      ) : (
-                        <Link
-                          href={detailHref}
-                          className="inline-flex items-center text-gray-300 hover:text-primary-600 p-1"
-                        >
-                          <ArrowRight className="w-4 h-4" />
-                        </Link>
-                      )}
+
+                        {item.kind === 'job' && (item.job_status === 'quoted' || item.job_status === 'estimate_revised') && (
+                          <button
+                            onClick={() => sendToJobs(item)}
+                            className="p-1.5 rounded text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
+                            title="Send to Jobs (deal accepted)"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {item.kind === 'quote_request' && (
+                          <button
+                            onClick={() => archiveLead(item)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            title="Archive (lost / out of pipeline)"
+                          >
+                            <Archive className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {item.kind === 'quote_request' ? (
+                          <button
+                            onClick={() => convertLead(item.id)}
+                            disabled={convertingId === item.id}
+                            className="ml-1 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-60"
+                          >
+                            {convertingId === item.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Sparkles className="w-3 h-3" />
+                                Start
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <Link
+                            href={detailHref}
+                            className="ml-1 p-1.5 rounded text-gray-400 hover:text-primary-600 hover:bg-primary-50"
+                            title="Open lead workspace"
+                          >
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
+
+                  {/* EXPANDED HIGHLIGHT VIEW */}
+                  {expanded && (
+                    <tr className="bg-gray-50/60">
+                      <td className="px-2 py-3"></td>
+                      <td colSpan={7} className="px-4 py-3">
+                        <ExpandedRowDetail item={item} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -437,6 +562,115 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Inline panel surfaced when a row is expanded. Pulls everything else worth
+// seeing at a glance — description, address, site visit, source, intake
+// answers, scope notes excerpt — without making the user open the detail page.
+function ExpandedRowDetail({ item }: { item: PipelineItem }) {
+  const answerEntries = item.customer_answers
+    ? Object.entries(item.customer_answers).filter(([k, v]) => v && k !== 'address' && k !== 'description' && k !== 'projectDescription')
+    : []
+  const hasAnyDetail =
+    item.description || item.client_address || item.site_visit_at ||
+    item.source || answerEntries.length > 0 || item.scope_notes_excerpt
+
+  if (!hasAnyDetail) {
+    return (
+      <p className="text-xs text-gray-400 italic">
+        No additional intake details. Open the lead workspace to add scope, schedule a visit, or build an estimate.
+      </p>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+      {/* Project description */}
+      {item.description && (
+        <div className="md:col-span-3">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Project description</div>
+          <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.description}</p>
+        </div>
+      )}
+
+      {/* Scope notes (for jobs) */}
+      {item.scope_notes_excerpt && (
+        <div className="md:col-span-3">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Scope notes</div>
+          <p className="text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed">{item.scope_notes_excerpt}</p>
+        </div>
+      )}
+
+      {/* Address */}
+      {item.client_address && (
+        <div>
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <MapPin className="w-3 h-3" /> Address
+          </div>
+          <p className="text-sm text-gray-800">{item.client_address}</p>
+        </div>
+      )}
+
+      {/* Site visit */}
+      {item.site_visit_at && (
+        <div>
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <Calendar className="w-3 h-3" /> Estimate visit
+          </div>
+          <p className="text-sm text-amber-700">
+            {new Date(item.site_visit_at).toLocaleString('en-US', {
+              weekday: 'short', month: 'short', day: 'numeric',
+              hour: 'numeric', minute: '2-digit',
+            })}
+          </p>
+          {item.site_visit_notes && <p className="text-xs text-gray-600 mt-0.5">{item.site_visit_notes}</p>}
+        </div>
+      )}
+
+      {/* Source */}
+      {item.source && (
+        <div>
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Source</div>
+          <p className="text-sm text-gray-800 capitalize">{(sourceLabels[item.source] ?? item.source)}</p>
+        </div>
+      )}
+
+      {/* Intake answers (project-specific Q&A) */}
+      {answerEntries.length > 0 && (
+        <div className="md:col-span-3">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">From the quote form</div>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-2">
+            {answerEntries.map(([key, value]) => (
+              <div key={key}>
+                <dt className="text-[10px] text-gray-500 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}
+                </dt>
+                <dd className="text-xs text-gray-800">{String(value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {/* Quick contact links */}
+      {(item.client_phone || item.client_email) && (
+        <div className="md:col-span-3 flex items-center gap-3 pt-1 border-t border-gray-200">
+          {item.client_phone && (
+            <a href={`tel:${item.client_phone}`} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline">
+              <Phone className="w-3 h-3" />
+              {item.client_phone}
+            </a>
+          )}
+          {item.client_email && (
+            <a href={`mailto:${item.client_email}`} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline truncate">
+              <Mail className="w-3 h-3" />
+              {item.client_email}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   )
 }

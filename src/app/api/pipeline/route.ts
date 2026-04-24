@@ -51,6 +51,12 @@ export type PipelineItem = {
   linked_quote_request_id?: string | null
   // Quote-request-only:
   project_type?: string
+  // Optional rich-detail fields used by the expanded "highlight view" row.
+  // Kept on the same endpoint so the table doesn't need a per-row fetch.
+  description?: string | null
+  site_visit_notes?: string | null
+  customer_answers?: Record<string, string> | null
+  scope_notes_excerpt?: string | null
 }
 
 function daysSince(iso: string | null | undefined): number | null {
@@ -111,12 +117,12 @@ export async function GET(req: NextRequest) {
     const [quoteRes, jobRes, qrLinkRes] = await Promise.all([
       supabase
         .from('quote_requests')
-        .select('id, status, client_name, client_email, client_phone, project_type, source, last_contact_at, next_follow_up, site_visit_at, notes, converted_job_id, created_at, updated_at, answers')
+        .select('id, status, client_name, client_email, client_phone, project_type, source, last_contact_at, next_follow_up, site_visit_at, site_visit_notes, notes, converted_job_id, created_at, updated_at, answers')
         .not('status', 'in', '(converted,archived)')
         .order('created_at', { ascending: false }),
       supabase
         .from('jobs')
-        .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, created_at, updated_at')
+        .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, scope_notes, created_at, updated_at')
         .in('status', ['lead', 'quoted', 'estimate_revised'])
         .order('created_at', { ascending: false }),
       supabase
@@ -184,6 +190,9 @@ export async function GET(req: NextRequest) {
           site_visit_at: q.site_visit_at,
         }),
         project_type: q.project_type,
+        description: desc || null,
+        site_visit_notes: (q as { site_visit_notes?: string | null }).site_visit_notes ?? null,
+        customer_answers: (q.answers ?? null) as Record<string, string> | null,
       })
     }
 
@@ -221,6 +230,9 @@ export async function GET(req: NextRequest) {
         }),
         job_number: j.job_number,
         job_status: j.status,
+        scope_notes_excerpt: typeof (j as { scope_notes?: string }).scope_notes === 'string'
+          ? ((j as { scope_notes: string }).scope_notes.slice(0, 280) + (((j as { scope_notes: string }).scope_notes.length > 280) ? '…' : ''))
+          : null,
       })
     }
 

@@ -116,6 +116,17 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         return
       }
 
+      // For job-only leads (no source quote_request), photos attach to the
+      // job via /api/jobs/[id]/photos. Lead-with-QR records loaded their
+      // photos above; this fills in the gap for the no-QR case.
+      if (!leadData && jobData) {
+        const photoRes = await fetch(`/api/jobs/${jobData.id}/photos`)
+        if (photoRes.ok) {
+          const list = (await photoRes.json()) as QuoteRequestPhoto[]
+          setPhotos(Array.isArray(list) ? list : [])
+        }
+      }
+
       setLead(leadData)
       setJob(jobData)
 
@@ -251,18 +262,28 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // Photos attach to whichever entity the lead workspace was loaded with.
+  // Lead with a quote_request → /api/quotes/[qr-id]/photos. Job-only lead
+  // (no QR) → /api/jobs/[job-id]/photos. Same UI either way.
+  function photoApiBase(): string | null {
+    if (lead) return `/api/quotes/${lead.id}/photos`
+    if (job) return `/api/jobs/${job.id}/photos`
+    return null
+  }
+
   async function uploadPhotos(files: FileList | null) {
-    if (!lead || !files || files.length === 0) return
+    const base = photoApiBase()
+    if (!base || !files || files.length === 0) return
     setUploadingPhotos(true)
     try {
       const form = new FormData()
       Array.from(files).forEach((f) => form.append('photos', f))
-      const res = await fetch(`/api/quotes/${lead.id}/photos`, { method: 'POST', body: form })
+      const res = await fetch(base, { method: 'POST', body: form })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Upload failed')
       // Refetch the photos list with signed URLs (the upload response only
       // returns id + file_name, not URLs).
-      const refreshed = await fetch(`/api/quotes/${lead.id}/photos`)
+      const refreshed = await fetch(base)
       if (refreshed.ok) {
         const list = (await refreshed.json()) as QuoteRequestPhoto[]
         setPhotos(Array.isArray(list) ? list : [])
@@ -277,20 +298,20 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   }
 
   async function deletePhoto(photoId: string) {
-    if (!lead) return
+    const base = photoApiBase()
+    if (!base) return
     if (!confirm('Delete this photo?')) return
     setDeletingPhotoId(photoId)
-    // Optimistic — remove from UI immediately so the user gets instant feedback.
     const prev = photos
     setPhotos((p) => p.filter((x) => x.id !== photoId))
     try {
-      const res = await fetch(`/api/quotes/${lead.id}/photos/${photoId}`, { method: 'DELETE' })
+      const res = await fetch(`${base}/${photoId}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Delete failed')
       }
     } catch (err) {
-      setPhotos(prev)  // rollback on failure
+      setPhotos(prev)
       toast(err instanceof Error ? err.message : 'Delete failed', 'error')
     } finally {
       setDeletingPhotoId(null)
@@ -620,10 +641,11 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          {/* Photos — visible whenever there's a lead so the upload control
-              is always reachable. Hidden entirely for job-only records (no QR
-              ID to attach photos to until conversion happens). */}
-          {lead && (
+          {/* Photos — visible whenever there's a lead OR a job. Lead-with-QR
+              records use /api/quotes/[id]/photos (the public form's upload
+              endpoint); job-only records use /api/jobs/[id]/photos.
+              photoApiBase() routes upload/delete to the right one. */}
+          {(lead || job) && (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">

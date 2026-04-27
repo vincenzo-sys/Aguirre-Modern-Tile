@@ -82,6 +82,24 @@ async function buildLeadContext(supabase: ReturnType<typeof getSupabase>, leadId
   const photoCount = photos?.length ?? 0
 
   const lines: string[] = []
+  // Top-of-document instruction — lands first so Claude reads the prompt
+  // before the data dump, framing the rest as input rather than narrative.
+  lines.push('# Review request')
+  lines.push('')
+  lines.push(
+    "I'm scoping this lead before I quote them. Please act as a senior tile-estimating reviewer for Aguirre Modern Tile (Greater Boston, target margin 39-45%) and:"
+  )
+  lines.push('')
+  lines.push("- **Decode the project**: from the customer's words below, what's the actual scope? Walk-in shower? Tub surround? Demo + new floor?")
+  lines.push("- **Pick a template**: which of our job_templates fits best? Use `list_templates` to check options.")
+  lines.push('- **Estimate the sub-areas**: rough wall sqft, shower-floor sqft, outside-floor sqft from any photos / answers.')
+  lines.push('- **Flag missing info**: what should I ask the customer or check on a site visit before quoting?')
+  lines.push('- **Suggest a quote range** (low / typical / high) before I commit to a number.')
+  lines.push('')
+  lines.push('Use the MCP tools (list_materials, list_templates, list_labor_rates) to spot-check anything. End your reply with a punch list of clarifying questions for me, not generic suggestions.')
+  lines.push('')
+  lines.push('---')
+  lines.push('')
   lines.push(`# Lead Context — ${customerName ?? 'Unknown'}`)
   lines.push('')
   lines.push(`**Lead ID**: \`${lead.id}\``)
@@ -126,9 +144,7 @@ async function buildLeadContext(supabase: ReturnType<typeof getSupabase>, leadId
   )
   lines.push('')
   lines.push('---')
-  lines.push(
-    '_Paste into Claude Desktop. Claude can use MCP tools to read the materials catalog, pick a template, and write line_items back to the job._'
-  )
+  lines.push('_Pasted from the Aguirre Modern Tile dashboard via "Copy for Claude". Reply with your scope read, suggested template, sub-area estimates, and a clarifying-questions punch list._')
 
   return lines.join('\n')
 }
@@ -173,6 +189,35 @@ async function buildJobContext(supabase: ReturnType<typeof getSupabase>, jobId: 
   }
 
   const lines: string[] = []
+  // Top-of-document review request — gives Claude its task before the data
+  // dump so the rest reads as input, not narrative. Tailored for the
+  // estimate-review case (line items already built, considering Send).
+  const hasItems = lineItems.length > 0
+  lines.push('# Review request')
+  lines.push('')
+  if (hasItems) {
+    lines.push(
+      "I'm about to send this estimate to the customer. Please act as a senior tile-estimating reviewer for Aguirre Modern Tile (Greater Boston, target margin 39-45%) and:"
+    )
+    lines.push('')
+    lines.push('- **Sanity-check the line items** against the scope of work — is anything missing? (shower system, demo days for old tile, prep, niches, benches)')
+    lines.push("- **Pricing concerns**: does the margin look healthy at our target? Any line items that look mispriced — too high, too low, doubled up?")
+    lines.push('- **Sub-area realism**: do the wall / shower-floor / outside-floor sqft values look right for this kind of bathroom?')
+    lines.push('- **Customer-facing readability**: would the customer be confused or push back on anything?')
+    lines.push('- **Clarifying questions**: what should I ask the customer or verify on-site before sending?')
+  } else {
+    lines.push("This job has no line items yet. Please act as a senior tile-estimating reviewer for Aguirre Modern Tile (target margin 39-45%) and:")
+    lines.push('')
+    lines.push('- **Decode the scope** from the customer notes / lead answers below.')
+    lines.push("- **Pick a template** that fits — use `list_templates` to confirm.")
+    lines.push('- **Estimate sub-areas** (walls / shower-floor / outside-floor) and any addons (tray, curb, large-format, niche).')
+    lines.push("- Suggest the line items I should add — or generate them via `generate_estimate` if you're confident.")
+  }
+  lines.push('')
+  lines.push("Use MCP tools (list_materials, list_templates, list_labor_rates, list_operating_costs) to spot-check anything. End your reply with a clarifying-questions punch list, not generic advice.")
+  lines.push('')
+  lines.push('---')
+  lines.push('')
   lines.push(`# Job Context — #${job.job_number}: ${job.title}`)
   lines.push('')
   lines.push(`**Job ID**: \`${job.id}\``)
@@ -224,7 +269,7 @@ async function buildJobContext(supabase: ReturnType<typeof getSupabase>, jobId: 
   lines.push('')
   lines.push('---')
   lines.push(
-    '_Paste into Claude Desktop to update pricing, scope, or line_items via MCP against this job id._'
+    `_Pasted from the Aguirre Modern Tile dashboard via "Copy for Claude". Job id: \`${job.id}\` — use it with the tile-crm MCP (update_job, add_line_item, generate_estimate) if you want to apply changes directly._`
   )
 
   return lines.join('\n')

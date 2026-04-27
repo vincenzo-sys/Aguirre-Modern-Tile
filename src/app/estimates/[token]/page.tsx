@@ -81,8 +81,17 @@ function classifyLineItem(item: JobLineItem): CustomerGroup {
   }
   const desc = item.description.toLowerCase()
   if (desc.startsWith('demolition') || desc.startsWith('demo')) return 'demo_labor'
-  if (desc.startsWith('jobsite cleanup') || desc.includes('debris')) return 'trash'
-  if (desc.startsWith('travel') || desc.startsWith('delivery')) return 'transport'
+  // Trash labels have varied across engine versions: "Jobsite cleanup ...",
+  // "Trash and debris removal", "Trash & debris ...". The "debris" substring
+  // catches all of them.
+  if (desc.startsWith('trash') || desc.startsWith('jobsite cleanup') || desc.includes('debris')) {
+    return 'trash'
+  }
+  // Transport labels likewise: "Travel: 8 trips...", "Delivery & materials
+  // transport", "Transportation (Revere base...)". Match all three prefixes.
+  if (desc.startsWith('travel') || desc.startsWith('delivery') || desc.startsWith('transport')) {
+    return 'transport'
+  }
   return 'install_labor'
 }
 

@@ -32,6 +32,26 @@ function calcAmount(qty: number, price: number): number {
   return Number((qty * price).toFixed(2))
 }
 
+// Per-line wholesale cost — mirrors the engine's costTotal logic. Returns
+// null when the catalog/rate data isn't available yet OR the line is a
+// pass-through (trash/transport) that shouldn't display a separate cost
+// vs customer price (cost = customer for those, 0% margin by design).
+function lineCost(
+  item: JobLineItem,
+  catalog: MaterialPricing[],
+  dayCost: number | null
+): number | null {
+  if (item.category === 'materials') {
+    const row = catalog.find((r) => r.item === item.description)
+    if (!row) return null
+    return Number((Number(row.your_cost) * item.quantity).toFixed(2))
+  }
+  if (item.category === 'labor' && item.unit === 'day' && dayCost != null) {
+    return Number((dayCost * item.quantity).toFixed(2))
+  }
+  return null  // pass-through — no separate cost number
+}
+
 // Group items by section in the order each section first appears, then float
 // the implicit "Project-wide" bucket (unsectioned items: trash, transport,
 // hand-added rows) to the end. Single-section jobs land entirely in
@@ -117,13 +137,20 @@ export default function JobLineItems({
   // transport, ea) is treated as pass-through (cost = revenue, 0% margin).
   // When catalog/rates haven't loaded yet, costStats stays null and the
   // footer falls back to the persisted marginPercent prop.
-  const costStats = useMemo(() => {
-    if (materialsCatalog.length === 0 || laborRates.length === 0) return null
+  // dayCostNumber is also used by SectionBlock to render per-line costs
+  // independent of whether the costStats summary is computed.
+  const dayCostNumber = useMemo(() => {
+    if (laborRates.length === 0) return null
     const dayRate =
       Number(laborRates.find((r) => r.setting === 'Day Rate (per tiler)')?.value) || 250
     const crewSize =
       Number(laborRates.find((r) => r.setting === 'Standard Crew Size')?.value) || 2
-    const dayCost = dayRate * crewSize
+    return dayRate * crewSize
+  }, [laborRates])
+
+  const costStats = useMemo(() => {
+    if (materialsCatalog.length === 0 || dayCostNumber == null) return null
+    const dayCost = dayCostNumber
     const cost = liveItems.reduce((sum, item) => {
       if (item.category === 'materials') {
         const row = materialsCatalog.find((r) => r.item === item.description)
@@ -138,7 +165,7 @@ export default function JobLineItems({
     const profit = grandTotal - cost
     const margin = grandTotal > 0 ? (profit / grandTotal) * 100 : 0
     return { cost, profit, margin }
-  }, [liveItems, materialsCatalog, laborRates, grandTotal])
+  }, [liveItems, materialsCatalog, dayCostNumber, grandTotal])
 
   // Live margin overrides the persisted prop once we have the data to
   // compute it; the persisted value is stale the moment a line item is
@@ -285,6 +312,8 @@ export default function JobLineItems({
               jobId={jobId}
               updating={updating}
               itemIndexMap={itemIndexMap}
+              materialsCatalog={materialsCatalog}
+              dayCost={dayCostNumber}
               onSetStatus={setStatus}
               onUpdateRow={updateRow}
               onDeleteRow={deleteRow}
@@ -393,6 +422,8 @@ function SectionBlock({
   jobId,
   updating,
   itemIndexMap,
+  materialsCatalog,
+  dayCost,
   onSetStatus,
   onUpdateRow,
   onDeleteRow,
@@ -405,6 +436,8 @@ function SectionBlock({
   jobId?: string
   updating: boolean
   itemIndexMap: Map<JobLineItem, number>
+  materialsCatalog: MaterialPricing[]
+  dayCost: number | null
   onSetStatus: (index: number, status: MaterialStatus) => void
   onUpdateRow: (index: number, patch: Partial<JobLineItem>) => void
   onDeleteRow: (index: number) => void
@@ -489,9 +522,10 @@ function SectionBlock({
                       </select>
                     </div>
                   )}
-                  <span className="text-sm font-medium text-gray-900 w-24 text-right shrink-0">
-                    {formatCurrency(item.amount)}
-                  </span>
+                  <CostCustomerCell
+                    cost={lineCost(item, materialsCatalog, dayCost)}
+                    customer={item.amount}
+                  />
                 </div>
               )
             })}
@@ -524,20 +558,44 @@ function SectionBlock({
                 )
               }
               return (
-                <div key={i} className="px-4 py-3 flex items-center justify-between">
-                  <div>
+                <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">{item.description}</p>
                     <p className="text-xs text-gray-500">
                       {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
                     </p>
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</span>
+                  <CostCustomerCell
+                    cost={lineCost(item, materialsCatalog, dayCost)}
+                    customer={item.amount}
+                  />
                 </div>
               )
             })}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Side-by-side display of "Our cost" vs "Customer" for a single line. When
+// cost is null (pass-through items like trash/transport/ea-unit labor, or
+// materials that haven't loaded their catalog yet) we hide the cost column
+// so the customer price stays visually anchored to the right.
+function CostCustomerCell({ cost, customer }: { cost: number | null; customer: number }) {
+  return (
+    <div className="shrink-0 flex items-stretch gap-3 text-right">
+      {cost != null && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-400">Our cost</div>
+          <div className="text-sm font-medium text-gray-500">{formatCurrency(cost)}</div>
+        </div>
+      )}
+      <div className="w-24">
+        <div className="text-[10px] uppercase tracking-wider text-gray-500">Customer</div>
+        <div className="text-sm font-semibold text-gray-900">{formatCurrency(customer)}</div>
+      </div>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
+import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import type { Job, QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
@@ -506,6 +507,14 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                     The URL stays the same forever — edits to line items below appear instantly on the customer&apos;s page.
                   </p>
                 )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-900">Line items</h2>
+                <GenerateEstimateModal
+                  jobId={job.id}
+                  hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
+                />
               </div>
 
               <JobLineItems

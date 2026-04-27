@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive,
   CheckCircle, MapPin, ImageIcon, Sparkles, Loader2, Send, Copy, Check,
-  ExternalLink, FileText, Trash2,
+  ExternalLink, FileText, Trash2, X, MessageSquare,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
@@ -79,6 +79,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const [generatingLink, setGeneratingLink] = useState(false)
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [sendingEstimate, setSendingEstimate] = useState(false)
 
   // Editable form state
   const [notes, setNotes] = useState('')
@@ -377,6 +378,47 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     toast(`Marked as ${newStatus}`)
   }
 
+  async function sendEstimateToCustomer() {
+    if (!job) return
+    setSendingEstimate(true)
+    try {
+      const res = await fetch(`/api/jobs/${job.id}/send-estimate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Send failed')
+      // Build a clear toast — what landed, what didn't, why.
+      const parts: string[] = []
+      if (data.sms?.success) parts.push('SMS sent')
+      else if (data.sms) parts.push(`SMS skipped (${data.sms.error})`)
+      if (data.email?.success) parts.push('email sent')
+      else if (data.email) parts.push(`email skipped (${data.email.error})`)
+      const summary = parts.length > 0 ? parts.join(' · ') : 'No channels available'
+      toast(summary, parts.some((p) => p.includes('sent')) ? 'success' : 'error')
+      // Reflect server-side state changes locally without a full reload.
+      // The endpoint may have generated a token (so the share URL block
+      // appears) and advanced status from lead to quoted.
+      if (job) {
+        const updates: Partial<Job> = {}
+        if (data.estimate_url && !job.estimate_token) {
+          updates.estimate_token = data.estimate_url.split('/').pop() ?? null
+        }
+        if (job.status === 'lead' && data.new_status === 'quoted') {
+          updates.status = 'quoted'
+        }
+        if (Object.keys(updates).length > 0) {
+          setJob({ ...job, ...updates } as Job)
+        }
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Send failed', 'error')
+    } finally {
+      setSendingEstimate(false)
+    }
+  }
+
   async function changeJobStatus(newStatus: string) {
     if (!job || newStatus === job.status) return
     try {
@@ -542,6 +584,23 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
               Archive
             </button>
           )}
+
+          {/* Cancel — visible whenever there's a job that isn't already
+              cancelled. Same effect as picking "Cancelled" from the status
+              dropdown, but a one-click button when a deal is dead. */}
+          {job && job.status !== 'cancelled' && (
+            <button
+              onClick={() => {
+                if (confirm('Cancel this lead? You can revert from the status dropdown.')) {
+                  changeJobStatus('cancelled')
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 border border-red-200"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </button>
+          )}
         </div>
       </div>
 
@@ -600,16 +659,36 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                     <FileText className="w-4 h-4 text-gray-400" />
                     Customer-facing estimate
                   </h2>
-                  {!estimateUrl && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {!estimateUrl && (
+                      <button
+                        onClick={generateEstimateLink}
+                        disabled={generatingLink}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 disabled:opacity-60"
+                      >
+                        {generatingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        Generate share URL
+                      </button>
+                    )}
                     <button
-                      onClick={generateEstimateLink}
-                      disabled={generatingLink}
+                      onClick={sendEstimateToCustomer}
+                      disabled={sendingEstimate}
+                      title="Send the estimate via SMS (OpenPhone) and email (if on file)"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-60"
                     >
-                      {generatingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                      Generate share URL
+                      {sendingEstimate ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Sending…
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-3 h-3" />
+                          Send to customer
+                        </>
+                      )}
                     </button>
-                  )}
+                  </div>
                 </div>
                 {estimateUrl ? (
                   <div className="flex items-center gap-2">

@@ -25,7 +25,30 @@ const jobStatusColors: Record<string, string> = {
   lead: 'bg-yellow-100 text-yellow-800',
   quoted: 'bg-purple-100 text-purple-800',
   estimate_revised: 'bg-pink-100 text-pink-800',
+  accepted_not_scheduled: 'bg-blue-100 text-blue-800',
+  scheduled: 'bg-indigo-100 text-indigo-800',
+  in_progress: 'bg-orange-100 text-orange-800',
+  waiting_for_materials: 'bg-amber-100 text-amber-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+  paid: 'bg-green-100 text-green-800',
+  cancelled: 'bg-gray-200 text-gray-600',
 }
+
+// Status options for the dropdown — grouped logically so the user reads them
+// in pipeline order. Picking a non-lead-stage status from this page triggers
+// the same redirect as if the status had landed via "Send to Jobs".
+const JOB_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'quoted', label: 'Quoted' },
+  { value: 'estimate_revised', label: 'Estimate revised' },
+  { value: 'accepted_not_scheduled', label: 'Accepted — not scheduled' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'waiting_for_materials', label: 'Waiting for materials' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 const sources = [
   { value: 'website', label: 'Website' },
@@ -340,6 +363,22 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     toast(`Marked as ${newStatus}`)
   }
 
+  async function changeJobStatus(newStatus: string) {
+    if (!job || newStatus === job.status) return
+    try {
+      await patchJob({ status: newStatus })
+      toast(`Status: ${newStatus.replace(/_/g, ' ')}`, 'success')
+      // Statuses past the lead stage live on the operations page; the layout
+      // there has the install scheduler, day rate, crew assignment, etc.
+      // Auto-redirect matches the existing "Send to Jobs" flow.
+      if (!LEAD_STAGE_STATUSES.includes(newStatus)) {
+        router.push(`/dashboard/jobs/${job.id}`)
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Status change failed', 'error')
+    }
+  }
+
   // Derive the unified contact/project data
   const display = useMemo(() => {
     return {
@@ -388,9 +427,20 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold text-gray-900">{display.client_name}</h1>
             {job && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${jobStatusColors[job.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                {job.status.replace(/_/g, ' ')}
-              </span>
+              <select
+                value={job.status}
+                onChange={(e) => changeJobStatus(e.target.value)}
+                title="Change status"
+                className={`text-xs font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-primary-500 ${
+                  jobStatusColors[job.status] ?? 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                {JOB_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             )}
             {!job && lead && (
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[lead.status]}`}>

@@ -70,13 +70,18 @@ const GROUP_LABEL: Record<CustomerGroup, string> = {
   transport: 'Travel & delivery',
 }
 
-// Heuristic mapping. Schluter items (tray/drain/curb/bench) become add-ons —
-// every Schluter SKU in the catalog is a fixture-style component, not a
-// setting material. If catalog ever holds a non-fixture Schluter item we'll
-// promote this to a real subcategory column.
+// Add-ons in the customer's mental model = optional upgrades they choose
+// (niches, benches, heated floors, decorative accents). The shower tray,
+// drain, and curb are required components of a walk-in shower — they're
+// materials. Match against keywords specific to upgrade-style items so
+// only those land in add-ons; everything else material-category goes to
+// Materials.
+const ADDON_KEYWORDS = ['bench', 'niche', 'ditra-heat', 'heated floor']
+
 function classifyLineItem(item: JobLineItem): CustomerGroup {
   if (item.category === 'materials') {
-    if (item.description.toLowerCase().startsWith('schluter')) return 'addons'
+    const lower = item.description.toLowerCase()
+    if (ADDON_KEYWORDS.some((k) => lower.includes(k))) return 'addons'
     return 'materials'
   }
   const desc = item.description.toLowerCase()

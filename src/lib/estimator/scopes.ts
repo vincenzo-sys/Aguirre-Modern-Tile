@@ -23,6 +23,7 @@ import type {
 import {
   computeMaterialQty,
   computeLaborDays,
+  appliesWhen,
   type MaterialFormulaEntry,
   type LaborFormula,
 } from '@/lib/estimator/formulas'
@@ -55,10 +56,22 @@ export interface TemplateSubArea {
   default_share?: number
 }
 
+// One addon toggle definition seeded onto the template by migration 025.
+// Each entry becomes a checkbox in the modal; the chosen values are sent
+// back as scope.addons.<key> and gate materials_formula entries via
+// applies_when predicates.
+export interface TemplateAddon {
+  key: string
+  label: string
+  hint?: string
+  default?: boolean
+}
+
 export interface ScopedTemplate extends JobTemplateRow {
   materials_formula?: MaterialFormulaEntry[] | null
   labor_formula?: LaborFormula | null
   sub_areas?: TemplateSubArea[] | null
+  addons?: TemplateAddon[] | null
 }
 
 // Helpers from estimator.ts that we need to reuse. Importing them as private
@@ -240,6 +253,7 @@ function buildScope(
   }
 
   for (const entry of formulas) {
+    if (!appliesWhen(entry.applies_when, scope.addons ?? {})) continue
     const qty = computeMaterialQty({
       formula: entry.formula,
       vars: formulaVars,

@@ -15,11 +15,19 @@ type SubArea = {
   default_share?: number
 }
 
+type Addon = {
+  key: string
+  label: string
+  hint?: string
+  default?: boolean
+}
+
 type Template = {
   template_name: string
   typical_sqft_low: number | null
   typical_sqft_high: number | null
   sub_areas: SubArea[] | null
+  addons: Addon[] | null
 }
 
 // Fallback list shown until the API call returns. Matches the seed order
@@ -48,6 +56,10 @@ type ScopeInput = {
   // Per-area sqft strings, keyed by sub_area.key. Empty string = not yet
   // entered. Only populated when the selected template has sub_areas.
   sub_sqft: Record<string, string>
+  // Boolean addon flags (has_shower_tray / has_curb / large_format / etc.).
+  // Keyed by template addon.key. Modal initializes from each addon's
+  // `default`; user toggles via checkbox.
+  addons: Record<string, boolean>
   customer_provides_tile: boolean
 }
 
@@ -73,6 +85,7 @@ function defaultScope(template: string = FALLBACK_TEMPLATE_NAMES[0]): ScopeInput
     template_name: template,
     sqft: '',
     sub_sqft: {},
+    addons: {},
     customer_provides_tile: true,
   }
 }
@@ -130,6 +143,29 @@ export default function GenerateEstimateModal({
     }
   }, [open, initialTemplate, initialSqft])
 
+  // Initialize addon defaults whenever the templates list lands or the user
+  // switches a scope to a different template. Only fills in keys the user
+  // hasn't already set, so toggling a checkbox isn't undone by a later sync.
+  useEffect(() => {
+    if (templates.length === 0) return
+    setScopes((prev) =>
+      prev.map((s) => {
+        const tmpl = templates.find((t) => t.template_name === s.template_name)
+        const tmplAddons = tmpl?.addons ?? []
+        if (tmplAddons.length === 0) return s
+        const next = { ...s.addons }
+        let changed = false
+        for (const a of tmplAddons) {
+          if (next[a.key] === undefined) {
+            next[a.key] = a.default ?? false
+            changed = true
+          }
+        }
+        return changed ? { ...s, addons: next } : s
+      })
+    )
+  }, [templates, scopes.map((s) => s.template_name).join('|')])  // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -177,11 +213,20 @@ export default function GenerateEstimateModal({
           } else {
             payloadSqft = s.sqft ? Number(s.sqft) : null
           }
+          // Only send addon keys this template actually declares — keeps
+          // the payload tight and prevents a stale toggle from a previous
+          // template selection from leaking through.
+          const declaredAddonKeys = new Set((tmpl?.addons ?? []).map((a) => a.key))
+          const payloadAddons: Record<string, boolean> = {}
+          for (const [k, v] of Object.entries(s.addons)) {
+            if (declaredAddonKeys.has(k)) payloadAddons[k] = v
+          }
           return {
             label: fallbackLabel(s, i),
             template_name: s.template_name,
             sqft: payloadSqft,
             sub_sqft: payloadSubSqft,
+            addons: Object.keys(payloadAddons).length > 0 ? payloadAddons : undefined,
             customer_provides: s.customer_provides_tile ? ['tile'] : [],
           }
         }),
@@ -463,6 +508,38 @@ function ScopeCard({
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
           />
           <p className="text-[10px] text-gray-400 mt-0.5">Drives material qty via formulas</p>
+        </div>
+      )}
+
+      {tmpl?.addons && tmpl.addons.length > 0 && (
+        <div className="space-y-2 pt-1">
+          <label className="block text-xs font-medium text-gray-700">Options</label>
+          <div className="space-y-1.5">
+            {tmpl.addons.map((a) => (
+              <label
+                key={a.key}
+                className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(scope.addons[a.key])}
+                  onChange={(e) =>
+                    onPatch({
+                      addons: { ...scope.addons, [a.key]: e.target.checked },
+                    })
+                  }
+                  disabled={disabled}
+                  className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span>
+                  <span className="font-medium text-gray-800">{a.label}</span>
+                  {a.hint && (
+                    <span className="block text-[10px] text-gray-400 mt-0.5">{a.hint}</span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 

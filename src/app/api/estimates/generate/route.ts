@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     supabase.from('jobs').select('*').eq('id', body.job_id).single(),
     supabase
       .from('job_templates')
-      .select('template_name, job_type, typical_sqft_low, typical_sqft_high, demo_days, install_days, typical_materials, materials_formula, labor_formula, sub_areas')
+      .select('template_name, job_type, typical_sqft_low, typical_sqft_high, demo_days, install_days, typical_materials, materials_formula, labor_formula, sub_areas, addons')
       .in('template_name', requestedTemplates),
     supabase
       .from('materials_pricing')

@@ -186,7 +186,36 @@ export interface MaterialFormulaEntry {
   formula: string
   min?: number
   max?: number
-  applies_when?: string  // reserved for future conditional inclusion (e.g. only on wet areas)
+  // Predicate that gates whether this entry contributes a line item. The
+  // engine evaluates against scope.addons. Supported syntax (deliberately
+  // tiny — keep applies_when easy to author by hand):
+  //   - Empty / absent: always include.
+  //   - "name": include when addons.name is truthy.
+  //   - "!name": include when addons.name is falsy.
+  // For richer conditionals (AND / OR / numeric comparisons), the right
+  // move is multiple entries each with single-name predicates rather than
+  // expanding the predicate language.
+  applies_when?: string
+}
+
+// Returns true if the entry should produce a line item given the scope's
+// addon flags. Throws on a malformed predicate so typos like "has_curbs"
+// (extra s) surface during generation rather than silently dropping the
+// material.
+export function appliesWhen(
+  predicate: string | undefined,
+  addons: Record<string, boolean | number | undefined>
+): boolean {
+  if (!predicate || !predicate.trim()) return true
+  const expr = predicate.trim()
+  const negated = expr.startsWith('!')
+  const name = negated ? expr.slice(1).trim() : expr
+  if (!/^[a-z_][a-z0-9_]*$/i.test(name)) {
+    throw new Error(`Invalid applies_when predicate "${predicate}" — expected a name or "!name".`)
+  }
+  const raw = addons[name]
+  const truthy = raw === true || (typeof raw === 'number' && raw !== 0)
+  return negated ? !truthy : truthy
 }
 
 export interface LaborFormula {

@@ -50,6 +50,7 @@ export interface JobTemplateRow {
   materials_formula?: MaterialFormulaEntry[] | null
   labor_formula?: import('@/lib/estimator/formulas').LaborFormula | null
   sub_areas?: import('@/lib/estimator/scopes').TemplateSubArea[] | null
+  addons?: import('@/lib/estimator/scopes').TemplateAddon[] | null
 }
 
 export interface GenerateOptions {

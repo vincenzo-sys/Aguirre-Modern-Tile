@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, Save, ExternalLink } from 'lucide-react'
+import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobLineItem, MaterialStatus, MaterialPricing } from '@/lib/supabase/types'
 
@@ -26,8 +26,29 @@ const MATERIAL_UNITS: JobLineItem['unit'][] = ['sheet', 'bag', 'tube', 'kit', 'r
 // Labor defaults to 'day' (2-man crew day rate). Use 'hr' for hourly carve-outs.
 const LABOR_UNITS: JobLineItem['unit'][] = ['day', 'hr', 'ea', 'sq ft']
 
+const PROJECTWIDE_LABEL = 'Project-wide'
+
 function calcAmount(qty: number, price: number): number {
   return Number((qty * price).toFixed(2))
+}
+
+// Group items by section in the order each section first appears, then float
+// the implicit "Project-wide" bucket (unsectioned items: trash, transport,
+// hand-added rows) to the end. Single-section jobs land entirely in
+// Project-wide and we suppress the header to keep the legacy look.
+function groupBySection(items: JobLineItem[]): Array<[string, JobLineItem[]]> {
+  const sectionMap = new Map<string, JobLineItem[]>()
+  for (const item of items) {
+    const key = item.section || PROJECTWIDE_LABEL
+    if (!sectionMap.has(key)) sectionMap.set(key, [])
+    sectionMap.get(key)!.push(item)
+  }
+  return [
+    ...Array.from(sectionMap.entries()).filter(([k]) => k !== PROJECTWIDE_LABEL),
+    ...(sectionMap.has(PROJECTWIDE_LABEL)
+      ? [[PROJECTWIDE_LABEL, sectionMap.get(PROJECTWIDE_LABEL)!] as [string, JobLineItem[]]]
+      : []),
+  ]
 }
 
 export default function JobLineItems({
@@ -56,12 +77,28 @@ export default function JobLineItems({
       .catch(() => {})
   }, [editing, materialsCatalog.length])
 
-  const materials = liveItems.filter((i) => i.category === 'materials')
-  const labor = liveItems.filter((i) => i.category === 'labor')
+  // Index by reference so we can edit/delete the right row regardless of
+  // section grouping. Sections are presentation only — the underlying array
+  // index is what we PATCH.
+  const itemIndexMap = useMemo(() => {
+    const map = new Map<JobLineItem, number>()
+    liveItems.forEach((it, i) => map.set(it, i))
+    return map
+  }, [liveItems])
 
-  const materialsTotal = materials.reduce((sum, i) => sum + (i.amount ?? 0), 0)
-  const laborTotal = labor.reduce((sum, i) => sum + (i.amount ?? 0), 0)
-  const grandTotal = materialsTotal + laborTotal
+  const sections = useMemo(() => groupBySection(liveItems), [liveItems])
+  const showSectionHeaders =
+    sections.length > 1 || (sections[0] && sections[0][0] !== PROJECTWIDE_LABEL)
+
+  const grandTotal = liveItems.reduce((s, i) => s + (i.amount ?? 0), 0)
+  const allMaterials = liveItems.filter((i) => i.category === 'materials')
+  const materialStatusCounts: Record<MaterialStatus, number> = {
+    needed: 0,
+    ordered: 0,
+    received: 0,
+    on_site: 0,
+  }
+  for (const m of allMaterials) materialStatusCounts[m.status ?? 'needed']++
 
   async function persist(next: JobLineItem[]) {
     if (!jobId) return
@@ -126,9 +163,6 @@ export default function JobLineItems({
     await persist([...liveItems, defaults])
   }
 
-  // When a description matches a material in the catalog, auto-fill price,
-  // source link, and source name so the customer-facing estimate shows the
-  // retail link alongside the line.
   function onDescriptionBlur(index: number, value: string) {
     const match = materialsCatalog.find((m) => m.item.toLowerCase() === value.trim().toLowerCase())
     if (!match) {
@@ -150,22 +184,6 @@ export default function JobLineItems({
     }
     updateRow(index, updates)
   }
-
-  const materialStatusCounts: Record<MaterialStatus, number> = {
-    needed: 0,
-    ordered: 0,
-    received: 0,
-    on_site: 0,
-  }
-  for (const m of materials) {
-    materialStatusCounts[m.status ?? 'needed']++
-  }
-
-  const materialIndexMap = useMemo(() => {
-    const map = new Map<JobLineItem, number>()
-    liveItems.forEach((it, i) => map.set(it, i))
-    return map
-  }, [liveItems])
 
   const canEdit = isOwner && !!jobId
 
@@ -203,175 +221,53 @@ export default function JobLineItems({
         </div>
       ) : (
         <>
-          {/* Materials */}
-          {(materials.length > 0 || editing) && (
-            <div>
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Materials
-                </span>
-                <div className="flex items-center gap-2">
-                  {jobId && !editing && materials.length > 0 && (
-                    <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                      <span>{materialStatusCounts.needed} needed</span>
-                      <span>·</span>
-                      <span>{materialStatusCounts.ordered} ordered</span>
-                      <span>·</span>
-                      <span>{materialStatusCounts.on_site + materialStatusCounts.received} ready</span>
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-gray-500">
-                    {formatCurrency(materialsTotal)}
-                  </span>
-                </div>
-              </div>
+          {sections.map(([sectionKey, sectionItems]) => (
+            <SectionBlock
+              key={sectionKey}
+              sectionKey={sectionKey}
+              items={sectionItems}
+              showHeader={showSectionHeaders}
+              editing={editing}
+              jobId={jobId}
+              updating={updating}
+              itemIndexMap={itemIndexMap}
+              onSetStatus={setStatus}
+              onUpdateRow={updateRow}
+              onDeleteRow={deleteRow}
+              onDescriptionBlur={onDescriptionBlur}
+            />
+          ))}
 
-              <div className="divide-y divide-gray-100">
-                {materials.map((item) => {
-                  const i = materialIndexMap.get(item)!
-                  const status = item.status ?? 'needed'
-                  const meta = statusMeta[status]
-                  const Icon = meta.icon
-
-                  if (editing) {
-                    return (
-                      <LineItemEditRow
-                        key={i}
-                        item={item}
-                        disabled={updating}
-                        unitOptions={MATERIAL_UNITS}
-                        catalogList="materials-catalog"
-                        onPatch={(patch) => updateRow(i, patch)}
-                        onDescriptionBlur={(v) => onDescriptionBlur(i, v)}
-                        onDelete={() => deleteRow(i)}
-                      />
-                    )
-                  }
-
-                  return (
-                    <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
-                          <span>{item.description}</span>
-                          {item.source_url && (
-                            <a
-                              href={item.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={item.source_name || 'Source'}
-                              className="text-gray-400 hover:text-primary-600"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
-                        </p>
-                      </div>
-                      {jobId && (
-                        <div className="shrink-0 flex items-center gap-1">
-                          <Icon className="w-3 h-3 text-gray-500" />
-                          <select
-                            value={status}
-                            onChange={(e) => setStatus(i, e.target.value as MaterialStatus)}
-                            disabled={updating}
-                            className={`text-xs font-medium px-2 py-1 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer ${meta.className} disabled:opacity-50`}
-                          >
-                            {statusOrder.map((s) => (
-                              <option key={s} value={s}>
-                                {statusMeta[s].label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <span className="text-sm font-medium text-gray-900 w-24 text-right shrink-0">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {editing && (
-                <div className="px-4 py-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => addRow('materials')}
-                    disabled={updating}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
-                  >
-                    <Plus className="w-4 h-4" /> Add material
-                  </button>
-                </div>
-              )}
+          {editing && (
+            <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => addRow('materials')}
+                disabled={updating}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" /> Add material
+              </button>
+              <button
+                type="button"
+                onClick={() => addRow('labor')}
+                disabled={updating}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" /> Add labor
+              </button>
+              <span className="text-xs text-gray-400 ml-auto">New rows land in Project-wide</span>
             </div>
           )}
 
-          {/* Labor */}
-          {(labor.length > 0 || editing) && (
-            <div>
-              <div className="px-4 py-2 bg-gray-50 border-b border-t border-gray-200 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Labor
-                </span>
-                <span className="text-xs font-medium text-gray-500">{formatCurrency(laborTotal)}</span>
-              </div>
-
-              <div className="divide-y divide-gray-100">
-                {labor.map((item) => {
-                  const i = materialIndexMap.get(item)!
-                  if (editing) {
-                    return (
-                      <LineItemEditRow
-                        key={i}
-                        item={item}
-                        disabled={updating}
-                        unitOptions={LABOR_UNITS}
-                        onPatch={(patch) => updateRow(i, patch)}
-                        onDescriptionBlur={(v) => updateRow(i, { description: v })}
-                        onDelete={() => deleteRow(i)}
-                      />
-                    )
-                  }
-
-                  return (
-                    <div key={i} className="px-4 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.description}</p>
-                        <p className="text-xs text-gray-500">
-                          {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
-                        </p>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {editing && (
-                <div className="px-4 py-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => addRow('labor')}
-                    disabled={updating}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
-                  >
-                    <Plus className="w-4 h-4" /> Add labor
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Total */}
+          {/* Grand total */}
           {liveItems.length > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                {materials.length > 0 && labor.length > 0 && (
-                  <div className="text-xs text-gray-500">
-                    Materials: {formatCurrency(materialsTotal)} &middot; Labor: {formatCurrency(laborTotal)}
+              <div className="flex items-center justify-between gap-4">
+                {jobId && allMaterials.length > 0 && !editing && (
+                  <div className="text-[11px] text-gray-500">
+                    {materialStatusCounts.needed} needed · {materialStatusCounts.ordered} ordered ·{' '}
+                    {materialStatusCounts.on_site + materialStatusCounts.received} ready
                   </div>
                 )}
                 <div className="ml-auto text-right">
@@ -393,6 +289,166 @@ export default function JobLineItems({
             </option>
           ))}
         </datalist>
+      )}
+    </div>
+  )
+}
+
+// One per scope (or one for the whole job in single-scope mode). Internally
+// shows materials and labor as sub-bands matching the legacy layout, so a
+// single-scope job looks identical to before.
+function SectionBlock({
+  sectionKey,
+  items,
+  showHeader,
+  editing,
+  jobId,
+  updating,
+  itemIndexMap,
+  onSetStatus,
+  onUpdateRow,
+  onDeleteRow,
+  onDescriptionBlur,
+}: {
+  sectionKey: string
+  items: JobLineItem[]
+  showHeader: boolean
+  editing: boolean
+  jobId?: string
+  updating: boolean
+  itemIndexMap: Map<JobLineItem, number>
+  onSetStatus: (index: number, status: MaterialStatus) => void
+  onUpdateRow: (index: number, patch: Partial<JobLineItem>) => void
+  onDeleteRow: (index: number) => void
+  onDescriptionBlur: (index: number, value: string) => void
+}) {
+  const materials = items.filter((i) => i.category === 'materials')
+  const labor = items.filter((i) => i.category === 'labor')
+  const sectionTotal = items.reduce((s, i) => s + (i.amount ?? 0), 0)
+
+  return (
+    <div>
+      {showHeader && (
+        <div className="px-4 py-2 bg-primary-50 border-b border-primary-100 flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-primary-900">{sectionKey}</h4>
+          <span className="text-xs font-medium text-primary-800">{formatCurrency(sectionTotal)}</span>
+        </div>
+      )}
+
+      {(materials.length > 0 || (editing && !showHeader)) && (
+        <div>
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Materials</span>
+            <span className="text-xs font-medium text-gray-500">
+              {formatCurrency(materials.reduce((s, i) => s + (i.amount ?? 0), 0))}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {materials.map((item) => {
+              const i = itemIndexMap.get(item)!
+              const status = item.status ?? 'needed'
+              const meta = statusMeta[status]
+              const Icon = meta.icon
+              if (editing) {
+                return (
+                  <LineItemEditRow
+                    key={i}
+                    item={item}
+                    disabled={updating}
+                    unitOptions={MATERIAL_UNITS}
+                    catalogList="materials-catalog"
+                    onPatch={(patch) => onUpdateRow(i, patch)}
+                    onDescriptionBlur={(v) => onDescriptionBlur(i, v)}
+                    onDelete={() => onDeleteRow(i)}
+                  />
+                )
+              }
+              return (
+                <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
+                      <span>{item.description}</span>
+                      {item.source_url && (
+                        <a
+                          href={item.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={item.source_name || 'Source'}
+                          className="text-gray-400 hover:text-primary-600"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
+                    </p>
+                  </div>
+                  {jobId && (
+                    <div className="shrink-0 flex items-center gap-1">
+                      <Icon className="w-3 h-3 text-gray-500" />
+                      <select
+                        value={status}
+                        onChange={(e) => onSetStatus(i, e.target.value as MaterialStatus)}
+                        disabled={updating}
+                        className={`text-xs font-medium px-2 py-1 rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer ${meta.className} disabled:opacity-50`}
+                      >
+                        {statusOrder.map((s) => (
+                          <option key={s} value={s}>
+                            {statusMeta[s].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <span className="text-sm font-medium text-gray-900 w-24 text-right shrink-0">
+                    {formatCurrency(item.amount)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {(labor.length > 0 || (editing && !showHeader)) && (
+        <div>
+          <div className="px-4 py-2 bg-gray-50 border-b border-t border-gray-200 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor</span>
+            <span className="text-xs font-medium text-gray-500">
+              {formatCurrency(labor.reduce((s, i) => s + (i.amount ?? 0), 0))}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {labor.map((item) => {
+              const i = itemIndexMap.get(item)!
+              if (editing) {
+                return (
+                  <LineItemEditRow
+                    key={i}
+                    item={item}
+                    disabled={updating}
+                    unitOptions={LABOR_UNITS}
+                    onPatch={(patch) => onUpdateRow(i, patch)}
+                    onDescriptionBlur={(v) => onUpdateRow(i, { description: v })}
+                    onDelete={() => onDeleteRow(i)}
+                  />
+                )
+              }
+              return (
+                <div key={i} className="px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{item.description}</p>
+                    <p className="text-xs text-gray-500">
+                      {item.quantity} {item.unit} &times; {formatCurrency(item.unit_price)}/{item.unit}
+                    </p>
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

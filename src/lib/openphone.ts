@@ -45,7 +45,20 @@ export async function sendSMS(to: string, body: string): Promise<{ success: bool
     if (!res.ok) {
       const data = await res.text()
       console.error('OpenPhone SMS error:', res.status, data)
-      return { success: false, error: `OpenPhone API error: ${res.status}` }
+      // Surface the OpenPhone response body in the error so the dashboard
+      // toast tells the user *why* it failed ("invalid 'to'", "from number
+      // not in workspace", etc.) instead of just "API error 400".
+      let detail = data
+      try {
+        const parsed = JSON.parse(data)
+        detail = parsed.message || parsed.error || JSON.stringify(parsed.errors ?? parsed)
+      } catch {
+        // not JSON, keep raw text
+      }
+      return {
+        success: false,
+        error: `OpenPhone ${res.status}: ${String(detail).slice(0, 200)}`,
+      }
     }
 
     const data = await res.json()

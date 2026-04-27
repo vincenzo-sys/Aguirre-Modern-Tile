@@ -17,7 +17,11 @@ import { sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
 // sending both when contact channels are available. Pass {sms: false}
 // or {email: false} to skip a channel.
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
+const CONFIGURED_FROM = process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
+// Resend's universal sender — works for any account without DNS verification.
+// We fall back to this when the configured domain isn't verified yet so an
+// unverified RESEND_FROM_EMAIL doesn't block sends entirely.
+const RESEND_FALLBACK_FROM = 'Aguirre Modern Tile <onboarding@resend.dev>'
 
 function generateToken(): string {
   return randomBytes(18).toString('base64url')
@@ -160,16 +164,36 @@ export async function POST(
     if (!process.env.RESEND_API_KEY) {
       emailResult = { success: false, error: 'RESEND_API_KEY not set' }
     } else {
+      const resend = new Resend(process.env.RESEND_API_KEY)
+      const html = buildEmailHtml(firstName, estimateUrl)
+      const subject = 'Your tile estimate from Aguirre Modern Tile'
+      // Try the configured FROM first. If Resend rejects it because the
+      // domain isn't verified, retry once via the always-valid fallback so
+      // the customer still gets the email while DNS verification is pending.
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY)
         const sent = await resend.emails.send({
-          from: FROM_EMAIL,
+          from: CONFIGURED_FROM,
           to: [email],
-          subject: 'Your tile estimate from Aguirre Modern Tile',
-          html: buildEmailHtml(firstName, estimateUrl),
+          subject,
+          html,
         })
         if (sent.error) {
-          emailResult = { success: false, error: sent.error.message }
+          const isDomainErr = /domain is not verified|not allowed/i.test(sent.error.message)
+          if (isDomainErr && CONFIGURED_FROM !== RESEND_FALLBACK_FROM) {
+            const retry = await resend.emails.send({
+              from: RESEND_FALLBACK_FROM,
+              to: [email],
+              subject,
+              html,
+            })
+            if (retry.error) {
+              emailResult = { success: false, error: retry.error.message }
+            } else {
+              emailResult = { success: true, id: retry.data?.id }
+            }
+          } else {
+            emailResult = { success: false, error: sent.error.message }
+          }
         } else {
           emailResult = { success: true, id: sent.data?.id }
         }

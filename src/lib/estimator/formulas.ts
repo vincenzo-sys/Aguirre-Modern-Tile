@@ -24,6 +24,10 @@ export interface FormulaVars {
   linear_ft?: number
   height_ft?: number
   addons?: Record<string, boolean | number>
+  // Per-template sub-area sqft. For walk-in showers: { walls, shower_floor,
+  // outside_floor }; for tub combos: { walls, floor }; for simple templates:
+  // empty/absent. Formulas reference values via `sub_sqft.<key>`.
+  sub_sqft?: Record<string, number>
 }
 
 // Locked-down parser. Disable assignment, comparisons, conditionals, and any
@@ -96,6 +100,19 @@ function buildScope(vars: FormulaVars): Record<string, unknown> {
     }
   }
   scope.addons = addons
+  // Sub-area sqft (e.g. walls / shower_floor / outside_floor for showers)
+  // exposed as `sub_sqft.<key>` in formulas. The caller (scopes.ts) is
+  // responsible for filling every key declared in the template's
+  // sub_areas; missing keys here would resolve to undefined and propagate
+  // NaN through the formula — which is the loud-failure mode we want for
+  // typos like `sub_sqft.outsie_floor`.
+  const subSqft: Record<string, number> = {}
+  if (vars.sub_sqft) {
+    for (const [k, v] of Object.entries(vars.sub_sqft)) {
+      subSqft[k] = Number(v) || 0
+    }
+  }
+  scope.sub_sqft = subSqft
   return scope
 }
 

@@ -31,6 +31,10 @@ interface ScopeBody {
   label?: string
   template_name: string
   sqft?: number | null
+  // Per-area sqft for templates that price by region (walk-in showers,
+  // tub combos). Keys come from job_templates.sub_areas — typically
+  // walls / shower_floor / outside_floor / floor.
+  sub_sqft?: Record<string, number>
   addons?: Record<string, boolean | number>
   customer_provides?: string[]
 }
@@ -40,6 +44,7 @@ interface GenerateBody {
   scopes?: ScopeBody[]
   template_name?: string
   sqft?: number | null
+  sub_sqft?: Record<string, number>
   customer_provides?: string[]
   warranty_years?: number
   overwrite?: boolean
@@ -69,6 +74,7 @@ export async function POST(req: NextRequest) {
           template_name: body.template_name,
           label: body.template_name,
           sqft: body.sqft ?? null,
+          sub_sqft: body.sub_sqft,
           customer_provides: body.customer_provides,
         }]
       : []
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
     supabase.from('jobs').select('*').eq('id', body.job_id).single(),
     supabase
       .from('job_templates')
-      .select('template_name, job_type, typical_sqft_low, typical_sqft_high, demo_days, install_days, typical_materials, materials_formula, labor_formula')
+      .select('template_name, job_type, typical_sqft_low, typical_sqft_high, demo_days, install_days, typical_materials, materials_formula, labor_formula, sub_areas')
       .in('template_name', requestedTemplates),
     supabase
       .from('materials_pricing')
@@ -129,6 +135,7 @@ export async function POST(req: NextRequest) {
     label: s.label?.trim() || `${s.template_name} #${idx + 1}`,
     template_name: s.template_name,
     sqft: s.sqft ?? null,
+    sub_sqft: s.sub_sqft,
     addons: s.addons,
     customer_provides: s.customer_provides,
   }))
@@ -146,6 +153,7 @@ export async function POST(req: NextRequest) {
         (costsRes.data ?? []) as OperatingCostRow[],
         {
           sqft: scopes[0].sqft ?? null,
+          sub_sqft: scopes[0].sub_sqft,
           customer_provides: scopes[0].customer_provides,
           warranty_years: body.warranty_years ?? 3,
         }

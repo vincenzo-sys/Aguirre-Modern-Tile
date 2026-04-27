@@ -32,6 +32,12 @@ export interface JobScope {
   label: string
   template_name: string
   sqft?: number | null
+  // Optional per-area sqft for templates that price by region (walk-in
+  // showers split walls / shower_floor / outside_floor; tub combos split
+  // walls / floor). When provided, takes precedence over sqft and the
+  // engine sets sqft = sum of values. When omitted on a sub-aware
+  // template, the engine fills it from sqft × default_share.
+  sub_sqft?: Record<string, number>
   addons?: Record<string, boolean | number>
   customer_provides?: string[]
 }
@@ -40,9 +46,19 @@ export interface GenerateScopesOptions {
   warranty_years?: number
 }
 
+// One sub-area definition seeded onto the template by migration 023.
+// Shape mirrors the JSONB in job_templates.sub_areas.
+export interface TemplateSubArea {
+  key: string
+  label: string
+  hint?: string
+  default_share?: number
+}
+
 export interface ScopedTemplate extends JobTemplateRow {
   materials_formula?: MaterialFormulaEntry[] | null
   labor_formula?: LaborFormula | null
+  sub_areas?: TemplateSubArea[] | null
 }
 
 // Helpers from estimator.ts that we need to reuse. Importing them as private
@@ -102,6 +118,53 @@ function effectiveSqft(scope: JobScope, template: ScopedTemplate): number {
   return lo ?? hi ?? 0
 }
 
+// Build the sub_sqft map that's passed into formula evaluation. Three
+// sources, in priority order:
+//
+//   1. scope.sub_sqft — explicit per-area input from the modal. If provided,
+//      use it verbatim and derive total sqft from the sum.
+//   2. template.sub_areas + scope.sqft + default_share — legacy callers
+//      submit one sqft to a sub-aware template; we split it across the
+//      template's declared sub-areas using each entry's default_share so
+//      MCP / tile-estimate skill / old API requests keep producing
+//      reasonable numbers without code changes on their side.
+//   3. Neither — return {} and let formulas fall back to plain `sqft`.
+//
+// The returned object always has a key for every entry in template.sub_areas
+// (even if 0), so a formula like `ceil(sub_sqft.outside_floor / 15)` never
+// hits an undefined → NaN.
+function buildSubSqft(
+  scope: JobScope,
+  template: ScopedTemplate,
+  effective_sqft: number
+): { sub_sqft: Record<string, number>; total_from_sub: number | null } {
+  const sub_areas = Array.isArray(template.sub_areas) ? template.sub_areas : []
+  if (sub_areas.length === 0) {
+    return { sub_sqft: {}, total_from_sub: null }
+  }
+  const out: Record<string, number> = {}
+  // Initialize every declared sub-area to 0 so missing keys never throw.
+  for (const a of sub_areas) out[a.key] = 0
+
+  if (scope.sub_sqft && Object.keys(scope.sub_sqft).length > 0) {
+    let total = 0
+    for (const [k, v] of Object.entries(scope.sub_sqft)) {
+      const n = Number(v) || 0
+      out[k] = n
+      total += n
+    }
+    return { sub_sqft: out, total_from_sub: total }
+  }
+
+  // Fallback: split effective_sqft across sub_areas using default_share.
+  for (const a of sub_areas) {
+    if (a.default_share && a.default_share > 0) {
+      out[a.key] = effective_sqft * a.default_share
+    }
+  }
+  return { sub_sqft: out, total_from_sub: null }
+}
+
 interface ScopeBuildResult {
   line_items: JobLineItem[]
   demo_days: number
@@ -116,9 +179,15 @@ function buildScope(
   catalog: MaterialCatalogRow[],
   laborRates: LaborRateRow[]
 ): ScopeBuildResult {
-  const sqft = effectiveSqft(scope, template)
+  const sqft_input = effectiveSqft(scope, template)
+  const { sub_sqft, total_from_sub } = buildSubSqft(scope, template, sqft_input)
+  // When the modal supplied per-area numbers, the authoritative total is
+  // their sum (sqft_input might be 0 because the user only filled sub-areas).
+  // Otherwise fall back to the user's single sqft input.
+  const sqft = total_from_sub ?? sqft_input
   const formulaVars = {
     sqft,
+    sub_sqft,
     addons: scope.addons ?? {},
   }
 
@@ -199,7 +268,17 @@ function buildScope(
   }
 
   const scopeTotal = lineItems.reduce((s, i) => s + i.amount, 0)
-  const sqftLine = scope.sqft ? `${scope.sqft} sq ft` : `${sqft} sq ft typical`
+  // Description: show sub-area breakdown when present (so the scope notes
+  // record exactly what was measured), otherwise the single sqft input.
+  let sqftLine: string
+  if (total_from_sub !== null) {
+    const parts = Object.entries(sub_sqft)
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => `${Math.round(v)} ${k.replace(/_/g, ' ')}`)
+    sqftLine = `${Math.round(sqft)} sq ft total — ${parts.join(' + ')}`
+  } else {
+    sqftLine = scope.sqft ? `${scope.sqft} sq ft` : `${sqft} sq ft typical`
+  }
   const description_line = `${scope.label} — ${template.template_name} (${sqftLine})`
 
   return {

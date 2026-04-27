@@ -5,24 +5,49 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Sparkles, X, Plus, Trash2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 
-const TEMPLATES = [
-  { name: 'Backsplash (Standard)', sqftHint: '20-35 sq ft' },
-  { name: 'Backsplash (Large/Complex)', sqftHint: '35-60 sq ft' },
-  { name: 'Bathroom Floor (Small)', sqftHint: '25-40 sq ft' },
-  { name: 'Bathroom Floor (Medium)', sqftHint: '50-80 sq ft' },
-  { name: 'Fireplace Surround', sqftHint: '20-40 sq ft' },
-  { name: 'Shower Floor Only', sqftHint: '12-25 sq ft' },
-  { name: 'Standard Tub Surround', sqftHint: '70-90 sq ft' },
-  { name: 'Tub Surround + Bathroom Floor', sqftHint: '100-130 sq ft' },
-  { name: 'Walk-in Shower (Small)', sqftHint: '100-130 sq ft' },
-  { name: 'Walk-in Shower (Large)', sqftHint: '150-200 sq ft' },
-] as const
+// Template metadata fetched from /api/reference?table=job_templates. The
+// modal needs sub_areas to know whether to render single or multi-sqft
+// inputs and which keys to send back as sub_sqft.
+type SubArea = {
+  key: string
+  label: string
+  hint?: string
+  default_share?: number
+}
+
+type Template = {
+  template_name: string
+  typical_sqft_low: number | null
+  typical_sqft_high: number | null
+  sub_areas: SubArea[] | null
+}
+
+// Fallback list shown until the API call returns. Matches the seed order
+// from migration 002 so the dropdown looks identical pre/post-fetch.
+const FALLBACK_TEMPLATE_NAMES = [
+  'Backsplash (Standard)',
+  'Backsplash (Large/Complex)',
+  'Bathroom Floor (Small)',
+  'Bathroom Floor (Medium)',
+  'Fireplace Surround',
+  'Shower Floor Only',
+  'Standard Tub Surround',
+  'Tub Surround + Bathroom Floor',
+  'Walk-in Shower (Small)',
+  'Walk-in Shower (Large)',
+]
 
 type ScopeInput = {
   uid: string  // local React key only — server assigns the real scope id
   label: string
   template_name: string
+  // For templates with no sub_areas, sqft is the single input. For templates
+  // with sub_areas, we ignore sqft and use sub_sqft below — but we still
+  // show sqft as a "Total" derived field so the user can sanity-check.
   sqft: string
+  // Per-area sqft strings, keyed by sub_area.key. Empty string = not yet
+  // entered. Only populated when the selected template has sub_areas.
+  sub_sqft: Record<string, string>
   customer_provides_tile: boolean
 }
 
@@ -41,12 +66,13 @@ function newUid(): string {
   return `s${uidCounter}_${Date.now()}`
 }
 
-function defaultScope(template: string = TEMPLATES[0].name): ScopeInput {
+function defaultScope(template: string = FALLBACK_TEMPLATE_NAMES[0]): ScopeInput {
   return {
     uid: newUid(),
     label: '',
     template_name: template,
     sqft: '',
+    sub_sqft: {},
     customer_provides_tile: true,
   }
 }
@@ -70,13 +96,26 @@ export default function GenerateEstimateModal({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [templates, setTemplates] = useState<Template[]>([])
   const [scopes, setScopes] = useState<ScopeInput[]>(() => [
     {
-      ...defaultScope(initialTemplate ?? TEMPLATES[0].name),
+      ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
       sqft: initialSqft ? String(initialSqft) : '',
     },
   ])
   const [loading, setLoading] = useState(false)
+
+  // Fetch live templates (with sub_areas metadata) the first time the modal
+  // opens. Cached in component state across reopens since templates rarely
+  // change. Falls back to FALLBACK_TEMPLATE_NAMES if the request fails so
+  // the modal is never empty even when the API is down.
+  useEffect(() => {
+    if (!open || templates.length > 0) return
+    fetch('/api/reference?table=job_templates')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Template[]) => setTemplates(Array.isArray(data) ? data : []))
+      .catch(() => setTemplates([]))
+  }, [open, templates.length])
 
   // Reset scopes when reopening so a closed-then-reopened modal doesn't carry
   // stale entries from the previous interaction.
@@ -84,7 +123,7 @@ export default function GenerateEstimateModal({
     if (open) {
       setScopes([
         {
-          ...defaultScope(initialTemplate ?? TEMPLATES[0].name),
+          ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
           sqft: initialSqft ? String(initialSqft) : '',
         },
       ])
@@ -118,12 +157,34 @@ export default function GenerateEstimateModal({
       const body = {
         job_id: jobId,
         overwrite: hasExistingItems,
-        scopes: scopes.map((s, i) => ({
-          label: fallbackLabel(s, i),
-          template_name: s.template_name,
-          sqft: s.sqft ? Number(s.sqft) : null,
-          customer_provides: s.customer_provides_tile ? ['tile'] : [],
-        })),
+        scopes: scopes.map((s, i) => {
+          const tmpl = templates.find((t) => t.template_name === s.template_name)
+          const subAreas = tmpl?.sub_areas ?? []
+          const usingSubSqft = subAreas.length > 0
+          // For sub-aware templates: send sub_sqft built from the keyed
+          // inputs and let the engine derive the total. For simple
+          // templates: keep sending a single sqft value.
+          let payloadSqft: number | null = null
+          let payloadSubSqft: Record<string, number> | undefined
+          if (usingSubSqft) {
+            const sub: Record<string, number> = {}
+            for (const a of subAreas) {
+              const raw = s.sub_sqft[a.key]
+              if (raw && Number(raw) > 0) sub[a.key] = Number(raw)
+            }
+            if (Object.keys(sub).length > 0) payloadSubSqft = sub
+            else payloadSqft = s.sqft ? Number(s.sqft) : null
+          } else {
+            payloadSqft = s.sqft ? Number(s.sqft) : null
+          }
+          return {
+            label: fallbackLabel(s, i),
+            template_name: s.template_name,
+            sqft: payloadSqft,
+            sub_sqft: payloadSubSqft,
+            customer_provides: s.customer_provides_tile ? ['tile'] : [],
+          }
+        }),
       }
       const res = await fetch('/api/estimates/generate', {
         method: 'POST',
@@ -194,6 +255,7 @@ export default function GenerateEstimateModal({
                   index={idx}
                   canRemove={scopes.length > 1}
                   disabled={loading}
+                  templates={templates}
                   onPatch={(patch) => updateScope(scope.uid, patch)}
                   onRemove={() => removeScope(scope.uid)}
                 />
@@ -270,6 +332,7 @@ function ScopeCard({
   index,
   canRemove,
   disabled,
+  templates,
   onPatch,
   onRemove,
 }: {
@@ -277,10 +340,29 @@ function ScopeCard({
   index: number
   canRemove: boolean
   disabled: boolean
+  templates: Template[]
   onPatch: (patch: Partial<ScopeInput>) => void
   onRemove: () => void
 }) {
-  const tmpl = TEMPLATES.find((t) => t.name === scope.template_name)
+  // Use the live template if it's been fetched; otherwise fall back to the
+  // hardcoded name list so the dropdown is never empty.
+  const tmpl = templates.find((t) => t.template_name === scope.template_name)
+  const subAreas = tmpl?.sub_areas ?? []
+  const hasSubAreas = subAreas.length > 0
+  const sqftHint =
+    tmpl?.typical_sqft_low && tmpl?.typical_sqft_high
+      ? `${tmpl.typical_sqft_low}-${tmpl.typical_sqft_high} sq ft`
+      : null
+
+  // Sum of sub-area inputs for the live "Total" badge — same number the
+  // engine will compute server-side when it sums sub_sqft values.
+  const subTotal = hasSubAreas
+    ? subAreas.reduce((s, a) => s + (Number(scope.sub_sqft[a.key]) || 0), 0)
+    : 0
+
+  const templateNames =
+    templates.length > 0 ? templates.map((t) => t.template_name) : FALLBACK_TEMPLATE_NAMES
+
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white">
       <div className="flex items-center justify-between">
@@ -312,26 +394,62 @@ function ScopeCard({
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Template</label>
-          <select
-            value={scope.template_name}
-            onChange={(e) => onPatch({ template_name: e.target.value })}
-            disabled={disabled}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
-          >
-            {TEMPLATES.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-          {tmpl && (
-            <p className="text-[10px] text-gray-400 mt-0.5">Typical: {tmpl.sqftHint}</p>
-          )}
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Template</label>
+        <select
+          value={scope.template_name}
+          onChange={(e) => onPatch({ template_name: e.target.value, sub_sqft: {} })}
+          disabled={disabled}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
+        >
+          {templateNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        {sqftHint && (
+          <p className="text-[10px] text-gray-400 mt-0.5">Typical: {sqftHint}</p>
+        )}
+      </div>
 
+      {hasSubAreas ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-medium text-gray-700">
+              Square footage by area
+            </label>
+            <span className="text-[11px] text-gray-500">
+              Total: <strong className="text-gray-800">{subTotal || '—'}</strong> sq ft
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {subAreas.map((a) => (
+              <div key={a.key}>
+                <label className="block text-[11px] text-gray-600 mb-0.5">{a.label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={scope.sub_sqft[a.key] ?? ''}
+                  onChange={(e) =>
+                    onPatch({
+                      sub_sqft: { ...scope.sub_sqft, [a.key]: e.target.value },
+                    })
+                  }
+                  disabled={disabled}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
+                />
+                {a.hint && <p className="text-[10px] text-gray-400 mt-0.5">{a.hint}</p>}
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400">
+            Each area drives different materials (walls use GoBoard, floor uses cement board, etc.).
+          </p>
+        </div>
+      ) : (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Square footage</label>
           <input
@@ -346,7 +464,7 @@ function ScopeCard({
           />
           <p className="text-[10px] text-gray-400 mt-0.5">Drives material qty via formulas</p>
         </div>
-      </div>
+      )}
 
       <label className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
         <input

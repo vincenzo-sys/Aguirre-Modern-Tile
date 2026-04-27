@@ -36,9 +36,9 @@ export interface OperatingCostRow {
 }
 
 // Mirrors the job_templates row shape including the formula columns added in
-// migration 021. Both formula fields are optional — legacy templates may
-// arrive without them and we synthesize formulas from TEMPLATE_MATERIALS
-// below as a safety net.
+// migration 021 and sub_areas added in migration 023. Both formula fields
+// are optional — legacy templates may arrive without them and we synthesize
+// formulas from TEMPLATE_MATERIALS below as a safety net.
 export interface JobTemplateRow {
   template_name: string
   job_type: string
@@ -49,10 +49,12 @@ export interface JobTemplateRow {
   typical_materials: string | null
   materials_formula?: MaterialFormulaEntry[] | null
   labor_formula?: import('@/lib/estimator/formulas').LaborFormula | null
+  sub_areas?: import('@/lib/estimator/scopes').TemplateSubArea[] | null
 }
 
 export interface GenerateOptions {
   sqft?: number | null
+  sub_sqft?: Record<string, number>
   customer_provides?: string[]
   warranty_years?: number
   use_platinum_for_large_format?: boolean
@@ -185,6 +187,7 @@ export function generateEstimate(
     label: template.template_name,
     template_name: template.template_name,
     sqft: opts.sqft ?? null,
+    sub_sqft: opts.sub_sqft,
     customer_provides: opts.customer_provides ?? ['tile'],
   }
 

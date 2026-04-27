@@ -296,16 +296,29 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
 
   async function uploadPhotos(files: FileList | null) {
     const base = photoApiBase()
-    if (!base || !files || files.length === 0) return
+    if (!base) {
+      toast('No lead or job loaded yet — try again in a moment', 'error')
+      return
+    }
+    if (!files || files.length === 0) {
+      // User cancelled the picker — silent return is fine.
+      return
+    }
+    // Snapshot the FileList into a plain array immediately. FileList is a
+    // live reference to the input element; if we await before iterating,
+    // a later e.target.value = '' clear (see the input's onChange) can null
+    // out the entries before we read them. Array.from() is synchronous and
+    // captures the actual File objects, which are safe to use after.
+    const fileArr = Array.from(files)
     setUploadingPhotos(true)
     try {
       const form = new FormData()
-      Array.from(files).forEach((f) => form.append('photos', f))
+      fileArr.forEach((f) => form.append('photos', f))
       const res = await fetch(base, { method: 'POST', body: form })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      // Refetch the photos list with signed URLs (the upload response only
-      // returns id + file_name, not URLs).
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || `Upload failed (${res.status})`)
+      }
       const refreshed = await fetch(base)
       if (refreshed.ok) {
         const list = (await refreshed.json()) as QuoteRequestPhoto[]
@@ -314,6 +327,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
       const noun = data.uploaded === 1 ? 'photo' : 'photos'
       toast(`Uploaded ${data.uploaded} ${noun}${data.failed ? ` (${data.failed} failed)` : ''}`, 'success')
     } catch (err) {
+      console.error('Photo upload failed:', err)
       toast(err instanceof Error ? err.message : 'Upload failed', 'error')
     } finally {
       setUploadingPhotos(false)

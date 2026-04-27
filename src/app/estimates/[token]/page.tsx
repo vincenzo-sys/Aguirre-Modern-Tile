@@ -40,53 +40,83 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-function renderLineItemGroup(
-  label: string,
-  items: JobLineItem[],
-  total: number,
-  transformDescription?: (raw: string) => string,
-) {
-  if (items.length === 0) return null
-  return (
-    <div>
-      <div className="px-6 py-2 bg-gray-50 border-b border-t border-gray-100 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
-        <span className="text-xs text-gray-500">{formatCurrency(total)}</span>
-      </div>
-      <div className="divide-y divide-gray-100">
-        {items.map((item, i) => (
-          <div key={i} className="px-6 py-3 flex items-start justify-between text-sm gap-4">
-            <div className="flex-1">
-              <p className="text-gray-900">
-                {transformDescription ? transformDescription(item.description) : item.description}
-              </p>
-              <p className="text-xs text-gray-500">
-                {item.quantity} {item.unit} × {formatCurrency(item.unit_price)}
-              </p>
-            </div>
-            <span className="font-medium text-gray-900 whitespace-nowrap">{formatCurrency(item.amount)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+// Customer-facing line items collapse into 6 buckets so the estimate reads
+// like a homeowner's mental model — they don't care about 2 bags of thinset
+// vs 1 bag, they care about "what am I paying for materials." The internal
+// dashboard still shows every line; this is presentation-only.
+type CustomerGroup =
+  | 'materials'
+  | 'addons'
+  | 'install_labor'
+  | 'demo_labor'
+  | 'trash'
+  | 'transport'
+
+const GROUP_ORDER: CustomerGroup[] = [
+  'materials',
+  'addons',
+  'install_labor',
+  'demo_labor',
+  'trash',
+  'transport',
+]
+
+const GROUP_LABEL: Record<CustomerGroup, string> = {
+  materials: 'Materials',
+  addons: 'Add-ons',
+  install_labor: 'Install labor',
+  demo_labor: 'Demo labor',
+  trash: 'Trash & debris removal',
+  transport: 'Travel & delivery',
 }
 
-function friendlyLaborDescription(raw: string): string {
-  const s = raw.toLowerCase()
-  if (s.startsWith('demolition')) {
-    return 'Demo & substrate prep — remove existing tile, ready surface for install'
+// Heuristic mapping. Schluter items (tray/drain/curb/bench) become add-ons —
+// every Schluter SKU in the catalog is a fixture-style component, not a
+// setting material. If catalog ever holds a non-fixture Schluter item we'll
+// promote this to a real subcategory column.
+function classifyLineItem(item: JobLineItem): CustomerGroup {
+  if (item.category === 'materials') {
+    if (item.description.toLowerCase().startsWith('schluter')) return 'addons'
+    return 'materials'
   }
-  if (s.startsWith('installation')) {
-    return 'Installation — waterproofing, precision tile set, hand-finished grout'
-  }
-  if (s.startsWith('trash')) {
-    return 'Jobsite cleanup & full debris removal'
-  }
-  if (s.startsWith('transport')) {
-    return 'Delivery & materials transport'
-  }
-  return raw
+  const desc = item.description.toLowerCase()
+  if (desc.startsWith('demolition') || desc.startsWith('demo')) return 'demo_labor'
+  if (desc.startsWith('jobsite cleanup') || desc.includes('debris')) return 'trash'
+  if (desc.startsWith('travel') || desc.startsWith('delivery')) return 'transport'
+  return 'install_labor'
+}
+
+function renderCustomerGroup(
+  group: CustomerGroup,
+  items: JobLineItem[],
+  total: number,
+) {
+  if (items.length === 0) return null
+  // Materials + add-ons render as a single category row with bullets of the
+  // included items underneath. Labor / trash / transport don't list items
+  // (one labor line means one description anyway).
+  const showBullets = group === 'materials' || group === 'addons'
+  return (
+    <div className="px-6 py-3 border-b border-gray-100 last:border-b-0">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-medium text-gray-900">{GROUP_LABEL[group]}</span>
+        <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+          {formatCurrency(total)}
+        </span>
+      </div>
+      {showBullets && (
+        <ul className="mt-1.5 ml-1 space-y-0.5 text-[11px] text-gray-400">
+          {items.map((item, i) => (
+            <li key={i} className="leading-tight">
+              <span className="text-gray-300">•</span>{' '}
+              {item.quantity > 1 ? `${item.quantity} × ` : ''}
+              {item.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 function parseScopeNotes(notes: string | null): ParsedScope {
@@ -389,11 +419,22 @@ export default async function EstimatePage({
             </div>
 
             {orderedSections.map(([sectionKey, sectionItems], sIdx) => {
-              const labor = sectionItems.filter((i) => i.category === 'labor')
-              const materials = sectionItems.filter((i) => i.category === 'materials')
-              const laborTotal = labor.reduce((s, i) => s + (i.amount ?? 0), 0)
-              const materialsTotal = materials.reduce((s, i) => s + (i.amount ?? 0), 0)
-              const subtotal = laborTotal + materialsTotal
+              // Bucket each line item into one of the six customer-facing
+              // groups, then render any non-empty group as a single row.
+              const groups: Record<CustomerGroup, { items: JobLineItem[]; total: number }> = {
+                materials: { items: [], total: 0 },
+                addons: { items: [], total: 0 },
+                install_labor: { items: [], total: 0 },
+                demo_labor: { items: [], total: 0 },
+                trash: { items: [], total: 0 },
+                transport: { items: [], total: 0 },
+              }
+              for (const item of sectionItems) {
+                const g = classifyLineItem(item)
+                groups[g].items.push(item)
+                groups[g].total += item.amount ?? 0
+              }
+              const subtotal = sectionItems.reduce((s, i) => s + (i.amount ?? 0), 0)
               return (
                 <div key={sectionKey}>
                   {showSectionHeaders && (
@@ -410,8 +451,9 @@ export default async function EstimatePage({
                       </span>
                     </div>
                   )}
-                  {renderLineItemGroup('Labor', labor, laborTotal, friendlyLaborDescription)}
-                  {renderLineItemGroup('Materials', materials, materialsTotal)}
+                  {GROUP_ORDER.map((g) =>
+                    renderCustomerGroup(g, groups[g].items, groups[g].total)
+                  )}
                 </div>
               )
             })}

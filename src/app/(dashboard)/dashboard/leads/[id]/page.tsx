@@ -339,7 +339,13 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {lead && <CopyContextButton leadId={lead.id} />}
+          {/* Job context (line items + scope notes + originating lead) is more useful
+              for estimate review than the bare lead context, so prefer it when a job exists. */}
+          {job ? (
+            <CopyContextButton jobId={job.id} />
+          ) : (
+            lead && <CopyContextButton leadId={lead.id} />
+          )}
 
           {/* "Start working this lead" — appears only when there's no job yet */}
           {inquiryReadyToWork && (

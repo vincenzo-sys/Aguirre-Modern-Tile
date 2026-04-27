@@ -70,18 +70,31 @@ export default function JobLineItems({
   const [updating, setUpdating] = useState(false)
   const [editing, setEditing] = useState(false)
   const [materialsCatalog, setMaterialsCatalog] = useState<MaterialPricing[]>([])
+  const [laborRates, setLaborRates] = useState<Array<{ setting: string; value: number }>>([])
 
   useEffect(() => {
     setLiveItems(items ?? [])
   }, [items])
 
+  // Fetch reference data on mount so the footer can show live cost + profit
+  // (in addition to the persisted margin). The same catalog also drives the
+  // editor's autocomplete; fetching here means we don't need a second fetch
+  // when the user clicks Edit.
   useEffect(() => {
-    if (!editing || materialsCatalog.length > 0) return
-    fetch('/api/reference?table=materials_pricing')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setMaterialsCatalog(data as MaterialPricing[]))
-      .catch(() => {})
-  }, [editing, materialsCatalog.length])
+    if (!isOwner || !jobId) return
+    if (materialsCatalog.length === 0) {
+      fetch('/api/reference?table=materials_pricing')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => setMaterialsCatalog(data as MaterialPricing[]))
+        .catch(() => {})
+    }
+    if (laborRates.length === 0) {
+      fetch('/api/reference?table=labor_rates')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => setLaborRates((data as Array<{ setting: string; value: number }>) ?? []))
+        .catch(() => {})
+    }
+  }, [isOwner, jobId, materialsCatalog.length, laborRates.length])
 
   // Index by reference so we can edit/delete the right row regardless of
   // section grouping. Sections are presentation only — the underlying array
@@ -97,6 +110,41 @@ export default function JobLineItems({
     sections.length > 1 || (sections[0] && sections[0][0] !== PROJECTWIDE_LABEL)
 
   const grandTotal = liveItems.reduce((s, i) => s + (i.amount ?? 0), 0)
+
+  // Live cost / profit / margin — mirrors the engine's costTotal in
+  // src/lib/estimator/scopes.ts. Materials use catalog.your_cost × qty;
+  // day-unit labor uses day_rate × crew_size × qty; non-day labor (trash,
+  // transport, ea) is treated as pass-through (cost = revenue, 0% margin).
+  // When catalog/rates haven't loaded yet, costStats stays null and the
+  // footer falls back to the persisted marginPercent prop.
+  const costStats = useMemo(() => {
+    if (materialsCatalog.length === 0 || laborRates.length === 0) return null
+    const dayRate =
+      Number(laborRates.find((r) => r.setting === 'Day Rate (per tiler)')?.value) || 250
+    const crewSize =
+      Number(laborRates.find((r) => r.setting === 'Standard Crew Size')?.value) || 2
+    const dayCost = dayRate * crewSize
+    const cost = liveItems.reduce((sum, item) => {
+      if (item.category === 'materials') {
+        const row = materialsCatalog.find((r) => r.item === item.description)
+        if (row) return sum + Number(row.your_cost) * item.quantity
+        return sum + item.amount  // unknown material → assume 0% margin
+      }
+      if (item.category === 'labor' && item.unit === 'day') {
+        return sum + dayCost * item.quantity
+      }
+      return sum + item.amount  // pass-through (trash, transport, ea)
+    }, 0)
+    const profit = grandTotal - cost
+    const margin = grandTotal > 0 ? (profit / grandTotal) * 100 : 0
+    return { cost, profit, margin }
+  }, [liveItems, materialsCatalog, laborRates, grandTotal])
+
+  // Live margin overrides the persisted prop once we have the data to
+  // compute it; the persisted value is stale the moment a line item is
+  // hand-edited, so the live number is always more accurate when shown.
+  const displayMargin = costStats ? costStats.margin : marginPercent
+
   const allMaterials = liveItems.filter((i) => i.category === 'materials')
   const materialStatusCounts: Record<MaterialStatus, number> = {
     needed: 0,
@@ -277,19 +325,35 @@ export default function JobLineItems({
                   </div>
                 )}
                 <div className="ml-auto flex items-end gap-6">
-                  {marginPercent != null && (
+                  {costStats && (
+                    <>
+                      <div className="text-right">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Cost</span>
+                        <p className="text-sm font-medium text-gray-700">
+                          {formatCurrency(costStats.cost)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-gray-500 uppercase tracking-wider">Profit</span>
+                        <p className="text-sm font-semibold text-emerald-700">
+                          {formatCurrency(costStats.profit)}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {displayMargin != null && (
                     <div className="text-right">
                       <span className="text-xs text-gray-500 uppercase tracking-wider">Margin</span>
                       <p
                         className={`text-xl font-bold ${
-                          marginPercent >= 40
+                          displayMargin >= 40
                             ? 'text-emerald-700'
-                            : marginPercent >= 30
+                            : displayMargin >= 30
                               ? 'text-amber-600'
                               : 'text-red-600'
                         }`}
                       >
-                        {Number(marginPercent).toFixed(1)}%
+                        {Number(displayMargin).toFixed(1)}%
                       </p>
                     </div>
                   )}

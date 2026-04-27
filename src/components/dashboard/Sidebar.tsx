@@ -56,6 +56,7 @@ const ownerSections: NavSection[] = [
   {
     heading: 'Estimation',
     items: [
+      { label: 'Templates', href: '/dashboard/templates', icon: FileText },
       { label: 'Estimating Guidance', href: '/dashboard/settings', icon: Settings },
     ],
   },

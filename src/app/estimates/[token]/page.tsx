@@ -76,7 +76,7 @@ const GROUP_LABEL: Record<CustomerGroup, string> = {
 // materials. Match against keywords specific to upgrade-style items so
 // only those land in add-ons; everything else material-category goes to
 // Materials.
-const ADDON_KEYWORDS = ['bench', 'niche', 'ditra-heat', 'heated floor']
+const ADDON_KEYWORDS = ['bench', 'niche', 'corner shelf', 'cornershelf', 'ditra-heat', 'heated floor']
 
 function classifyLineItem(item: JobLineItem): CustomerGroup {
   if (item.category === 'materials') {

@@ -9,6 +9,7 @@ import type {
   JobTemplateRow,
 } from '@/lib/estimator'
 import { generateFromScopes, type JobScope, type ScopedTemplate } from '@/lib/estimator/scopes'
+import { milesFromRevere } from '@/lib/geocode'
 
 function getSupabase() {
   return createClient(
@@ -48,6 +49,10 @@ interface GenerateBody {
   customer_provides?: string[]
   warranty_years?: number
   overwrite?: boolean
+  // Optional manual override of miles from Revere base to the jobsite.
+  // When omitted, the route geocodes the customer/job address and falls
+  // back to the operating_costs minimum if that fails.
+  transportation_miles_one_way?: number | null
 }
 
 export async function POST(req: NextRequest) {
@@ -140,6 +145,28 @@ export async function POST(req: NextRequest) {
     customer_provides: s.customer_provides,
   }))
 
+  // ── Transportation distance: prefer caller's explicit override, else
+  // try to geocode the job's address. Failure is silent — the engine
+  // falls back to the operating_costs minimum.
+  let transportMilesOneWay = body.transportation_miles_one_way ?? null
+  if (transportMilesOneWay == null) {
+    const candidate = job.client_address ?? null
+    let address = candidate
+    if (!address && job.customer_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('address, city, state, zip')
+        .eq('id', job.customer_id)
+        .single()
+      if (customer?.address) {
+        address = [customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ')
+      }
+    }
+    if (address) {
+      transportMilesOneWay = await milesFromRevere(address)
+    }
+  }
+
   let result
   try {
     // Single-scope legacy bodies still go through generateEstimate so the
@@ -156,6 +183,7 @@ export async function POST(req: NextRequest) {
           sub_sqft: scopes[0].sub_sqft,
           customer_provides: scopes[0].customer_provides,
           warranty_years: body.warranty_years ?? 3,
+          transportation_miles_one_way: transportMilesOneWay,
         }
       )
     } else {
@@ -165,7 +193,10 @@ export async function POST(req: NextRequest) {
         (catalogRes.data ?? []) as MaterialCatalogRow[],
         (laborRes.data ?? []) as LaborRateRow[],
         (costsRes.data ?? []) as OperatingCostRow[],
-        { warranty_years: body.warranty_years ?? 3 }
+        {
+          warranty_years: body.warranty_years ?? 3,
+          transportation_miles_one_way: transportMilesOneWay,
+        }
       )
     }
   } catch (err) {

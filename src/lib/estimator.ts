@@ -59,6 +59,7 @@ export interface GenerateOptions {
   customer_provides?: string[]
   warranty_years?: number
   use_platinum_for_large_format?: boolean
+  transportation_miles_one_way?: number | null
 }
 
 export interface GenerateResult {
@@ -198,7 +199,10 @@ export function generateEstimate(
     catalog,
     laborRates,
     operatingCosts,
-    { warranty_years: opts.warranty_years }
+    {
+      warranty_years: opts.warranty_years,
+      transportation_miles_one_way: opts.transportation_miles_one_way,
+    }
   )
 }
 

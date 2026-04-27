@@ -45,6 +45,10 @@ export interface JobScope {
 
 export interface GenerateScopesOptions {
   warranty_years?: number
+  // One-way miles from Revere MA to the jobsite. When provided, the engine
+  // computes transportation = labor_days × 2 trips × miles × per_mile_rate.
+  // When null/undefined, falls back to the operating_costs minimum (or $25).
+  transportation_miles_one_way?: number | null
 }
 
 // One sub-area definition seeded onto the template by migration 023.
@@ -319,9 +323,19 @@ export function generateFromScopes(
   const dayRatePerTiler = settingValue(laborRates, 'Day Rate (per tiler)') ?? 250
   const crewSize = settingValue(laborRates, 'Standard Crew Size') ?? 2
 
-  const trashLargeCost = parseDollars(operatingValue(operatingCosts, 'Trash Disposal - Large Job'))
-  const trashSmallCost = parseDollars(operatingValue(operatingCosts, 'Trash Disposal - Small Job'))
-  const transportMin = parseDollars(operatingValue(operatingCosts, 'Minimum Transportation Charge'))
+  // Trash is hand-priced for now (no consistent supplier yet) — ship a
+  // flat $300 floor and the user edits the line item if a specific job
+  // needs more. The operating_costs "Trash Disposal - Large Job" value
+  // can override the floor upward; small-job tier deprecated.
+  const trashConfigured = parseDollars(operatingValue(operatingCosts, 'Trash Disposal - Large Job'))
+  const trashFloor = 300
+  // Transportation: $0.70/mi by default, overridable via operating_costs
+  // "Transportation Rate per Mile". Two trips per crew-day (out + back =
+  // one round trip = 2 one-way legs). Floor of $25 when miles unknown.
+  const transportPerMile =
+    parseDollars(operatingValue(operatingCosts, 'Transportation Rate per Mile')) || 0.7
+  const transportMinFloor =
+    parseDollars(operatingValue(operatingCosts, 'Minimum Transportation Charge')) || 25
 
   // Build each scope and accumulate.
   const allLineItems: JobLineItem[] = []
@@ -343,8 +357,23 @@ export function generateFromScopes(
 
   // ── Project-wide line items (trash + transport, one set total) ───────
   const totalLaborDays = totalDemo + totalInstall
-  const trashCost = totalLaborDays >= 2 ? trashLargeCost || 300 : trashSmallCost || 150
-  const transportCost = transportMin || 25
+  const trashCost = Math.max(trashConfigured, trashFloor)
+
+  // Transportation: when we have miles, price by trip × distance × rate.
+  // 2 trips per crew-day (1 round-trip = 2 one-way legs), Math.ceil rounds
+  // partial days up since you don't half-drive.
+  let transportCost: number
+  let transportDescription: string
+  const oneWayMiles = opts.transportation_miles_one_way
+  if (typeof oneWayMiles === 'number' && oneWayMiles > 0 && totalLaborDays > 0) {
+    const trips = Math.ceil(totalLaborDays) * 2
+    const rawCost = trips * oneWayMiles * transportPerMile
+    transportCost = Math.max(Math.round(rawCost * 100) / 100, transportMinFloor)
+    transportDescription = `Travel: ${trips} trips × ${oneWayMiles} mi × $${transportPerMile.toFixed(2)}/mi`
+  } else {
+    transportCost = transportMinFloor
+    transportDescription = 'Delivery & materials transport'
+  }
 
   if (trashCost > 0) {
     allLineItems.push({
@@ -360,7 +389,7 @@ export function generateFromScopes(
   if (transportCost > 0) {
     allLineItems.push({
       category: 'labor',
-      description: 'Delivery & materials transport',
+      description: transportDescription,
       quantity: 1,
       unit: 'ea',
       unit_price: transportCost,

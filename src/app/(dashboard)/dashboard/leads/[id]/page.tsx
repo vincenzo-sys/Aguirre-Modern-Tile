@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive,
   CheckCircle, MapPin, ImageIcon, Sparkles, Loader2, Send, Copy, Check,
-  ExternalLink, FileText,
+  ExternalLink, FileText, Trash2,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
@@ -54,6 +54,8 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const [advancing, setAdvancing] = useState(false)
   const [copyingUrl, setCopyingUrl] = useState(false)
   const [generatingLink, setGeneratingLink] = useState(false)
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
 
   // Editable form state
   const [notes, setNotes] = useState('')
@@ -246,6 +248,52 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
       setTimeout(() => setCopyingUrl(false), 2000)
     } catch {
       // ignore — user can select manually
+    }
+  }
+
+  async function uploadPhotos(files: FileList | null) {
+    if (!lead || !files || files.length === 0) return
+    setUploadingPhotos(true)
+    try {
+      const form = new FormData()
+      Array.from(files).forEach((f) => form.append('photos', f))
+      const res = await fetch(`/api/quotes/${lead.id}/photos`, { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      // Refetch the photos list with signed URLs (the upload response only
+      // returns id + file_name, not URLs).
+      const refreshed = await fetch(`/api/quotes/${lead.id}/photos`)
+      if (refreshed.ok) {
+        const list = (await refreshed.json()) as QuoteRequestPhoto[]
+        setPhotos(Array.isArray(list) ? list : [])
+      }
+      const noun = data.uploaded === 1 ? 'photo' : 'photos'
+      toast(`Uploaded ${data.uploaded} ${noun}${data.failed ? ` (${data.failed} failed)` : ''}`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Upload failed', 'error')
+    } finally {
+      setUploadingPhotos(false)
+    }
+  }
+
+  async function deletePhoto(photoId: string) {
+    if (!lead) return
+    if (!confirm('Delete this photo?')) return
+    setDeletingPhotoId(photoId)
+    // Optimistic — remove from UI immediately so the user gets instant feedback.
+    const prev = photos
+    setPhotos((p) => p.filter((x) => x.id !== photoId))
+    try {
+      const res = await fetch(`/api/quotes/${lead.id}/photos/${photoId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Delete failed')
+      }
+    } catch (err) {
+      setPhotos(prev)  // rollback on failure
+      toast(err instanceof Error ? err.message : 'Delete failed', 'error')
+    } finally {
+      setDeletingPhotoId(null)
     }
   }
 
@@ -572,31 +620,84 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
             </div>
           )}
 
-          {/* Customer-uploaded photos */}
-          {photos.length > 0 && (
+          {/* Photos — visible whenever there's a lead so the upload control
+              is always reachable. Hidden entirely for job-only records (no QR
+              ID to attach photos to until conversion happens). */}
+          {lead && (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-gray-400" />
-                Photos from customer ({photos.length})
-              </h2>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {photos.map((photo) => (
-                  <button
-                    key={photo.id}
-                    type="button"
-                    onClick={() => photo.url && setLightbox(photo.url)}
-                    className="aspect-square overflow-hidden rounded-lg bg-gray-100 hover:opacity-90 transition-opacity"
-                    title={photo.file_name}
-                  >
-                    {photo.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={photo.url} alt={photo.file_name} className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No preview</div>
-                    )}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-gray-400" />
+                  Photos {photos.length > 0 && `(${photos.length})`}
+                </h2>
+                <label
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer ${
+                    uploadingPhotos
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100'
+                  }`}
+                >
+                  {uploadingPhotos ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-3 h-3" /> Upload photos
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                    onChange={(e) => {
+                      uploadPhotos(e.target.files)
+                      e.target.value = ''
+                    }}
+                    disabled={uploadingPhotos}
+                    className="hidden"
+                  />
+                </label>
               </div>
+              {photos.length === 0 ? (
+                <p className="text-xs text-gray-500 italic">
+                  No photos yet. Customer can upload from the quote form, or you can add jobsite
+                  shots from your phone here.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="relative group aspect-square">
+                      <button
+                        type="button"
+                        onClick={() => photo.url && setLightbox(photo.url)}
+                        className="absolute inset-0 overflow-hidden rounded-lg bg-gray-100 hover:opacity-90 transition-opacity"
+                        title={photo.file_name}
+                      >
+                        {photo.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={photo.url} alt={photo.file_name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No preview</div>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deletePhoto(photo.id)}
+                        disabled={deletingPhotoId === photo.id}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-opacity disabled:opacity-50"
+                        title="Delete photo"
+                      >
+                        {deletingPhotoId === photo.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

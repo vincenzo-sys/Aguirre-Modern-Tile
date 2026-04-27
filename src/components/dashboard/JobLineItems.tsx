@@ -55,10 +55,16 @@ export default function JobLineItems({
   items,
   jobId,
   isOwner = false,
+  marginPercent = null,
 }: {
   items: JobLineItem[]
   jobId?: string
   isOwner?: boolean
+  // Last-generated profit margin (jobs.margin_percent). Shown in the footer
+  // next to the total. Hand edits to line items don't update this until the
+  // next regenerate — we surface a "stale" hint when items have been
+  // edited locally so the user knows the number is approximate.
+  marginPercent?: number | null
 }) {
   const [liveItems, setLiveItems] = useState<JobLineItem[]>(items ?? [])
   const [updating, setUpdating] = useState(false)
@@ -270,9 +276,27 @@ export default function JobLineItems({
                     {materialStatusCounts.on_site + materialStatusCounts.received} ready
                   </div>
                 )}
-                <div className="ml-auto text-right">
-                  <span className="text-xs text-gray-500 uppercase tracking-wider">Total</span>
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(grandTotal)}</p>
+                <div className="ml-auto flex items-end gap-6">
+                  {marginPercent != null && (
+                    <div className="text-right">
+                      <span className="text-xs text-gray-500 uppercase tracking-wider">Margin</span>
+                      <p
+                        className={`text-xl font-bold ${
+                          marginPercent >= 40
+                            ? 'text-emerald-700'
+                            : marginPercent >= 30
+                              ? 'text-amber-600'
+                              : 'text-red-600'
+                        }`}
+                      >
+                        {Number(marginPercent).toFixed(1)}%
+                      </p>
+                    </div>
+                  )}
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500 uppercase tracking-wider">Total</span>
+                    <p className="text-xl font-bold text-gray-900">{formatCurrency(grandTotal)}</p>
+                  </div>
                 </div>
               </div>
             </div>

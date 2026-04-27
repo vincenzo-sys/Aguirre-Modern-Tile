@@ -527,6 +527,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                 items={(job.line_items ?? []) as Job['line_items']}
                 jobId={job.id}
                 isOwner={true}
+                marginPercent={job.margin_percent}
               />
 
               <div className="bg-white rounded-lg border border-gray-200 p-5">
@@ -735,6 +736,25 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                   <dt className="text-xs text-gray-500">Crew days</dt>
                   <dd className="text-sm text-gray-900">{job.estimated_days ?? '—'}</dd>
                 </div>
+                {job.margin_percent != null && (
+                  <div>
+                    <dt className="text-xs text-gray-500">Profit margin</dt>
+                    <dd
+                      className={`text-base font-semibold ${
+                        job.margin_percent >= 40
+                          ? 'text-emerald-700'
+                          : job.margin_percent >= 30
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                      }`}
+                    >
+                      {Number(job.margin_percent).toFixed(1)}%
+                    </dd>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      Aguirre target: 39-45%. Hand edits to line items aren&apos;t reflected here until next regenerate.
+                    </p>
+                  </div>
+                )}
               </dl>
               {job.status === 'lead' && (
                 <p className="mt-3 text-xs text-gray-500 italic">

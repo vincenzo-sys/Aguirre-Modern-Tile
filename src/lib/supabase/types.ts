@@ -78,6 +78,7 @@ export interface Job {
   estimated_days: number | null
   actual_days: number | null
   estimated_cost: number | null
+  margin_percent?: number | null
   actual_cost: number | null
   amount_invoiced: number | null
   amount_paid: number | null

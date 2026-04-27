@@ -118,6 +118,12 @@ export default function GenerateEstimateModal({
   ])
   const [loading, setLoading] = useState(false)
 
+  // Live preview state — populated by a debounced /api/estimates/preview call
+  // as the user changes inputs. Null until the first measurement is filled in
+  // (see the no_measurement short-circuit on the server side).
+  const [preview, setPreview] = useState<Result | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
   // Fetch live templates (with sub_areas metadata) the first time the modal
   // opens. Cached in component state across reopens since templates rarely
   // change. Falls back to FALLBACK_TEMPLATE_NAMES if the request fails so
@@ -174,6 +180,75 @@ export default function GenerateEstimateModal({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open])
+
+  // Live preview: 350ms after the last keystroke, fire the same payload
+  // we'd send on Generate against /api/estimates/preview. Server returns
+  // null when no measurement is filled in yet so the user doesn't see
+  // bouncing zero-numbers while filling out the form.
+  useEffect(() => {
+    if (!open || templates.length === 0) {
+      setPreview(null)
+      return
+    }
+    const controller = new AbortController()
+    const handle = setTimeout(async () => {
+      const previewBody = {
+        scopes: scopes.map((s, i) => {
+          const tmpl = templates.find((t) => t.template_name === s.template_name)
+          const subAreas = tmpl?.sub_areas ?? []
+          const usingSubSqft = subAreas.length > 0
+          let payloadSqft: number | null = null
+          let payloadSubSqft: Record<string, number> | undefined
+          if (usingSubSqft) {
+            const sub: Record<string, number> = {}
+            for (const a of subAreas) {
+              const raw = s.sub_sqft[a.key]
+              if (raw && Number(raw) > 0) sub[a.key] = Number(raw)
+            }
+            if (Object.keys(sub).length > 0) payloadSubSqft = sub
+            else payloadSqft = s.sqft ? Number(s.sqft) : null
+          } else {
+            payloadSqft = s.sqft ? Number(s.sqft) : null
+          }
+          const declaredAddonKeys = new Set((tmpl?.addons ?? []).map((a) => a.key))
+          const payloadAddons: Record<string, boolean> = {}
+          for (const [k, v] of Object.entries(s.addons)) {
+            if (declaredAddonKeys.has(k)) payloadAddons[k] = v
+          }
+          return {
+            label: fallbackLabel(s, i),
+            template_name: s.template_name,
+            sqft: payloadSqft,
+            sub_sqft: payloadSubSqft,
+            addons: Object.keys(payloadAddons).length > 0 ? payloadAddons : undefined,
+            customer_provides: s.customer_provides_tile ? ['tile'] : [],
+          }
+        }),
+      }
+      try {
+        setPreviewLoading(true)
+        const res = await fetch('/api/estimates/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(previewBody),
+          signal: controller.signal,
+        })
+        const data = await res.json()
+        if (!controller.signal.aborted) {
+          setPreview(res.ok ? (data.summary ?? null) : null)
+        }
+      } catch {
+        // Fetch aborted (newer keystroke fired) or network blip — silently
+        // leave the previous preview value rather than flashing a null.
+      } finally {
+        if (!controller.signal.aborted) setPreviewLoading(false)
+      }
+    }, 350)
+    return () => {
+      clearTimeout(handle)
+      controller.abort()
+    }
+  }, [open, templates, JSON.stringify(scopes)])  // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateScope(uid: string, patch: Partial<ScopeInput>) {
     setScopes((prev) => prev.map((s) => (s.uid === uid ? { ...s, ...patch } : s)))
@@ -332,6 +407,9 @@ export default function GenerateEstimateModal({
                   headers the customer sees.
                 </div>
               )}
+
+              {/* Live preview banner — shows what Generate will produce. */}
+              <PreviewBanner preview={preview} loading={previewLoading} />
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between sticky bottom-0 bg-white">
@@ -369,6 +447,52 @@ export default function GenerateEstimateModal({
         </div>
       )}
     </>
+  )
+}
+
+// Color-coded margin so a glance tells you whether this quote is healthy.
+// Tied to feedback_pricing_conventions: Aguirre target is 39-45%, so green
+// at >=40, amber at 30-40, red below 30.
+function marginColor(pct: number | null | undefined): string {
+  if (pct == null) return 'text-gray-500'
+  if (pct >= 40) return 'text-emerald-700'
+  if (pct >= 30) return 'text-amber-600'
+  return 'text-red-600'
+}
+
+function PreviewBanner({ preview, loading }: { preview: Result | null; loading: boolean }) {
+  if (!preview) {
+    return (
+      <div className="rounded-md bg-gray-50 border border-dashed border-gray-300 p-3 text-xs text-gray-500 text-center">
+        {loading ? 'Computing preview…' : 'Enter sqft to see total + margin preview'}
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-md bg-primary-50 border border-primary-200 p-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-primary-700 font-semibold">
+            Preview {loading && <span className="text-primary-500">(updating…)</span>}
+          </div>
+          <div className="text-2xl font-bold text-gray-900 mt-0.5">
+            ${preview.total.toFixed(2)}
+          </div>
+          <div className="text-[11px] text-gray-600">
+            10% deposit ${preview.deposit.toFixed(2)} · {preview.line_item_count} line items · {preview.scope_count} scope{preview.scope_count === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Margin</div>
+          <div className={`text-2xl font-bold ${marginColor(preview.margin_percent)}`}>
+            {preview.margin_percent.toFixed(1)}%
+          </div>
+          <div className="text-[11px] text-gray-600">
+            {preview.labor_days} crew day{preview.labor_days === 1 ? '' : 's'}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

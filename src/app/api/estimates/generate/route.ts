@@ -221,6 +221,7 @@ export async function POST(req: NextRequest) {
       scopes: scopes,
       estimated_cost: result.total,
       estimated_days: Math.max(1, Math.round(result.labor_days)),
+      margin_percent: result.margin_percent,
       customer_provides: customerProvidesText,
     })
     .eq('id', body.job_id)

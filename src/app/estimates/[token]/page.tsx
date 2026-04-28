@@ -100,6 +100,17 @@ function classifyLineItem(item: JobLineItem): CustomerGroup {
   return 'install_labor'
 }
 
+// Flat rendering for hand-built bundled estimates (Erwin's PDF format —
+// every line is "Area Description: $Amount" with no inner category split).
+// We detect this when every line item is unit='ea' and category='labor' —
+// the template estimator never produces that shape (it always emits day-
+// unit labor + sheet/bag/tube materials), so the heuristic uniquely
+// identifies bundled hand-built quotes.
+function isFlatEstimate(items: JobLineItem[]): boolean {
+  if (items.length === 0) return false
+  return items.every((i) => i.unit === 'ea' && i.category === 'labor')
+}
+
 function renderCustomerGroup(
   group: CustomerGroup,
   items: JobLineItem[],
@@ -432,7 +443,20 @@ export default async function EstimatePage({
               </h3>
             </div>
 
-            {orderedSections.map(([sectionKey, sectionItems], sIdx) => {
+            {isFlatEstimate(estimate.line_items) ? (
+              // Flat table — Description + Amount, like the PDF format Vince
+              // hands customers for bundled quotes.
+              <div className="divide-y divide-gray-100">
+                {estimate.line_items.map((item, idx) => (
+                  <div key={idx} className="px-6 py-3 flex items-start justify-between gap-4">
+                    <p className="text-sm text-gray-900 flex-1">{item.description}</p>
+                    <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                      {formatCurrency(item.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : orderedSections.map(([sectionKey, sectionItems], sIdx) => {
               // Bucket each line item into one of the six customer-facing
               // groups, then render any non-empty group as a single row.
               const groups: Record<CustomerGroup, { items: JobLineItem[]; total: number }> = {

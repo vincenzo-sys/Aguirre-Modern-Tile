@@ -3,8 +3,32 @@ import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
 import { sendSMS } from '@/lib/openphone'
+import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { Resend } from 'resend'
 import type Stripe from 'stripe'
+
+// Fire a red Discord alert when Stripe took money but the dashboard
+// can't attribute it. These are the three known orphan paths:
+//   - estimate deposit checkout with no job_id in metadata
+//   - estimate deposit for a job_id that doesn't match any row
+//   - invoice.paid for a stripe_invoice_id we have no local row for
+// Each represents real revenue we're not tracking — Vince needs to
+// hear about it inside seconds, not when he scrolls Vercel logs.
+function alertOrphanPayment(reason: string, fields: Array<{ name: string; value: string }>) {
+  return postToDiscord({
+    username: 'Stripe orphan',
+    embeds: [
+      {
+        title: `⚠️ Stripe payment orphaned: ${reason}`,
+        description:
+          'Stripe took money but the dashboard could not attribute it to a job/invoice. Reconcile manually in Stripe.',
+        color: DISCORD_COLORS.red,
+        fields,
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  }).catch((err) => console.error('Discord orphan alert failed:', err))
+}
 
 // Stripe sends raw body — we need to disable Next.js body parsing
 export const dynamic = 'force-dynamic'
@@ -86,6 +110,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const jobId = session.metadata.job_id
   if (!jobId) {
     console.warn('Estimate deposit checkout completed without job_id metadata')
+    await alertOrphanPayment('deposit checkout missing job_id metadata', [
+      { name: 'Stripe session', value: session.id },
+      { name: 'Amount', value: `$${(Number(session.amount_total ?? 0) / 100).toFixed(2)}` },
+      { name: 'Customer email', value: session.customer_details?.email ?? '(none on session)' },
+    ])
     return
   }
 
@@ -102,6 +131,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   if (!job) {
     console.warn(`Received estimate deposit for unknown job ${jobId}`)
+    await alertOrphanPayment('deposit for job that does not exist', [
+      { name: 'Job ID (claimed)', value: jobId },
+      { name: 'Stripe session', value: session.id },
+      { name: 'Amount', value: `$${depositDollars.toFixed(2)}` },
+      { name: 'Customer email', value: session.customer_details?.email ?? '(none on session)' },
+    ])
     return
   }
 
@@ -179,6 +214,18 @@ async function handleInvoicePaid(stripeInvoice: Stripe.Invoice) {
 
   if (error || !invoice) {
     console.warn('Received payment for unknown Stripe invoice:', stripeInvoiceId)
+    await alertOrphanPayment('payment for invoice not in dashboard', [
+      { name: 'Stripe invoice ID', value: stripeInvoiceId ?? '(no id)' },
+      {
+        name: 'Amount paid',
+        value: `$${(Number(stripeInvoice.amount_paid ?? 0) / 100).toFixed(2)}`,
+      },
+      {
+        name: 'Customer email',
+        value: stripeInvoice.customer_email ?? '(none on invoice)',
+      },
+      { name: 'Hosted URL', value: stripeInvoice.hosted_invoice_url ?? '(none)' },
+    ])
     return
   }
 

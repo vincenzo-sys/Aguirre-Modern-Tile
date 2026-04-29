@@ -170,6 +170,33 @@ export async function POST(
     })
     .eq('id', leadId)
 
+  // If the customer already had jobs (excluding this brand-new one), flag
+  // them as source='repeat'. Only flips from 'website' so we don't trample
+  // 'referral' or hand-set 'repeat' values. Filtering on jobs-table for
+  // this customer because counting across the parallel quote_requests
+  // table would double-count when both records exist for one inquiry.
+  if (customerId) {
+    const { data: customerJobs } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('customer_id', customerId)
+      .neq('id', job.id)
+      .limit(1)
+    if (customerJobs && customerJobs.length > 0) {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('source')
+        .eq('id', customerId)
+        .single()
+      if (cust?.source === 'website') {
+        await supabase
+          .from('customers')
+          .update({ source: 'repeat' })
+          .eq('id', customerId)
+      }
+    }
+  }
+
   return NextResponse.json({
     job,
     message:

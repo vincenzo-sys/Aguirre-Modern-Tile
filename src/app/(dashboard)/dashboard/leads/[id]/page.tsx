@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive,
   CheckCircle, MapPin, ImageIcon, Sparkles, Loader2, Send, Copy, Check,
-  ExternalLink, FileText, Trash2, X, MessageSquare,
+  ExternalLink, FileText, Trash2, X, MessageSquare, Star,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
@@ -92,6 +92,12 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const [scopeNotes, setScopeNotes] = useState('')
   const [estimateUrl, setEstimateUrl] = useState<string | null>(null)
 
+  // Customer's prior job history — fetched on the side once we know the
+  // customer_id, so the contact card can surface "Repeat — N prior jobs"
+  // and last-project context without making Vince click through to the
+  // customer page.
+  const [priorJobs, setPriorJobs] = useState<Job[]>([])
+
   useEffect(() => {
     async function load() {
       // Try as a quote_request first; fall back to job
@@ -176,6 +182,31 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     }
     load()
   }, [id, router])
+
+  // Once we know the customer_id, fetch their job history so the contact
+  // card can show "Repeat customer — N prior jobs". Exclude the current
+  // job from the count so a fresh-converted lead doesn't say "1 prior".
+  useEffect(() => {
+    const customerId = lead?.customer_id ?? job?.customer_id
+    if (!customerId) {
+      setPriorJobs([])
+      return
+    }
+    let cancelled = false
+    fetch(`/api/customers/${customerId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { jobs?: Job[] } | null) => {
+        if (cancelled || !data?.jobs) return
+        const currentJobId = job?.id
+        setPriorJobs(data.jobs.filter((j) => j.id !== currentJobId))
+      })
+      .catch(() => {
+        if (!cancelled) setPriorJobs([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [lead?.customer_id, job?.customer_id, job?.id])
 
   async function patchLead(updates: Record<string, unknown>) {
     if (!lead) return null
@@ -624,6 +655,17 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         <div className="lg:col-span-2 space-y-6">
           {/* Contact card */}
           <div className="bg-white rounded-lg border border-gray-200 p-5">
+            {/* Repeat-customer banner — most important context at a glance.
+                Shows total prior jobs, last project, last payment so Vince
+                walks into the call already knowing the relationship.
+                Renders only when the customer has prior jobs (excluding
+                the current one). */}
+            {priorJobs.length > 0 && (
+              <RepeatCustomerBanner
+                priorJobs={priorJobs}
+                customerId={(lead?.customer_id ?? job?.customer_id) as string}
+              />
+            )}
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Contact</h2>
             <dl className="space-y-2 text-sm">
               <div className="flex items-center gap-3">
@@ -1085,6 +1127,64 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
           <img src={lightbox} alt="Lead photo" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
         </div>
       )}
+    </div>
+  )
+}
+
+// Banner showing prior-job count + last-project summary. Only mounts when
+// priorJobs.length > 0, so the "this is a repeat customer" signal is loud
+// the moment Vince opens the lead — without polluting first-time leads
+// with empty-state UI.
+function RepeatCustomerBanner({
+  priorJobs,
+  customerId,
+}: {
+  priorJobs: Job[]
+  customerId: string
+}) {
+  // Most recent prior job — sorted desc by created_at. The customers API
+  // returns them sorted that way already, but enforce here in case order
+  // changes upstream.
+  const last = [...priorJobs].sort((a, b) =>
+    (b.created_at ?? '').localeCompare(a.created_at ?? '')
+  )[0]
+  const lastDate = last?.created_at
+    ? new Date(last.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      })
+    : null
+  const lastAmount =
+    last && (last.amount_paid ?? 0) > 0
+      ? `$${Number(last.amount_paid).toLocaleString()}`
+      : last?.estimated_cost
+        ? `$${Number(last.estimated_cost).toLocaleString()} est.`
+        : null
+
+  return (
+    <div className="mb-4 rounded-md border border-purple-200 bg-purple-50 p-3">
+      <div className="flex items-start gap-2">
+        <Star className="w-4 h-4 text-purple-700 fill-purple-700 mt-0.5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-purple-900 leading-tight">
+            Repeat customer · {priorJobs.length} prior job
+            {priorJobs.length === 1 ? '' : 's'}
+          </p>
+          {last && (
+            <p className="text-xs text-purple-800 mt-0.5 truncate">
+              Last: {last.title}
+              {lastDate ? ` · ${lastDate}` : ''}
+              {lastAmount ? ` · ${lastAmount}` : ''}
+            </p>
+          )}
+        </div>
+        <Link
+          href={`/dashboard/customers/${customerId}`}
+          className="text-xs font-medium text-purple-700 hover:text-purple-900 whitespace-nowrap"
+        >
+          History →
+        </Link>
+      </div>
     </div>
   )
 }

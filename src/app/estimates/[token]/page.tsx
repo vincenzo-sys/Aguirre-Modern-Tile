@@ -16,6 +16,7 @@ type EstimateResponse = {
   deposit_amount: number
   amount_paid: number
   accepted: boolean
+  accepted_at: string | null
   already_viewed: boolean
 }
 
@@ -334,6 +335,18 @@ export default async function EstimatePage({
             <h2 className="text-lg font-semibold text-green-900 mb-1">
               Deposit received — thank you!
             </h2>
+            {(estimate.amount_paid > 0 || estimate.accepted_at) && (
+              <p className="text-sm font-medium text-green-900 mb-1">
+                {estimate.amount_paid > 0 && `Paid ${formatCurrency(estimate.amount_paid)}`}
+                {estimate.amount_paid > 0 && estimate.accepted_at && ' on '}
+                {estimate.accepted_at &&
+                  new Date(estimate.accepted_at).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+              </p>
+            )}
             <p className="text-sm text-green-800">
               Your install date is reserved. We&apos;ll be in touch within 24 hours to confirm the schedule.
             </p>

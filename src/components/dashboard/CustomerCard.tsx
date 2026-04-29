@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Phone, Mail, MessageSquare, MapPin, ExternalLink } from 'lucide-react'
+import EditCustomerForm from './EditCustomerForm'
 import type { Customer, Job } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -9,9 +10,11 @@ function getInitials(name: string): string {
 export default function CustomerCard({
   customer,
   job,
+  editable = true,
 }: {
   customer?: Customer | null
   job: Job
+  editable?: boolean
 }) {
   // Use customer data if available, fall back to job's client_* fields
   const name = customer?.name ?? job.client_name
@@ -26,12 +29,16 @@ export default function CustomerCard({
       <div className="px-4 py-3 bg-gray-800 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Customer</h3>
         {customer && (
-          <Link
-            href={`/dashboard/customers/${customer.id}`}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-3">
+            {editable && <EditCustomerForm customer={customer} variant="icon" />}
+            <Link
+              href={`/dashboard/customers/${customer.id}`}
+              className="text-gray-400 hover:text-white transition-colors"
+              aria-label="Open customer page"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
         )}
       </div>
       <div className="p-4">

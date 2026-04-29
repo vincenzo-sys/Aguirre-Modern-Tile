@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Ruler, Clock, ImageIcon, DollarSign } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Ruler, Clock, ImageIcon, DollarSign, CheckCircle2 } from 'lucide-react'
 import JobStatusBadge from '@/components/dashboard/JobStatusBadge'
 import StatusUpdateDropdown from '@/components/dashboard/StatusUpdateDropdown'
 import CustomerCard from '@/components/dashboard/CustomerCard'
@@ -229,6 +229,26 @@ export default async function JobDetailPage({
           </div>
         </div>
 
+        {/* Deposit-paid pill — prominent when the customer has paid the
+            deposit, so the moment Vince opens a job he can see the deal
+            money has actually moved. Sources `estimate_accepted_at` (set
+            by Stripe webhook OR DepositReceivedAction); falls back to
+            `updated_at` for legacy rows where amount_paid was set without
+            the timestamp. */}
+        {job.amount_paid != null && job.amount_paid > 0 && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 w-fit">
+            <CheckCircle2 className="w-4 h-4 text-green-700" />
+            <span className="text-sm font-semibold text-green-900">
+              Deposit paid · {formatCurrency(Number(job.amount_paid))}
+            </span>
+            {(job.estimate_accepted_at || job.updated_at) && (
+              <span className="text-xs text-green-700">
+                · {formatDate((job.estimate_accepted_at ?? job.updated_at).split('T')[0])}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Metadata row — like ShopPilot */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 mt-6 pt-4 border-t border-gray-100">
           <div>
@@ -265,7 +285,7 @@ export default async function JobDetailPage({
       {/* Customer Card + Details side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-1">
-          <CustomerCard customer={customer} job={job} />
+          <CustomerCard customer={customer} job={job} editable={!useDemo} />
         </div>
         <div className="lg:col-span-2 space-y-4">
           {/* Job Details */}

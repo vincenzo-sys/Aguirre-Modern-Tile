@@ -985,6 +985,29 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
           {job && (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Estimate summary</h2>
+              {/* Deposit-paid callout — visible the moment a deposit lands
+                  (Stripe webhook or manual entry), so Vince knows on this
+                  page (not just on the operations job page) that the deal
+                  is live. */}
+              {job.amount_paid != null && job.amount_paid > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+                  <CheckCircle className="w-4 h-4 text-green-700 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-green-900 leading-tight">
+                      Deposit paid · ${Number(job.amount_paid).toLocaleString()}
+                    </p>
+                    {(job.estimate_accepted_at || job.updated_at) && (
+                      <p className="text-xs text-green-700 leading-tight">
+                        {new Date(job.estimate_accepted_at ?? job.updated_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               <dl className="space-y-3 text-sm">
                 <div>
                   <dt className="text-xs text-gray-500">Quote total</dt>

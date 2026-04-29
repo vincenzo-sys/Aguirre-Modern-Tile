@@ -46,6 +46,7 @@ export async function GET(
         : 0,
       amount_paid: job.amount_paid ?? 0,
       accepted: !!job.estimate_accepted_at,
+      accepted_at: job.estimate_accepted_at ?? null,
       already_viewed: !!job.estimate_viewed_at,
     })
   } catch (err) {

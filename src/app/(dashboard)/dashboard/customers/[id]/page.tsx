@@ -6,6 +6,7 @@ import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
 import ReferralRewardToggle from '@/components/dashboard/ReferralRewardToggle'
 import CallHistory, { type CallLogEntry } from '@/components/dashboard/CallHistory'
+import EditCustomerForm from '@/components/dashboard/EditCustomerForm'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
 
 function getInitials(name: string): string {
@@ -138,16 +139,19 @@ export default async function CustomerDetailPage({
             {getInitials(customer.name)}
           </div>
           <div className="flex-1">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-              <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                customer.source === 'website' ? 'bg-blue-100 text-blue-700' :
-                customer.source === 'referral' ? 'bg-green-100 text-green-700' :
-                customer.source === 'repeat' ? 'bg-purple-100 text-purple-700' :
-                'bg-gray-100 text-gray-600'
-              }`}>
-                {customer.source}
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                  customer.source === 'website' ? 'bg-blue-100 text-blue-700' :
+                  customer.source === 'referral' ? 'bg-green-100 text-green-700' :
+                  customer.source === 'repeat' ? 'bg-purple-100 text-purple-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {customer.source}
+                </span>
+              </div>
+              {!useDemo && <EditCustomerForm customer={customer} />}
             </div>
             {customer.address && (
               <p className="text-sm text-gray-500 flex items-center gap-1 mb-3">

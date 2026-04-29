@@ -32,6 +32,13 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
       const updates: Record<string, unknown> = {
         amount_paid: num,
       }
+      // Stamp the deposit-paid timestamp if not already set so the customer-
+      // facing estimate page and the dashboard show the same payment date
+      // regardless of whether the deposit came through Stripe or was logged
+      // here by hand (cash, check, Venmo).
+      if (!job.estimate_accepted_at) {
+        updates.estimate_accepted_at = new Date().toISOString()
+      }
       // If there's already a scheduled date, advance status to 'scheduled'
       if (job.scheduled_start) {
         updates.status = 'scheduled'

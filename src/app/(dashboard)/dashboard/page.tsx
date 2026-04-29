@@ -176,6 +176,14 @@ function OwnerHome({
 
       <MorningBriefing jobs={jobs} leads={leads} todayStr={todayStr} />
 
+      {/* Action queue lives above the fold so the morning ritual is "open
+          dashboard, see 3 things, do them" instead of scrolling past status
+          cards. Status cards (Today / Active jobs / New this week) below
+          provide context for whatever doesn't make the worklist. */}
+      <div className="mb-6">
+        <SalesWorklist leads={leads} jobs={jobs} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Follow up today */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -355,11 +363,6 @@ function OwnerHome({
             Review new leads <ArrowRight className="w-3 h-3" />
           </Link>
         </section>
-      </div>
-
-      {/* Worklist */}
-      <div className="mt-6">
-        <SalesWorklist leads={leads} jobs={jobs} />
       </div>
     </div>
   )

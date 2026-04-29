@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireApiAuth } from '@/lib/apiAuth'
+import { deriveQuoteHints } from '@/lib/quoteHints'
 
 // Convert a quote_request into a job skeleton.
 //
@@ -131,6 +132,11 @@ export async function POST(
   }
   notesSections.push('', '— Pricing not yet set. Use Generate Estimate, Claude Desktop, or edit line items manually.')
 
+  // Carry the customer's size hint onto the job so the GenerateEstimateModal
+  // shows it as a default. Vince still confirms in the modal — this just
+  // saves the typing. Pricing isn't computed; only the sqft input is seeded.
+  const hints = deriveQuoteHints(lead.project_type, lead.answers as Record<string, string> | null)
+
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .insert({
@@ -142,6 +148,7 @@ export async function POST(
       job_type: projectTypeLabel.split(' ')[0] ?? 'Tile',
       status: 'lead',
       scope_notes: notesSections.join('\n'),
+      square_footage: hints.initialSqft,
       next_contact_date: new Date().toISOString().slice(0, 10),
     })
     .select()

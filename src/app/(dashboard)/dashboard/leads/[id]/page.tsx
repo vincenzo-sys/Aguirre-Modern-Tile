@@ -12,6 +12,7 @@ import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
+import { deriveQuoteHints } from '@/lib/quoteHints'
 import type { Job, QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
@@ -448,6 +449,20 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     }
   }, [lead, job])
 
+  // Pre-fill hints for the GenerateEstimateModal — derived once from the
+  // originating quote_request so reopening the modal doesn't recompute or
+  // wobble. answers may be a JSONB object; deriveQuoteHints typechecks the
+  // shape. Job-only leads (no QR) get null hints — modal falls back to
+  // FALLBACK_TEMPLATE_NAMES[0] and an empty sqft input.
+  const quoteHints = useMemo(
+    () =>
+      deriveQuoteHints(
+        lead?.project_type ?? null,
+        (lead?.answers ?? null) as Record<string, string> | null,
+      ),
+    [lead?.project_type, lead?.answers],
+  )
+
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading…</div>
   }
@@ -729,9 +744,15 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
 
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-900">Line items</h2>
+                {/* Hints derived from the originating quote_request answers
+                    (template + sqft) so Vince doesn't re-type what the
+                    customer already told us. The modal still shows them as
+                    editable defaults — Vince confirms before generating. */}
                 <GenerateEstimateModal
                   jobId={job.id}
                   hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
+                  initialSqft={job.square_footage ?? quoteHints.initialSqft}
+                  initialTemplate={quoteHints.initialTemplate ?? undefined}
                 />
               </div>
 

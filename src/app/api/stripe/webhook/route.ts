@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
 import { sendSMS } from '@/lib/openphone'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
+import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { Resend } from 'resend'
 import type Stripe from 'stripe'
 
@@ -125,7 +126,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, title, client_name, status, scheduled_start, amount_paid, estimated_cost')
+    .select('id, title, client_name, status, scheduled_start, scheduled_end, estimated_days, amount_paid, estimated_cost')
     .eq('id', jobId)
     .single()
 
@@ -153,6 +154,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     updates.status = 'scheduled'
   } else if (job.status === 'lead') {
     updates.status = 'quoted'
+  }
+
+  // Auto-fill scheduled_end so the calendar block spans the full install.
+  // Only fires when start is set, end is empty, and estimated_days > 0 —
+  // never overwrites a hand-typed end date.
+  const autoEnd = deriveScheduledEnd(
+    job.scheduled_start,
+    job.estimated_days,
+    job.scheduled_end,
+  )
+  if (autoEnd) {
+    updates.scheduled_end = autoEnd
   }
 
   await supabase.from('jobs').update(updates).eq('id', jobId)

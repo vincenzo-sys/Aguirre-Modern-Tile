@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, DollarSign, Loader2, X } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import type { Job } from '@/lib/supabase/types'
 
 export default function DepositReceivedAction({ job }: { job: Job }) {
@@ -42,6 +43,17 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
       // If there's already a scheduled date, advance status to 'scheduled'
       if (job.scheduled_start) {
         updates.status = 'scheduled'
+      }
+      // Auto-fill scheduled_end so the calendar shows the full install
+      // block. Same logic the Stripe webhook uses — start + estimated_days
+      // calendar days inclusive, never overwrites a hand-typed end.
+      const autoEnd = deriveScheduledEnd(
+        job.scheduled_start,
+        job.estimated_days,
+        job.scheduled_end,
+      )
+      if (autoEnd) {
+        updates.scheduled_end = autoEnd
       }
       const res = await fetch(`/api/jobs/${job.id}`, {
         method: 'PATCH',

@@ -3,6 +3,7 @@ import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
 import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus, Calendar } from 'lucide-react'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
+import { parseScopeNotes as parseStructuredScope } from '@/lib/scopeNotes'
 
 type EstimateResponse = {
   title: string
@@ -21,16 +22,6 @@ type EstimateResponse = {
   already_viewed: boolean
   scheduled_start: string | null
   estimated_days: number | null
-}
-
-type ParsedScope = {
-  body: string | null
-  warranty: string | null
-  warrantyYears: number | null
-  included: string[]
-  notIncluded: string[]
-  payment: string | null
-  validThrough: string | null
 }
 
 const COMPANY_PHONE = '(617) 766-1259'
@@ -148,85 +139,25 @@ function renderCustomerGroup(
   )
 }
 
-function parseScopeNotes(notes: string | null): ParsedScope {
-  const empty: ParsedScope = {
-    body: null,
-    warranty: null,
-    warrantyYears: null,
-    included: [],
-    notIncluded: [],
-    payment: null,
-    validThrough: null,
-  }
-  if (!notes) return empty
-
-  const input = '\n' + notes
-  const matches = Array.from(
-    input.matchAll(/\n(SCOPE OF WORK|WARRANTY|WHAT'S INCLUDED|WHAT'S NOT INCLUDED|PAYMENT)\n/g)
-  )
-
-  const parts: { header: string; text: string }[] = []
-  let lastIndex = 0
-  let lastHeader = 'PREAMBLE'
-  for (const m of matches) {
-    const idx = m.index ?? 0
-    parts.push({ header: lastHeader, text: input.slice(lastIndex, idx).trim() })
-    lastHeader = m[1]
-    lastIndex = idx + m[0].length
-  }
-  parts.push({ header: lastHeader, text: input.slice(lastIndex).trim() })
-
-  const get = (name: string) => parts.find((p) => p.header === name)?.text ?? null
-
-  // Prefer an explicit SCOPE OF WORK section, but fall back to the preamble
-  // text before the first recognized header — many estimator outputs describe
-  // the scope up front without labeling it.
-  const preamble = parts.find((p) => p.header === 'PREAMBLE')?.text ?? null
-  const scopeBody = get('SCOPE OF WORK') ?? preamble
-  const warrantyText = get('WARRANTY')
-  const includedText = get("WHAT'S INCLUDED")
-  const notIncludedText = get("WHAT'S NOT INCLUDED")
-  const paymentText = get('PAYMENT')
-
-  const toBullets = (t: string | null): string[] =>
-    !t
-      ? []
-      : t
-          .split('\n')
-          .map((l) => l.replace(/^[-\u2022]\s*/, '').trim())
-          .filter(Boolean)
-
-  let warrantyYears: number | null = null
-  if (warrantyText) {
-    const m = warrantyText.match(/(\d+)-year/i)
-    if (m) warrantyYears = parseInt(m[1], 10)
-  }
-
-  let validThrough: string | null = null
-  const validMatch = notes.match(/Valid\s+(\d+)\s+days\.\s+Generated\s+(\d{4}-\d{2}-\d{2})/i)
-  if (validMatch) {
-    const days = parseInt(validMatch[1], 10)
-    const generated = new Date(validMatch[2] + 'T00:00:00')
-    if (!Number.isNaN(generated.getTime())) {
-      const expires = new Date(generated.getTime() + days * 24 * 60 * 60 * 1000)
-      validThrough = expires.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    }
-  }
-
-  return {
-    body: scopeBody,
-    warranty: warrantyText,
-    warrantyYears,
-    included: toBullets(includedText),
-    notIncluded: toBullets(notIncludedText),
-    payment: paymentText,
-    validThrough,
-  }
+// Extract the "Valid N days. Generated YYYY-MM-DD" footer from the raw
+// scope_notes if present, and convert it to a human-readable expiration
+// date. Lives outside the structured parser because it operates on the raw
+// text. The structured parser strips that metadata line out of payment.
+function extractValidThrough(notes: string | null): string | null {
+  if (!notes) return null
+  const m = notes.match(/Valid\s+(\d+)\s+days\.\s+Generated\s+(\d{4}-\d{2}-\d{2})/i)
+  if (!m) return null
+  const days = parseInt(m[1], 10)
+  const generated = new Date(m[2] + 'T00:00:00')
+  if (Number.isNaN(generated.getTime())) return null
+  const expires = new Date(generated.getTime() + days * 24 * 60 * 60 * 1000)
+  return expires.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 }
+
 
 async function fetchEstimate(token: string): Promise<EstimateResponse | null> {
   const baseUrl =
@@ -281,7 +212,19 @@ export default async function EstimatePage({
     estimate.estimated_cost ??
     estimate.line_items.reduce((s, i) => s + (i.amount ?? 0), 0)
 
-  const parsed = parseScopeNotes(estimate.scope_notes)
+  const structured = parseStructuredScope(estimate.scope_notes)
+  const validThrough = extractValidThrough(estimate.scope_notes)
+  // Adapter to keep the existing JSX referencing `parsed.body`, `parsed.included`,
+  // etc., while sourcing data from the shared lib + the local validThrough helper.
+  const parsed = {
+    body: structured.scopeOfWork || null,
+    warranty: structured.warranty || null,
+    warrantyYears: structured.warrantyYears,
+    included: structured.included,
+    notIncluded: structured.notIncluded,
+    payment: structured.additionalNotes || null,
+    validThrough,
+  }
   const warrantyLabel = parsed.warrantyYears
     ? `${parsed.warrantyYears}-year labor warranty`
     : 'Labor warranty included'
@@ -548,6 +491,21 @@ export default async function EstimatePage({
             </p>
           )}
         </section>
+
+        {/* Additional notes — renders the PAYMENT section content from
+            scope_notes (cleaned of auto-generator metadata). This is where
+            free-form policy paragraphs the user typed under PAYMENT land:
+            "no additional charges if longer," insulation rules, etc. */}
+        {parsed.payment && (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Additional notes
+            </h3>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {parsed.payment}
+            </p>
+          </section>
+        )}
 
         {/* What happens next — pre-payment version */}
         {!depositSuccess && (

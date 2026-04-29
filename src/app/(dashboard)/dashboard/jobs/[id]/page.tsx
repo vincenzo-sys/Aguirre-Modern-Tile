@@ -347,10 +347,19 @@ export default async function JobDetailPage({
             </div>
           )}
 
-          {/* Scope of Work */}
+          {/* Scope of Work — also rendered on the customer-facing estimate.
+              Label flags this so editors don't mistake it for an internal
+              field. */}
           {job.scope_notes && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Scope of Work</h3>
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Scope of work
+                </h3>
+                <span className="text-[11px] font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded px-2 py-0.5">
+                  Shown to customer
+                </span>
+              </div>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.scope_notes}</p>
             </div>
           )}

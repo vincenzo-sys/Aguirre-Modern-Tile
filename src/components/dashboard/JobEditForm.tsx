@@ -189,8 +189,17 @@ export default function JobEditForm({ job, teamMembers }: JobEditFormProps) {
         </div>
 
         <div className="md:col-span-2">
-          <label className={labelClass}>Scope of Work</label>
-          <textarea rows={4} value={form.scope_notes} onChange={(e) => updateField('scope_notes', e.target.value)} className={inputClass} placeholder="What's getting installed — visible to Christian." />
+          <label className={labelClass}>Scope of work <span className="text-primary-700 normal-case font-semibold">· shown to customer</span></label>
+          <textarea
+            rows={6}
+            value={form.scope_notes}
+            onChange={(e) => updateField('scope_notes', e.target.value)}
+            className={inputClass}
+            placeholder="SCOPE OF WORK&#10;...&#10;&#10;WARRANTY&#10;...&#10;&#10;WHAT'S INCLUDED&#10;...&#10;&#10;WHAT'S NOT INCLUDED&#10;...&#10;&#10;PAYMENT&#10;..."
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Renders on the customer&apos;s estimate page. For a guided editor with one input per section (instead of remembering the magic headers), use the <strong>Customer-facing scope</strong> editor on the lead workspace.
+          </p>
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Customer is providing</label>

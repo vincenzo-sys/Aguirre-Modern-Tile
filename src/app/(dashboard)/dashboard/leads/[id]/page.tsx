@@ -12,6 +12,7 @@ import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
+import StructuredScopeEditor from '@/components/dashboard/StructuredScopeEditor'
 import { deriveQuoteHints } from '@/lib/quoteHints'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import type { Job, QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
@@ -90,7 +91,6 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const [lostReason, setLostReason] = useState('')
   const [siteVisitAt, setSiteVisitAt] = useState('')
   const [siteVisitNotes, setSiteVisitNotes] = useState('')
-  const [scopeNotes, setScopeNotes] = useState('')
   const [estimateUrl, setEstimateUrl] = useState<string | null>(null)
   // Proposed install start date — set during the sales conversation so the
   // customer sees a concrete date on their estimate. When they pay the
@@ -178,7 +178,6 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         setSiteVisitNotes(leadData.site_visit_notes ?? '')
       }
       if (jobData) {
-        setScopeNotes(jobData.scope_notes ?? '')
         setProposedStart(jobData.scheduled_start ?? '')
         if ((jobData as Job & { estimate_token?: string }).estimate_token) {
           const baseUrl = window.location.origin.replace(/^http:\/\/localhost.*/, 'https://aguirremoderntile.com')
@@ -263,13 +262,6 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     toast('Saved', 'success')
   }
 
-  async function saveScope() {
-    if (!job) return
-    setSaving(true)
-    await patchJob({ scope_notes: scopeNotes })
-    setSaving(false)
-    toast('Scope notes saved', 'success')
-  }
 
   // Save proposed install start date the moment the picker fires. The date
   // becomes visible to the customer on the next estimate page render and
@@ -824,28 +816,10 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                 marginPercent={job.margin_percent}
               />
 
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-gray-900">Scope notes (customer-facing)</h2>
-                  <button
-                    onClick={saveScope}
-                    disabled={saving || scopeNotes === (job.scope_notes ?? '')}
-                    className="text-xs px-2 py-1 rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-                <textarea
-                  value={scopeNotes}
-                  onChange={(e) => setScopeNotes(e.target.value)}
-                  rows={10}
-                  placeholder="SCOPE OF WORK…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Renders into the customer-facing estimate. Use SCOPE OF WORK / WARRANTY / WHAT&apos;S INCLUDED / WHAT&apos;S NOT INCLUDED / PAYMENT headers.
-                </p>
-              </div>
+              <StructuredScopeEditor
+                jobId={job.id}
+                initialScopeNotes={job.scope_notes}
+              />
             </>
           )}
 

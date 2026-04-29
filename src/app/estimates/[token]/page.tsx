@@ -535,7 +535,7 @@ export default async function EstimatePage({
           )}
         </section>
 
-        {/* What happens next */}
+        {/* What happens next — pre-payment version */}
         {!depositSuccess && (
           <section className="mb-6">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">
@@ -545,7 +545,7 @@ export default async function EstimatePage({
               {[
                 { n: '1', t: 'Pay 10% deposit', d: 'Reserve your install date with Stripe — secure checkout.' },
                 { n: '2', t: 'We confirm within 24h', d: 'You\u2019ll hear from us to lock in the schedule.' },
-                { n: '3', t: 'We show up ready', d: 'Full crew, all materials, jobsite protected.' },
+                { n: '3', t: 'We show up ready', d: 'Full crew, all materials, jobsite protected.' }, // post-payment block follows below
               ].map((step) => (
                 <li
                   key={step.n}
@@ -559,6 +559,61 @@ export default async function EstimatePage({
                 </li>
               ))}
             </ol>
+          </section>
+        )}
+
+        {/* Post-payment next-steps — green-themed mirror of the pre-payment
+            block. After paying, the customer needs a clear "here's what
+            happens next" so they don't refresh the page wondering if more
+            action is required. The Accept-and-Pay CTAs below are already
+            hidden by their own !depositSuccess guards. */}
+        {depositSuccess && (
+          <section className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">
+              What happens next
+            </h3>
+            <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  n: '1',
+                  t: "We'll be in touch within 24h",
+                  d: `Vince will call or text ${COMPANY_PHONE} to confirm.`,
+                },
+                {
+                  n: '2',
+                  t: 'We lock in the install date',
+                  d: "You pick what works — we'll work around your week.",
+                },
+                {
+                  n: '3',
+                  t: 'Crew arrives ready',
+                  d: "Full team, all materials, jobsite protected. You don't lift a finger.",
+                },
+              ].map((step) => (
+                <li
+                  key={step.n}
+                  className="bg-white rounded-lg border border-green-200 p-4"
+                >
+                  <div className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm mb-2">
+                    {step.n}
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">{step.t}</p>
+                  <p className="text-xs text-gray-500 mt-1">{step.d}</p>
+                </li>
+              ))}
+            </ol>
+            <div className="mt-4 text-center">
+              <a
+                href={`tel:${COMPANY_PHONE_TEL}`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                Call {COMPANY_PHONE}
+              </a>
+              <p className="text-xs text-gray-500 mt-2">
+                Questions? Reach out anytime — small team, we pick up.
+              </p>
+            </div>
           </section>
         )}
 

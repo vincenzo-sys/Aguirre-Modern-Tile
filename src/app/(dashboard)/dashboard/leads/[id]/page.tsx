@@ -13,6 +13,7 @@ import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import { deriveQuoteHints } from '@/lib/quoteHints'
+import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import type { Job, QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
@@ -91,6 +92,11 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const [siteVisitNotes, setSiteVisitNotes] = useState('')
   const [scopeNotes, setScopeNotes] = useState('')
   const [estimateUrl, setEstimateUrl] = useState<string | null>(null)
+  // Proposed install start date — set during the sales conversation so the
+  // customer sees a concrete date on their estimate. When they pay the
+  // deposit, the webhook auto-fills scheduled_end from estimated_days.
+  const [proposedStart, setProposedStart] = useState<string>('')
+  const [savingStart, setSavingStart] = useState(false)
 
   // Customer's prior job history — fetched on the side once we know the
   // customer_id, so the contact card can surface "Repeat — N prior jobs"
@@ -173,6 +179,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
       }
       if (jobData) {
         setScopeNotes(jobData.scope_notes ?? '')
+        setProposedStart(jobData.scheduled_start ?? '')
         if ((jobData as Job & { estimate_token?: string }).estimate_token) {
           const baseUrl = window.location.origin.replace(/^http:\/\/localhost.*/, 'https://aguirremoderntile.com')
           setEstimateUrl(`${baseUrl}/estimates/${(jobData as Job & { estimate_token: string }).estimate_token}`)
@@ -262,6 +269,18 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
     await patchJob({ scope_notes: scopeNotes })
     setSaving(false)
     toast('Scope notes saved', 'success')
+  }
+
+  // Save proposed install start date the moment the picker fires. The date
+  // becomes visible to the customer on the next estimate page render and
+  // tees up the auto-schedule when they pay the deposit. Sends null on
+  // clear so we don't write an empty string to the DB.
+  async function saveProposedStart(value: string) {
+    setProposedStart(value)
+    if (!job) return
+    setSavingStart(true)
+    await patchJob({ scheduled_start: value || null })
+    setSavingStart(false)
   }
 
   async function startWorkingThisLead() {
@@ -1084,6 +1103,26 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                     ${((job.estimated_cost ?? 0) * 0.1).toLocaleString()}
                   </dd>
                 </div>
+                {/* Proposed install start — committing to a date during the
+                    sales conversation creates urgency on the customer's
+                    estimate page ("this slot is yours") and the calendar
+                    auto-fills the full block when they pay the deposit. */}
+                <div>
+                  <dt className="text-xs text-gray-500 flex items-center gap-1.5 mb-1">
+                    <Calendar className="w-3 h-3" /> Proposed install start
+                  </dt>
+                  <input
+                    type="date"
+                    value={proposedStart}
+                    onChange={(e) => saveProposedStart(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <ProposedStartHelper
+                    saving={savingStart}
+                    proposedStart={proposedStart}
+                    estimatedDays={job.estimated_days}
+                  />
+                </div>
                 <div>
                   <dt className="text-xs text-gray-500">Crew days</dt>
                   <dd className="text-sm text-gray-900">{job.estimated_days ?? '—'}</dd>
@@ -1128,6 +1167,54 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         </div>
       )}
     </div>
+  )
+}
+
+// Helper text under the proposed install start date input. Shows a live
+// preview of when the install will end (using the same deriveScheduledEnd
+// formula the deposit webhook applies) so Vince sees the consequence of
+// his date choice before saving. Empty state explains where the date
+// shows up downstream.
+function ProposedStartHelper({
+  saving,
+  proposedStart,
+  estimatedDays,
+}: {
+  saving: boolean
+  proposedStart: string
+  estimatedDays: number | null
+}) {
+  if (saving) {
+    return <p className="text-[10px] text-gray-400 mt-1">Saving…</p>
+  }
+  if (!proposedStart) {
+    return (
+      <p className="text-[10px] text-gray-400 mt-1">
+        Customer sees this on their estimate. Calendar auto-fills the
+        end date when the deposit lands.
+      </p>
+    )
+  }
+  // Pass null as currentEnd so the helper computes a preview regardless of
+  // what's in the DB — we want to show the future state, not today's.
+  const previewEnd = deriveScheduledEnd(proposedStart, estimatedDays, null)
+  if (!previewEnd || !estimatedDays) {
+    return (
+      <p className="text-[10px] text-gray-400 mt-1">
+        Add crew days (Generate Estimate) to preview the end date.
+      </p>
+    )
+  }
+  const endLabel = new Date(previewEnd + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+  const daysText = estimatedDays === 1 ? '1 day' : `${estimatedDays} days`
+  return (
+    <p className="text-[10px] text-emerald-700 mt-1">
+      Through {endLabel} · {daysText}
+    </p>
   )
 }
 

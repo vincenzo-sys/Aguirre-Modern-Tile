@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
-import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus } from 'lucide-react'
+import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus, Calendar } from 'lucide-react'
+import { deriveScheduledEnd } from '@/lib/jobScheduling'
 
 type EstimateResponse = {
   title: string
@@ -18,6 +19,8 @@ type EstimateResponse = {
   accepted: boolean
   accepted_at: string | null
   already_viewed: boolean
+  scheduled_start: string | null
+  estimated_days: number | null
 }
 
 type ParsedScope = {
@@ -362,6 +365,17 @@ export default async function EstimatePage({
           </div>
         )}
 
+        {/* Install dates callout — committed start (and the auto-derived end
+            from estimated_days) so the customer sees exactly when their
+            install is. Pre-payment label says "Proposed" with a "lock in
+            with deposit" prompt; post-payment it switches to "Reserved" so
+            the same component carries the message after they pay. */}
+        <InstallDatesCallout
+          scheduledStart={estimate.scheduled_start}
+          estimatedDays={estimate.estimated_days}
+          accepted={depositSuccess}
+        />
+
         {/* Project */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900">{estimate.title}</h2>
@@ -664,5 +678,69 @@ export default async function EstimatePage({
         </div>
       )}
     </div>
+  )
+}
+
+// Render the proposed/reserved install dates so the customer knows exactly
+// when their install is BEFORE they pay. Shares deriveScheduledEnd with
+// the deposit webhook so what the customer sees here matches what gets
+// auto-written to scheduled_end the moment they pay. Returns null when
+// scheduled_start isn't set yet — silent rather than empty placeholder.
+function InstallDatesCallout({
+  scheduledStart,
+  estimatedDays,
+  accepted,
+}: {
+  scheduledStart: string | null
+  estimatedDays: number | null
+  accepted: boolean
+}) {
+  if (!scheduledStart) return null
+
+  // Pass null as currentEnd so the helper computes a preview regardless;
+  // the customer page is read-only so we always want the derived end.
+  const endDate = deriveScheduledEnd(scheduledStart, estimatedDays, null)
+
+  const fmt = (iso: string) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    })
+
+  const label = accepted ? 'Your install is reserved' : 'Proposed install dates'
+  const tone = accepted
+    ? 'border-green-200 bg-green-50'
+    : 'border-primary-200 bg-primary-50'
+  const headingTone = accepted ? 'text-green-900' : 'text-primary-900'
+  const bodyTone = accepted ? 'text-green-800' : 'text-primary-800'
+
+  return (
+    <section className={`mb-6 rounded-xl border ${tone} p-5`}>
+      <div className="flex items-start gap-3">
+        <Calendar className={`w-5 h-5 ${headingTone} flex-shrink-0 mt-0.5`} />
+        <div className="min-w-0 flex-1">
+          <p className={`text-xs font-semibold uppercase tracking-wider ${headingTone}`}>
+            {label}
+          </p>
+          <p className="text-lg font-bold text-gray-900 mt-0.5">
+            {fmt(scheduledStart)}
+            {endDate && endDate !== scheduledStart && (
+              <span className="text-gray-700"> &mdash; {fmt(endDate)}</span>
+            )}
+          </p>
+          {estimatedDays && (
+            <p className={`text-sm ${bodyTone} mt-0.5`}>
+              {estimatedDays === 1 ? '1 day' : `${estimatedDays} days`} of work
+            </p>
+          )}
+          {!accepted && (
+            <p className={`text-xs ${bodyTone} mt-2`}>
+              Pay the deposit below to lock in this slot.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }

@@ -14,7 +14,7 @@ export async function GET(
     const { data: job, error } = await supabase
       .from('jobs')
       .select(
-        'id, title, client_name, client_address, job_type, square_footage, scope_notes, customer_provides, line_items, estimated_cost, amount_paid, estimate_accepted_at, estimate_viewed_at'
+        'id, title, client_name, client_address, job_type, square_footage, scope_notes, customer_provides, line_items, estimated_cost, estimated_days, scheduled_start, amount_paid, estimate_accepted_at, estimate_viewed_at'
       )
       .eq('estimate_token', token)
       .single()
@@ -48,6 +48,8 @@ export async function GET(
       accepted: !!job.estimate_accepted_at,
       accepted_at: job.estimate_accepted_at ?? null,
       already_viewed: !!job.estimate_viewed_at,
+      scheduled_start: job.scheduled_start ?? null,
+      estimated_days: job.estimated_days ?? null,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

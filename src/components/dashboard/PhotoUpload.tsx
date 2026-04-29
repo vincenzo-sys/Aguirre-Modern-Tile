@@ -51,13 +51,15 @@ export default function PhotoUpload({ files, onChange }: PhotoUploadProps) {
       >
         <Upload className="w-8 h-8 mx-auto text-gray-400" />
         <p className="mt-2 text-sm text-gray-600">
-          Drag & drop photos here, or click to browse
+          <span className="sm:hidden">Tap to take a photo or choose from your library</span>
+          <span className="hidden sm:inline">Drag &amp; drop photos here, or click to browse</span>
         </p>
         <p className="mt-1 text-xs text-gray-400">JPG, PNG, WebP</p>
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
+          capture="environment"
           multiple
           onChange={handleSelect}
           className="hidden"
@@ -68,7 +70,7 @@ export default function PhotoUpload({ files, onChange }: PhotoUploadProps) {
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
           {files.map((file, i) => (
             <div key={i} className="relative group">
-              <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+              <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={URL.createObjectURL(file)}
@@ -78,10 +80,11 @@ export default function PhotoUpload({ files, onChange }: PhotoUploadProps) {
               </div>
               <button
                 type="button"
+                aria-label={`Remove ${file.name}`}
                 onClick={() => removeFile(i)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 active:scale-95 transition"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
               <p className="text-xs text-gray-500 mt-1 truncate">{file.name}</p>
             </div>

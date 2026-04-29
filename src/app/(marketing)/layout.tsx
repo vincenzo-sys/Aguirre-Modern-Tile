@@ -1,5 +1,6 @@
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import MobileStickyCTA from '@/components/MobileStickyCTA'
 import { getCmsGlobal } from '@/lib/cms'
 
 export default async function MarketingLayout({
@@ -36,8 +37,9 @@ export default async function MarketingLayout({
   return (
     <>
       <Header navItems={navItems} phone={phone} />
-      <main>{children}</main>
+      <main className="pb-24 lg:pb-0">{children}</main>
       <Footer />
+      <MobileStickyCTA phone={phone} />
     </>
   )
 }

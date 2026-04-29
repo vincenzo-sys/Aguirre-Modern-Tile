@@ -15,6 +15,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import LeadCaptureForm from '@/components/LeadCaptureForm'
+import QuoteCalculator from '@/components/QuoteCalculator'
 import JsonLd, { localBusinessJsonLd } from '@/components/JsonLd'
 import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
 
@@ -195,6 +196,23 @@ export default async function HomePage() {
               <Home className="w-6 h-6" />
               <span className="font-medium">220+ Bathrooms/Year</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Instant Ballpark Calculator — catches the visitor who isn't ready
+          to fill out a form yet. Three taps, instant range, then a soft
+          CTA to /contact for an exact quote. */}
+      <section className="py-12 sm:py-16 bg-gray-50">
+        <div className="container-custom px-4">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-6 sm:mb-8">
+              <h2 className="heading-secondary mb-2">Curious what it costs?</h2>
+              <p className="text-gray-600">
+                No phone number, no email — just tap your project for an instant ballpark.
+              </p>
+            </div>
+            <QuoteCalculator />
           </div>
         </div>
       </section>

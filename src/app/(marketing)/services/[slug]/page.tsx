@@ -5,6 +5,21 @@ import { CheckCircle, ArrowRight } from 'lucide-react'
 import { getCmsCollection } from '@/lib/cms'
 import { notFound } from 'next/navigation'
 import JsonLd, { serviceJsonLd, breadcrumbJsonLd } from '@/components/JsonLd'
+import QuoteCalculator from '@/components/QuoteCalculator'
+
+// Map service slug → calculator's room key. Slugs that don't fit any of the
+// four calculator categories (repair, reglazing) intentionally return null
+// so we skip the calculator on those pages — a "ballpark in 10 seconds"
+// for a tile repair would mislead more than help.
+type RoomKey = 'bathroom' | 'shower' | 'floor' | 'backsplash'
+const slugToRoomKey: Record<string, RoomKey | null> = {
+  'bathroom-tile': 'bathroom',
+  'shower-tile': 'shower',
+  'floor-tile': 'floor',
+  'backsplash-tile': 'backsplash',
+  'tile-repair': null,
+  'tile-reglazing': null,
+}
 
 interface ServiceData {
   title: string
@@ -355,6 +370,24 @@ export default async function ServiceDetailPage({ params }: Props) {
                   </ul>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Instant ballpark calculator — pre-selects the room type matching
+          this service so the visitor only has to pick size + complexity. */}
+      {slugToRoomKey[slug] && (
+        <section className="section-padding bg-white">
+          <div className="container-custom">
+            <div className="max-w-2xl mx-auto">
+              <div className="text-center mb-6 sm:mb-8">
+                <h2 className="heading-secondary mb-2">Get your ballpark</h2>
+                <p className="text-gray-600">
+                  No contact info needed. Tap to see your range.
+                </p>
+              </div>
+              <QuoteCalculator defaultRoomType={slugToRoomKey[slug]!} />
             </div>
           </div>
         </section>

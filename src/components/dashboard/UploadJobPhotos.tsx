@@ -70,7 +70,7 @@ export default function UploadJobPhotos({
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 active:scale-95 disabled:opacity-50 transition min-h-[40px] sm:min-h-0"
       >
         {uploading ? (
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -83,6 +83,7 @@ export default function UploadJobPhotos({
         ref={inputRef}
         type="file"
         accept="image/*"
+        capture="environment"
         multiple
         onChange={(e) => {
           if (e.target.files) uploadAll(Array.from(e.target.files))

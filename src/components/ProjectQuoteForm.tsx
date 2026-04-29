@@ -242,13 +242,15 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            capture="environment"
             multiple
             onChange={handleFileChange}
             className="hidden"
           />
           <Camera className="w-10 h-10 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600 font-medium">
-            Drop photos here or click to upload
+            <span className="sm:hidden">Take photos with your camera</span>
+            <span className="hidden sm:inline">Drop photos here or click to upload</span>
           </p>
           <p className="text-gray-400 text-sm mt-1">
             Up to 10 photos (JPG, PNG)
@@ -256,7 +258,7 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
         </div>
 
         {previews.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 mt-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
             {previews.map((preview, index) => (
               <div key={index} className="relative aspect-square">
                 <img
@@ -266,8 +268,9 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
                 />
                 <button
                   type="button"
+                  aria-label={`Remove photo ${index + 1}`}
                   onClick={() => removeFile(index)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 active:scale-95 transition"
                 >
                   <X className="w-4 h-4" />
                 </button>

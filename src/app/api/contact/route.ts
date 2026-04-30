@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
-import { createOpenPhoneContact } from '@/lib/openphone'
+import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
+import { sendCustomerEmail } from '@/lib/email'
 
 const RESEND_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
@@ -67,15 +68,24 @@ export async function POST(req: NextRequest) {
           }
         }
         if (!customerId && phone) {
-          const { data: existing } = await supabase
-            .from('customers')
-            .select('id, openphone_contact_id')
-            .eq('phone', phone)
-            .limit(1)
-            .single()
-          if (existing) {
-            customerId = existing.id
-            existingOpenPhoneId = existing.openphone_contact_id
+          // Match on digits-only (last 10) so format variants of the same
+          // number — "(617) 555-1234" vs "6175551234" vs "+16175551234" —
+          // resolve to one customer record instead of fragmenting history.
+          const phoneDigits = phone.replace(/\D/g, '')
+          if (phoneDigits.length >= 10) {
+            const last10 = phoneDigits.slice(-10)
+            const { data: existing } = await supabase
+              .from('customers')
+              .select('id, openphone_contact_id, phone')
+              .or(`phone.eq.${phone},phone.like.%${last10}`)
+              .limit(5)
+            const match = existing?.find(
+              (row) => (row.phone || '').replace(/\D/g, '').slice(-10) === last10
+            )
+            if (match) {
+              customerId = match.id
+              existingOpenPhoneId = match.openphone_contact_id
+            }
           }
         }
         if (!customerId) {
@@ -180,10 +190,70 @@ export async function POST(req: NextRequest) {
     }
     console.log(`[Contact] Lead email sent to ${TO_EMAIL}, Resend id=${sendResult.data?.id}`)
 
+    // Customer confirmation — fire-and-forget. Skip when source='quote'
+    // because /api/quotes already fired one for the same submission and
+    // we don't want the customer getting two confirmations.
+    if (source !== 'quote') {
+      const firstName = name.split(' ')[0] || ''
+      sendContactConfirmation({ email, phone, firstName, projectType }).catch((err) => {
+        console.error('contact confirmation send failed:', err)
+      })
+    }
+
     return NextResponse.json({ success: true, email_id: sendResult.data?.id })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Contact API error:', message)
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
+  }
+}
+
+async function sendContactConfirmation({
+  email,
+  phone,
+  firstName,
+  projectType,
+}: {
+  email: string
+  phone: string
+  firstName: string
+  projectType: string
+}) {
+  if (phone) {
+    const e164 = toE164(phone)
+    if (e164) {
+      await sendSMS(e164, AUTO_MESSAGES.quote_received(firstName)).catch((err) =>
+        console.error('quote_received SMS failed:', err)
+      )
+    }
+  }
+
+  if (email) {
+    const projectLabel = projectType ? projectType.replace('-', ' ') : 'tile'
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi there,'
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111827;">
+        <p style="font-size: 16px; margin: 0 0 12px 0;">${greeting}</p>
+        <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+          Thanks for reaching out about your ${projectLabel} project — your message came through.
+        </p>
+        <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+          I'll review the details (and any photos you sent) and put together a written estimate.
+          You can expect to hear back within a few hours, usually faster.
+        </p>
+        <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+          If you remember anything else — special features, timing, photos —
+          just reply to this email or text me at <a href="tel:+16177661259" style="color:#0284c7;">(617) 766-1259</a>.
+        </p>
+        <p style="font-size: 16px; margin: 24px 0 4px 0;">— Vince</p>
+        <p style="font-size: 13px; color: #6b7280; margin: 0;">Aguirre Modern Tile · Greater Boston</p>
+      </div>
+    `.trim()
+    await sendCustomerEmail({
+      to: email,
+      subject: 'Got your tile project request — Aguirre Modern Tile',
+      html,
+      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+    }).catch((err) => console.error('quote_received email failed:', err))
   }
 }

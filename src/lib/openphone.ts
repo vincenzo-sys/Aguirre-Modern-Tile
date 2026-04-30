@@ -179,4 +179,10 @@ export const AUTO_MESSAGES = {
           : 'Last check-in from me'
     return `${opener} on your tile estimate — any questions I can answer? You can review and pay the 10% deposit here: ${estimateUrl}. Happy to hop on a quick call too. - Vince, Aguirre Modern Tile`
   },
+
+  quote_received: (firstName: string) =>
+    `Hi ${firstName || 'there'} — got your quote request, thanks! I'll review the details and send you a written estimate within a few hours. Reply here if you remember anything else. - Vince, Aguirre Modern Tile`,
+
+  deposit_received: (firstName: string, amount: string) =>
+    `Thanks ${firstName || 'there'}! We received your $${amount} deposit and your install date is reserved. I'll be in touch within 24 hours to confirm the schedule. - Vince, Aguirre Modern Tile`,
 } as const

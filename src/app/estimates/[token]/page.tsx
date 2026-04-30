@@ -605,16 +605,37 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* Phone CTA */}
-        <p className="text-sm text-gray-500 text-center mt-6">
-          Questions?{' '}
-          <a
-            href={`tel:${COMPANY_PHONE_TEL}`}
-            className="text-primary-700 font-medium hover:text-primary-800"
-          >
-            Call {COMPANY_PHONE}
-          </a>
-        </p>
+        {/* Questions block — text + call options. Most homeowners prefer
+            text to phone for "I have a quick question" interactions, so
+            give them both with text on the left as the lower-friction
+            default. The sms: pre-fill threads back to Vince's phone with
+            context already in the message body. */}
+        <div className="mt-8 mb-4">
+          <p className="text-center text-sm font-medium text-gray-700 mb-3">
+            Have a question or want changes?
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2 max-w-md mx-auto">
+            <a
+              href={`sms:${COMPANY_PHONE_TEL}?&body=${encodeURIComponent(
+                `Hi Vince — question about my estimate (${estimate.client_name}):\n\n`
+              )}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold text-sm hover:bg-primary-700 active:scale-95 transition"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+              Text Vince
+            </a>
+            <a
+              href={`tel:${COMPANY_PHONE_TEL}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-white text-primary-700 border-2 border-primary-600 rounded-lg font-semibold text-sm hover:bg-primary-50 active:scale-95 transition"
+            >
+              <Phone className="w-4 h-4" />
+              Call {COMPANY_PHONE}
+            </a>
+          </div>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            Small team — Vince picks up.
+          </p>
+        </div>
       </main>
 
       {/* Sticky mobile CTA */}

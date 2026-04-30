@@ -134,20 +134,47 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
   }
 
   if (isSubmitted) {
+    const firstName = contactInfo.name.split(' ')[0] || ''
     return (
-      <div className="bg-green-50 rounded-2xl p-8 text-center">
+      <div className="bg-green-50 rounded-2xl p-6 sm:p-8 text-center">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Check className="w-8 h-8 text-green-600" />
         </div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">
-          Request Received!
+          Got it{firstName ? `, ${firstName}` : ''} — request received
         </h3>
-        <p className="text-gray-600 mb-4">
-          Thanks {contactInfo.name}! We'll review your {projectTitle.toLowerCase()} project details and get back to you within a few hours with an estimate.
+        <p className="text-gray-700 mb-5">
+          A confirmation is heading to your inbox and phone now. I&apos;ll review
+          the {projectTitle.toLowerCase()} details and send a written estimate within a few hours.
         </p>
-        <p className="text-sm text-gray-500">
-          We'll contact you at {contactInfo.phone} or {contactInfo.email}
+
+        <div className="bg-white rounded-lg border border-green-200 p-4 mb-5 text-left">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">What happens next</p>
+          <ol className="space-y-1.5 text-sm text-gray-700">
+            <li><span className="font-semibold text-green-700">1.</span> I review your photos &amp; project details</li>
+            <li><span className="font-semibold text-green-700">2.</span> You get a written estimate by email + text</li>
+            <li><span className="font-semibold text-green-700">3.</span> 10% deposit reserves your install date</li>
+          </ol>
+        </div>
+
+        <p className="text-sm text-gray-500 mb-4">
+          We&apos;ll reach you at {contactInfo.phone} or {contactInfo.email}.
         </p>
+
+        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          <a
+            href="sms:+16177661259"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-primary-700 border-2 border-primary-600 rounded-lg font-semibold text-sm hover:bg-primary-50 active:scale-95 transition"
+          >
+            Text Vince directly
+          </a>
+          <a
+            href="tel:+16177661259"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg font-semibold text-sm hover:bg-primary-700 active:scale-95 transition"
+          >
+            Call (617) 766-1259
+          </a>
+        </div>
       </div>
     )
   }

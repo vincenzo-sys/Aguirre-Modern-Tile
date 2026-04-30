@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
-import { sendSMS } from '@/lib/openphone'
+import { sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
+import { sendCustomerEmail } from '@/lib/email'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { Resend } from 'resend'
@@ -126,7 +127,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, title, client_name, status, scheduled_start, scheduled_end, estimated_days, amount_paid, estimated_cost')
+    .select('id, title, client_name, client_email, client_phone, status, scheduled_start, scheduled_end, estimated_days, amount_paid, estimated_cost, estimate_accepted_at, estimate_token')
     .eq('id', jobId)
     .single()
 
@@ -138,6 +139,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       { name: 'Amount', value: `$${depositDollars.toFixed(2)}` },
       { name: 'Customer email', value: session.customer_details?.email ?? '(none on session)' },
     ])
+    return
+  }
+
+  // Idempotency: Stripe can redeliver the same event up to 3 days later. If
+  // estimate_accepted_at is already set, this webhook already ran for this
+  // job and we should not double-credit amount_paid. The first delivery
+  // remains canonical; subsequent redeliveries are no-ops.
+  if (job.estimate_accepted_at) {
+    console.log(
+      `Skipping duplicate deposit webhook for job ${jobId} (already accepted at ${job.estimate_accepted_at}, session ${session.id})`
+    )
     return
   }
 
@@ -211,6 +223,83 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     } catch (err) {
       console.error('Owner email notification failed:', err)
     }
+  }
+
+  // Customer-side confirmation — closes the loop on payment so they don't
+  // wonder "did it go through?" Email is the receipt; SMS is the
+  // immediate "we got it" so they can stop staring at the page.
+  sendDepositConfirmation({
+    email: job.client_email,
+    phone: job.client_phone,
+    firstName: (job.client_name || '').split(' ')[0] || '',
+    title: job.title,
+    depositDollars,
+    estimateToken: job.estimate_token,
+  }).catch((err) => console.error('customer deposit confirmation failed:', err))
+}
+
+async function sendDepositConfirmation({
+  email,
+  phone,
+  firstName,
+  title,
+  depositDollars,
+  estimateToken,
+}: {
+  email: string | null
+  phone: string | null
+  firstName: string
+  title: string
+  depositDollars: number
+  estimateToken: string | null
+}) {
+  const amountStr = Math.round(depositDollars).toLocaleString()
+
+  if (phone) {
+    const e164 = toE164(phone)
+    if (e164) {
+      await sendSMS(e164, AUTO_MESSAGES.deposit_received(firstName, amountStr)).catch(
+        (err) => console.error('deposit_received SMS failed:', err)
+      )
+    }
+  }
+
+  if (email) {
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi there,'
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
+    const estimateUrl = estimateToken ? `${baseUrl}/estimates/${estimateToken}` : null
+    const dateStr = new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111827;">
+        <p style="font-size: 16px; margin: 0 0 12px 0;">${greeting}</p>
+        <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+          We received your <strong>$${amountStr} deposit</strong> for <strong>${title}</strong> on ${dateStr}. Thank you!
+        </p>
+        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:16px 18px; margin: 0 0 20px 0;">
+          <p style="font-size: 14px; color:#075985; font-weight:600; margin: 0 0 6px 0;">What happens next</p>
+          <p style="font-size: 14px; color:#0c4a6e; margin: 0 0 4px 0;">1. I'll be in touch within 24 hours to confirm your install schedule.</p>
+          <p style="font-size: 14px; color:#0c4a6e; margin: 0 0 4px 0;">2. We finalize the start date — you pick what works for your week.</p>
+          <p style="font-size: 14px; color:#0c4a6e; margin: 0;">3. Crew arrives ready: full team, all materials, jobsite protected.</p>
+        </div>
+        ${estimateUrl ? `<p style="font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; color:#374151;">You can review your estimate any time at <a href="${estimateUrl}" style="color:#0284c7;">${estimateUrl}</a>.</p>` : ''}
+        <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+          Questions? Reply to this email or text me at
+          <a href="tel:+16177661259" style="color:#0284c7;">(617) 766-1259</a>.
+        </p>
+        <p style="font-size: 16px; margin: 24px 0 4px 0;">— Vince</p>
+        <p style="font-size: 13px; color: #6b7280; margin: 0;">Aguirre Modern Tile · Greater Boston</p>
+      </div>
+    `.trim()
+    await sendCustomerEmail({
+      to: email,
+      subject: `Deposit received — $${amountStr} for ${title}`,
+      html,
+      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+    }).catch((err) => console.error('deposit_received email failed:', err))
   }
 }
 

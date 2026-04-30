@@ -20,7 +20,7 @@ export default function DashboardShell({
             there's no fixed bottom UI. The pt-4 on mobile (vs pt-16 before)
             reflects that the floating Menu button is gone — the tab bar at
             the bottom is the new mobile chrome. */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-36 sm:pt-8 sm:pb-8 lg:pt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-40 sm:pt-8 sm:pb-8 lg:pt-8">
           {children}
         </div>
       </main>

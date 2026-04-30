@@ -147,10 +147,10 @@ export default function JobMobileActionBar({ jobId, currentStatus, isOwner }: Pr
       )}
 
       {/* Sticky action bar — sits above the MobileTabBar.
-          76px clears the tab bar (~56px + iPhone safe-area). */}
+          64px matches the tab bar's min-h, plus iPhone safe-area. */}
       <div
         className="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
-        style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
+        style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-stretch gap-2 px-3 py-2.5">
           {primary && (

@@ -77,12 +77,12 @@ export default function MobileTabBar({ profile }: { profile: Profile }) {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-95 transition-transform ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 min-h-[64px] active:scale-95 transition-transform ${
                 active ? 'text-primary-600' : 'text-gray-500'
               }`}
             >
-              <Icon className={`w-6 h-6 ${active ? 'text-primary-600' : 'text-gray-500'}`} />
-              <span className={`text-[11px] font-medium ${active ? 'text-primary-700' : 'text-gray-600'}`}>
+              <Icon className={`w-7 h-7 ${active ? 'text-primary-600' : 'text-gray-500'}`} />
+              <span className={`text-xs font-medium ${active ? 'text-primary-700' : 'text-gray-600'}`}>
                 {tab.label}
               </span>
             </Link>
@@ -91,11 +91,11 @@ export default function MobileTabBar({ profile }: { profile: Profile }) {
         <button
           type="button"
           onClick={openSidebar}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-95 transition-transform text-gray-500"
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 min-h-[64px] active:scale-95 transition-transform text-gray-500"
           aria-label="Open more options"
         >
-          <Menu className="w-6 h-6 text-gray-500" />
-          <span className="text-[11px] font-medium text-gray-600">More</span>
+          <Menu className="w-7 h-7 text-gray-500" />
+          <span className="text-xs font-medium text-gray-600">More</span>
         </button>
       </div>
     </nav>

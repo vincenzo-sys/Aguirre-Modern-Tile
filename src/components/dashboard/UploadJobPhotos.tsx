@@ -28,26 +28,30 @@ export default function UploadJobPhotos({
         data: { user },
       } = await supabase.auth.getUser()
 
-      let succeeded = 0
-      for (const file of files) {
-        const ext = file.name.split('.').pop()
-        const path = `${jobId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-        const { error: upErr } = await supabase.storage
-          .from('job-photos')
-          .upload(path, file, { cacheControl: '3600' })
-        if (upErr) {
-          console.error('upload failed', upErr)
-          continue
-        }
-        const { error: insErr } = await supabase.from('job_photos').insert({
-          job_id: jobId,
-          storage_path: path,
-          file_name: file.name,
-          photo_type: photoType,
-          uploaded_by: user?.id ?? null,
+      // Upload all files concurrently rather than serially. On a phone with
+      // mediocre uplink, 6 photos go from ~6× single-photo latency to ~1×.
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const ext = file.name.split('.').pop()
+          const path = `${jobId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+          const { error: upErr } = await supabase.storage
+            .from('job-photos')
+            .upload(path, file, { cacheControl: '3600' })
+          if (upErr) {
+            console.error('upload failed', upErr)
+            return false
+          }
+          const { error: insErr } = await supabase.from('job_photos').insert({
+            job_id: jobId,
+            storage_path: path,
+            file_name: file.name,
+            photo_type: photoType,
+            uploaded_by: user?.id ?? null,
+          })
+          return !insErr
         })
-        if (!insErr) succeeded++
-      }
+      )
+      const succeeded = results.filter(Boolean).length
 
       if (succeeded > 0) {
         toast(`Uploaded ${succeeded} photo${succeeded === 1 ? '' : 's'}`)

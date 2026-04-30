@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, X, ImageIcon } from 'lucide-react'
 
 interface PhotoUploadProps {
@@ -10,7 +10,17 @@ interface PhotoUploadProps {
 
 export default function PhotoUpload({ files, onChange }: PhotoUploadProps) {
   const [dragOver, setDragOver] = useState(false)
+  const [previews, setPreviews] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Allocate blob URLs once per files change and revoke them on cleanup so
+  // previews don't pile up in memory across renders. Calling
+  // URL.createObjectURL inline in JSX would leak a fresh URL every paint.
+  useEffect(() => {
+    const urls = files.map((f) => URL.createObjectURL(f))
+    setPreviews(urls)
+    return () => urls.forEach(URL.revokeObjectURL)
+  }, [files])
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -71,12 +81,14 @@ export default function PhotoUpload({ files, onChange }: PhotoUploadProps) {
           {files.map((file, i) => (
             <div key={i} className="relative group">
               <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={file.name}
-                  className="w-full h-full object-cover"
-                />
+                {previews[i] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previews[i]}
+                    alt={file.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
               <button
                 type="button"

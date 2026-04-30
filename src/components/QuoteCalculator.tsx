@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Calculator, ArrowRight, Home, Droplets, Grid3X3, Wrench } from 'lucide-react'
 import Link from 'next/link'
 
@@ -35,20 +35,14 @@ export default function QuoteCalculator({ defaultRoomType, className = '' }: Pro
   const [size, setSize] = useState('')
   const [complexity, setComplexity] = useState('')
   const [needsDemo, setNeedsDemo] = useState(false)
-  const [estimate, setEstimate] = useState<{ min: number; max: number } | null>(null)
 
-  // Auto-recalculate as soon as all three picks are made — no "Calculate"
-  // button. The whole point is "get a number in 10 seconds." A button is a
-  // friction tax for an instant-feedback widget.
-  useEffect(() => {
-    if (!roomType || !size || !complexity) {
-      setEstimate(null)
-      return
-    }
+  // Auto-recalculates as picks change — no "Calculate" button.
+  const estimate = useMemo<{ min: number; max: number } | null>(() => {
+    if (!roomType || !size || !complexity) return null
     const room = roomTypes.find((r) => r.value === roomType)
     const sizeOption = sizes.find((s) => s.value === size)
     const complexityOption = complexities.find((c) => c.value === complexity)
-    if (!room || !sizeOption || !complexityOption) return
+    if (!room || !sizeOption || !complexityOption) return null
 
     let min = room.baseMin * sizeOption.multiplier * complexityOption.multiplier
     let max = room.baseMax * sizeOption.multiplier * complexityOption.multiplier
@@ -56,10 +50,10 @@ export default function QuoteCalculator({ defaultRoomType, className = '' }: Pro
       min += 500
       max += 1500
     }
-    setEstimate({
+    return {
       min: Math.round(min / 100) * 100,
       max: Math.round(max / 100) * 100,
-    })
+    }
   }, [roomType, size, complexity, needsDemo])
 
   return (

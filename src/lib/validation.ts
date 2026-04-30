@@ -13,6 +13,16 @@ export function isValidName(name: string): boolean {
   return name.trim().length >= 2
 }
 
+// Progressively format a US phone number as the user types: (xxx) xxx-xxxx.
+// Strips non-digits, caps at 10. Useful for controlled <input type="tel">.
+export function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 10)
+  if (digits.length === 0) return ''
+  if (digits.length < 4) return `(${digits}`
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
 export function validateContact(fields: { name: string; email: string; phone: string }) {
   const errors: Record<string, string> = {}
   if (!isValidName(fields.name)) errors.name = 'Name must be at least 2 characters'

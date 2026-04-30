@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, ArrowLeft, User, Phone, Mail, Home, Droplets, Grid3X3, Wrench, HelpCircle, Check } from 'lucide-react'
-import { validateContact } from '@/lib/validation'
+import { validateContact, formatPhone } from '@/lib/validation'
 
 const projectTypes = [
   {
@@ -37,17 +37,6 @@ const projectTypes = [
     icon: HelpCircle,
   },
 ]
-
-// Format a phone number string as the user types: (xxx) xxx-xxxx.
-// We strip non-digits, cap at 10, and progressively format. Keeping this
-// inline (no helper) so the input stays a controlled component.
-function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 10)
-  if (digits.length === 0) return ''
-  if (digits.length < 4) return `(${digits}`
-  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-}
 
 export default function LeadCaptureForm() {
   const router = useRouter()

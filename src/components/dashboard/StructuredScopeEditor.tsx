@@ -48,9 +48,6 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
   const [saving, setSaving] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
 
-  // Live-serialized preview — used for the raw-text panel and as the payload
-  // when saving. Kept reactive so toggling Show Raw always reflects current
-  // state.
   const serialized = useMemo(
     () =>
       serializeScopeNotes({
@@ -86,39 +83,28 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
     }
   }
 
-  function setIncluded(idx: number, value: string) {
-    setState((s) => {
-      const next = [...s.included]
-      next[idx] = value
-      return { ...s, included: next }
-    })
+  // Generic bullet-list handlers parameterized by which list to mutate.
+  // Empty list collapses to a single empty input so the user can keep
+  // typing without re-adding rows.
+  function bulletHandlers(key: 'included' | 'notIncluded') {
+    return {
+      onSet: (idx: number, value: string) =>
+        setState((s) => {
+          const next = [...s[key]]
+          next[idx] = value
+          return { ...s, [key]: next }
+        }),
+      onAdd: () =>
+        setState((s) => ({ ...s, [key]: [...s[key], ''] })),
+      onRemove: (idx: number) =>
+        setState((s) => {
+          const next = s[key].filter((_, i) => i !== idx)
+          return { ...s, [key]: next.length > 0 ? next : [''] }
+        }),
+    }
   }
-  function addIncluded() {
-    setState((s) => ({ ...s, included: [...s.included, ''] }))
-  }
-  function removeIncluded(idx: number) {
-    setState((s) => {
-      const next = s.included.filter((_, i) => i !== idx)
-      return { ...s, included: next.length > 0 ? next : [''] }
-    })
-  }
-
-  function setNotIncluded(idx: number, value: string) {
-    setState((s) => {
-      const next = [...s.notIncluded]
-      next[idx] = value
-      return { ...s, notIncluded: next }
-    })
-  }
-  function addNotIncluded() {
-    setState((s) => ({ ...s, notIncluded: [...s.notIncluded, ''] }))
-  }
-  function removeNotIncluded(idx: number) {
-    setState((s) => {
-      const next = s.notIncluded.filter((_, i) => i !== idx)
-      return { ...s, notIncluded: next.length > 0 ? next : [''] }
-    })
-  }
+  const includedHandlers = bulletHandlers('included')
+  const notIncludedHandlers = bulletHandlers('notIncluded')
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-5">
@@ -186,9 +172,7 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
           label="What's included"
           helper="Renders as the green check-list on the customer estimate."
           items={state.included}
-          onSet={setIncluded}
-          onAdd={addIncluded}
-          onRemove={removeIncluded}
+          {...includedHandlers}
           addLabel="Add included item"
           placeholder="e.g., Demo, waterproofing, tile installation"
         />
@@ -197,9 +181,7 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
           label="What's not included"
           helper="Renders as the gray dash-list on the customer estimate. Use this to set boundaries (e.g., customer-provided tile, plumbing fixtures)."
           items={state.notIncluded}
-          onSet={setNotIncluded}
-          onAdd={addNotIncluded}
-          onRemove={removeNotIncluded}
+          {...notIncludedHandlers}
           addLabel="Add not-included item"
           placeholder="e.g., Tile (you provide), plumbing fixtures, paint"
         />

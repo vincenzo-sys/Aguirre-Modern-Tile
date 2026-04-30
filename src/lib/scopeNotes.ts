@@ -1,32 +1,13 @@
-// Round-trip parser + serializer for the canonical `jobs.scope_notes` text
-// format. Five sections in fixed order, each prefaced by an uppercase header
-// on its own line:
+// Round-trip parser + serializer for the canonical `jobs.scope_notes`
+// text format (5 uppercase-headed sections: SCOPE OF WORK, WARRANTY,
+// WHAT'S INCLUDED, WHAT'S NOT INCLUDED, PAYMENT).
 //
-//   SCOPE OF WORK
-//   <body>
-//
-//   WARRANTY
-//   <text>
-//
-//   WHAT'S INCLUDED
-//   - <bullet>
-//   - <bullet>
-//
-//   WHAT'S NOT INCLUDED
-//   - <bullet>
-//
-//   PAYMENT
-//   <free-form notes>
-//
-// Why a single TEXT column and not five separate columns: legacy scopes were
-// hand-typed in this format before we added structured editing, and the
-// customer-facing estimate page already parses it. Keeping the storage format
-// stable means zero migration and zero risk to existing live estimates.
-//
-// `parse` is forgiving — it accepts the legacy "preamble" pattern (text
-// before any header gets treated as the scope body) and tolerates extra
-// blank lines. `serialize` always emits the canonical form so a save +
-// reload round-trips losslessly.
+// Why a single TEXT column and not five DB columns: legacy scopes were
+// hand-typed in this format before structured editing existed. Keeping
+// the storage format stable means zero migration risk to live estimates.
+// `parse` accepts the legacy "preamble" pattern (text before any header
+// becomes the body) so old hand-typed scopes load cleanly into the
+// editor.
 
 export type StructuredScope = {
   scopeOfWork: string

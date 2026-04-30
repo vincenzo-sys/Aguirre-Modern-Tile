@@ -4,67 +4,16 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import {
-  Home,
-  Inbox,
-  ClipboardList,
-  CalendarDays,
-  Package,
-  Users,
-  FileText,
-  BarChart3,
-  MapPin,
-  Settings,
-  LogOut,
-  X,
-  ImageIcon,
-} from 'lucide-react'
+import { LogOut, X } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
-
-type NavItem = {
-  label: string
-  href: string
-  icon: typeof Home
-}
-
-type NavSection = {
-  heading: string
-  items: NavItem[]
-}
-
-const ownerSections: NavSection[] = [
-  {
-    heading: 'Sales',
-    items: [
-      { label: 'Leads', href: '/dashboard/leads', icon: Inbox },
-      { label: 'Customers', href: '/dashboard/customers', icon: Users },
-      { label: 'Gallery', href: '/dashboard/gallery', icon: ImageIcon },
-      { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
-      { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-    ],
-  },
-  {
-    heading: 'Operations',
-    items: [
-      { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays },
-      { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList },
-      { label: 'Materials', href: '/dashboard/materials', icon: Package },
-      { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
-    ],
-  },
-  {
-    heading: 'Estimation',
-    items: [
-      { label: 'Templates', href: '/dashboard/templates', icon: FileText },
-      { label: 'Estimating Guidance', href: '/dashboard/settings', icon: Settings },
-    ],
-  },
-]
-
-const installerPrimary: NavItem[] = [
-  { label: 'Today', href: '/dashboard', icon: Home },
-  { label: 'Week', href: '/dashboard/jobs', icon: CalendarDays },
-]
+import {
+  ownerHome,
+  ownerSections,
+  installerHome,
+  installerExtras,
+  isNavActive,
+  type NavItem,
+} from '@/lib/dashboardNav'
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
@@ -88,14 +37,8 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     router.refresh()
   }
 
-  function isActive(href: string) {
-    if (href === '/dashboard') return pathname === '/dashboard'
-    if (href === '/dashboard/jobs') return pathname.startsWith('/dashboard/jobs')
-    return pathname.startsWith(href)
-  }
-
   function renderItem(item: NavItem) {
-    const active = isActive(item.href)
+    const active = isNavActive(item.href, pathname || '')
     return (
       <Link
         key={item.href}
@@ -111,9 +54,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     )
   }
 
-  const homeItem: NavItem = isOwner
-    ? { label: 'Home', href: '/dashboard', icon: Home }
-    : installerPrimary[0]
+  const homeItem: NavItem = isOwner ? ownerHome : installerHome
 
   const navContent = (
     <>
@@ -138,7 +79,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             </div>
           ))
         ) : (
-          <div className="pt-2">{installerPrimary.slice(1).map(renderItem)}</div>
+          <div className="pt-2">{installerExtras.map(renderItem)}</div>
         )}
       </nav>
 
@@ -156,13 +97,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   return (
     <>
-      {/* Floating Menu button is now superseded by the MobileTabBar's "More"
-          tab on mobile. Kept for installer mode and as a fallback if the tab
-          bar isn't mounted yet — but hidden on screens that have the bottom
-          bar (any mobile dashboard page). The dashboard:open-sidebar event
-          handler above means even without this button, the drawer is
-          reachable from More. */}
-
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"

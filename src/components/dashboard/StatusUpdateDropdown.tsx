@@ -5,55 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobStatus } from '@/lib/supabase/types'
-
-const ownerTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
-  lead: [
-    { label: 'Mark as Quoted', next: 'quoted' },
-    { label: 'Cancel', next: 'cancelled' },
-  ],
-  quoted: [
-    { label: 'Mark as Revised', next: 'estimate_revised' },
-    { label: 'Deposit Received', next: 'accepted_not_scheduled' },
-    { label: 'Schedule Job', next: 'scheduled' },
-    { label: 'Cancel', next: 'cancelled' },
-  ],
-  estimate_revised: [
-    { label: 'Deposit Received', next: 'accepted_not_scheduled' },
-    { label: 'Schedule Job', next: 'scheduled' },
-    { label: 'Cancel', next: 'cancelled' },
-  ],
-  accepted_not_scheduled: [
-    { label: 'Schedule Job', next: 'scheduled' },
-    { label: 'Cancel', next: 'cancelled' },
-  ],
-  scheduled: [
-    { label: 'Start Work', next: 'in_progress' },
-    { label: 'Cancel', next: 'cancelled' },
-  ],
-  in_progress: [
-    { label: 'Waiting for Materials', next: 'waiting_for_materials' },
-    { label: 'Mark Complete', next: 'completed' },
-  ],
-  waiting_for_materials: [
-    { label: 'Resume Work', next: 'in_progress' },
-    { label: 'Mark Complete', next: 'completed' },
-  ],
-  completed: [
-    { label: 'Mark as Paid', next: 'paid' },
-  ],
-}
-
-const crewTransitions: Partial<Record<JobStatus, { label: string; next: JobStatus }[]>> = {
-  scheduled: [{ label: 'Start Work', next: 'in_progress' }],
-  in_progress: [
-    { label: 'Waiting for Materials', next: 'waiting_for_materials' },
-    { label: 'Mark Complete', next: 'completed' },
-  ],
-  waiting_for_materials: [
-    { label: 'Resume Work', next: 'in_progress' },
-    { label: 'Mark Complete', next: 'completed' },
-  ],
-}
+import { getTransitions } from '@/lib/jobStatusTransitions'
 
 interface StatusUpdateDropdownProps {
   jobId: string
@@ -65,9 +17,9 @@ export default function StatusUpdateDropdown({ jobId, currentStatus, isOwner = f
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const transitions = isOwner ? ownerTransitions[currentStatus] : crewTransitions[currentStatus]
+  const transitions = getTransitions(isOwner ? 'owner' : 'crew', currentStatus)
 
-  if (!transitions || transitions.length === 0) return null
+  if (transitions.length === 0) return null
 
   async function handleUpdate(next: JobStatus) {
     setOpen(false)
@@ -114,7 +66,7 @@ export default function StatusUpdateDropdown({ jobId, currentStatus, isOwner = f
                 key={t.next}
                 onClick={() => handleUpdate(t.next)}
                 className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                  t.next === 'cancelled' ? 'text-red-600' : 'text-gray-700'
+                  t.tone === 'danger' ? 'text-red-600' : 'text-gray-700'
                 }`}
               >
                 {t.label}

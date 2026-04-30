@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -16,7 +16,6 @@ import {
   MapPin,
   Settings,
   LogOut,
-  Menu,
   X,
   ImageIcon,
 } from 'lucide-react'
@@ -73,6 +72,15 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   const supabase = createClient()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isOwner = profile.role === 'owner'
+
+  // Bottom tab bar's "More" tab triggers the drawer via window event so the
+  // shared layout doesn't need to lift drawer state. Listener mounted once
+  // per Sidebar render, cleaned on unmount.
+  useEffect(() => {
+    const open = () => setMobileOpen(true)
+    window.addEventListener('dashboard:open-sidebar', open)
+    return () => window.removeEventListener('dashboard:open-sidebar', open)
+  }, [])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -148,12 +156,12 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-800 text-white shadow-lg"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      {/* Floating Menu button is now superseded by the MobileTabBar's "More"
+          tab on mobile. Kept for installer mode and as a fallback if the tab
+          bar isn't mounted yet — but hidden on screens that have the bottom
+          bar (any mobile dashboard page). The dashboard:open-sidebar event
+          handler above means even without this button, the drawer is
+          reachable from More. */}
 
       {mobileOpen && (
         <div

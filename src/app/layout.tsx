@@ -38,6 +38,15 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <meta name="theme-color" content="#0284c7" />
+        {/* PWA — lets Christian install the dashboard to his iPhone homescreen.
+            The manifest start_url is /dashboard so the installed app launches
+            straight into the field view, skipping the marketing site. iOS
+            Safari needs the apple-* meta tags separately from the manifest. */}
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/images/logo.jpg" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Aguirre Tile" />
       </head>
       <body className={inter.className}>
         {children}

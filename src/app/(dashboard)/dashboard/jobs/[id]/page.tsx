@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft, Calendar, User, Ruler, Clock, ImageIcon, DollarSign, CheckCircle2 } from 'lucide-react'
 import JobStatusBadge from '@/components/dashboard/JobStatusBadge'
 import StatusUpdateDropdown from '@/components/dashboard/StatusUpdateDropdown'
+import JobMobileActionBar from '@/components/dashboard/JobMobileActionBar'
 import CustomerCard from '@/components/dashboard/CustomerCard'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
@@ -453,6 +454,11 @@ export default async function JobDetailPage({
         photos={photosWithUrls.filter((p) => p.photo_type === 'after')}
         uploadSlot={<UploadJobPhotos jobId={job.id} photoType="after" label="Add after photos" />}
       />
+
+      {/* Mobile-only sticky action bar with the most-likely-next status as
+          a thumb-zone primary button. Sits above the bottom tab bar.
+          Desktop keeps the existing StatusUpdateDropdown above. */}
+      <JobMobileActionBar jobId={job.id} currentStatus={job.status} isOwner={isOwner} />
     </div>
   )
 }

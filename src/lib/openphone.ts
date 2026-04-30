@@ -185,4 +185,10 @@ export const AUTO_MESSAGES = {
 
   deposit_received: (firstName: string, amount: string) =>
     `Thanks ${firstName || 'there'}! We received your $${amount} deposit and your install date is reserved. I'll be in touch within 24 hours to confirm the schedule. - Vince, Aguirre Modern Tile`,
+
+  install_day_before: (firstName: string, address: string) =>
+    `Hi ${firstName || 'there'} — quick heads up: our crew arrives tomorrow morning between 8 and 9am${address ? ` at ${address}` : ''} for your tile install. Anything to know before we get there? Just text back. - Vince, Aguirre Modern Tile`,
+
+  install_morning_of: (firstName: string) =>
+    `Good morning ${firstName || ''}! Our crew is on the way for your tile install today. Should be there between 8 and 9am. - Aguirre Modern Tile`,
 } as const

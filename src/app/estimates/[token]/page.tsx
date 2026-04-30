@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
+import ShareEstimateButton from './ShareEstimateButton'
 import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus, Calendar } from 'lucide-react'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { parseScopeNotes as parseStructuredScope } from '@/lib/scopeNotes'
+import { getCmsCollection } from '@/lib/cms'
 
 type EstimateResponse = {
   title: string
@@ -139,6 +141,43 @@ function renderCustomerGroup(
   )
 }
 
+// Map job_type strings (e.g. "Bathroom Tile") to gallery_projects category
+// values ("Bathroom"). Returns null when the job type doesn't have a clean
+// gallery analog so we just skip the gallery rather than render mismatched
+// photos.
+const JOB_TYPE_TO_GALLERY_CATEGORY: Record<string, string> = {
+  'Bathroom Tile': 'Bathroom',
+  Bathroom: 'Bathroom',
+  'Shower Tile': 'Shower',
+  Shower: 'Shower',
+  'Floor Tile': 'Floor',
+  Floor: 'Floor',
+  Backsplash: 'Backsplash',
+  'Tile Repair': 'Repair',
+  'Tile Reglazing': 'Reglazing',
+}
+
+type GalleryPhoto = { title: string; image: string }
+
+async function getSimilarGalleryPhotos(jobType: string | null): Promise<GalleryPhoto[]> {
+  if (!jobType) return []
+  const category = JOB_TYPE_TO_GALLERY_CATEGORY[jobType]
+  if (!category) return []
+  try {
+    const res = await getCmsCollection<{ title: string; image: string; category: string }>(
+      'gallery-projects',
+      {
+        'where[category][equals]': category,
+        sort: 'sortOrder',
+        limit: '3',
+      }
+    )
+    return (res?.docs ?? []).map((d) => ({ title: d.title, image: d.image }))
+  } catch {
+    return []
+  }
+}
+
 // Extract the "Valid N days. Generated YYYY-MM-DD" footer from the raw
 // scope_notes if present, and convert it to a human-readable expiration
 // date. Lives outside the structured parser because it operates on the raw
@@ -211,6 +250,12 @@ export default async function EstimatePage({
   const total =
     estimate.estimated_cost ??
     estimate.line_items.reduce((s, i) => s + (i.amount ?? 0), 0)
+
+  // Pull 3 gallery photos from the CMS that match this job's category.
+  // Renders right before the Total + deposit callout as social proof at
+  // the moment of decision. Falls back gracefully if CMS is offline —
+  // gallery is a nice-to-have, not load-bearing.
+  const galleryPhotos = await getSimilarGalleryPhotos(estimate.job_type)
 
   const structured = parseStructuredScope(estimate.scope_notes)
   const validThrough = extractValidThrough(estimate.scope_notes)
@@ -468,6 +513,30 @@ export default async function EstimatePage({
           </section>
         )}
 
+        {/* Similar work gallery — social proof right before the price.
+            Renders only when CMS returns matching photos. */}
+        {galleryPhotos.length > 0 && (
+          <section className="mb-6">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">
+              Recent {(estimate.job_type || '').toLowerCase()} projects
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {galleryPhotos.map((photo, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={i}
+                  src={photo.image}
+                  alt={photo.title}
+                  className="aspect-square w-full object-cover rounded-lg border border-gray-200"
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 text-center mt-2">
+              Real projects we&apos;ve completed in Greater Boston.
+            </p>
+          </section>
+        )}
+
         {/* Total + deposit */}
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-baseline justify-between mb-3">
@@ -605,16 +674,15 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* Questions block — text + call options. Most homeowners prefer
-            text to phone for "I have a quick question" interactions, so
-            give them both with text on the left as the lower-friction
-            default. The sms: pre-fill threads back to Vince's phone with
-            context already in the message body. */}
+        {/* Questions + share block. Three thumb-zone actions for the three
+            most common stall points: a question (Text Vince), a phone
+            preference (Call), and a spousal-decision check (Share). The
+            sms: pre-fill threads back with context already in the body. */}
         <div className="mt-8 mb-4">
           <p className="text-center text-sm font-medium text-gray-700 mb-3">
-            Have a question or want changes?
+            Have a question, or want to share with your spouse?
           </p>
-          <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2 max-w-2xl mx-auto">
             <a
               href={`sms:${COMPANY_PHONE_TEL}?&body=${encodeURIComponent(
                 `Hi Vince — question about my estimate (${estimate.client_name}):\n\n`
@@ -631,6 +699,11 @@ export default async function EstimatePage({
               <Phone className="w-4 h-4" />
               Call {COMPANY_PHONE}
             </a>
+            <ShareEstimateButton
+              url={`${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''}/estimates/${token}`}
+              customerName={estimate.client_name}
+              total={formatCurrency(total)}
+            />
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">
             Small team — Vince picks up.

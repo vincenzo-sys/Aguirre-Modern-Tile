@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
 import { sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
 import { sendCustomerEmail } from '@/lib/email'
+import { buildIcs } from '@/lib/ics'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { Resend } from 'resend'
@@ -127,7 +128,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, title, client_name, client_email, client_phone, status, scheduled_start, scheduled_end, estimated_days, amount_paid, estimated_cost, estimate_accepted_at, estimate_token')
+    .select('id, title, client_name, client_email, client_phone, client_address, status, scheduled_start, scheduled_end, estimated_days, amount_paid, estimated_cost, estimate_accepted_at, estimate_token')
     .eq('id', jobId)
     .single()
 
@@ -229,29 +230,41 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // wonder "did it go through?" Email is the receipt; SMS is the
   // immediate "we got it" so they can stop staring at the page.
   sendDepositConfirmation({
+    jobId: job.id,
     email: job.client_email,
     phone: job.client_phone,
     firstName: (job.client_name || '').split(' ')[0] || '',
     title: job.title,
     depositDollars,
     estimateToken: job.estimate_token,
+    scheduledStart: job.scheduled_start,
+    scheduledEnd: (updates.scheduled_end as string | undefined) ?? job.scheduled_end,
+    address: job.client_address,
   }).catch((err) => console.error('customer deposit confirmation failed:', err))
 }
 
 async function sendDepositConfirmation({
+  jobId,
   email,
   phone,
   firstName,
   title,
   depositDollars,
   estimateToken,
+  scheduledStart,
+  scheduledEnd,
+  address,
 }: {
+  jobId: string
   email: string | null
   phone: string | null
   firstName: string
   title: string
   depositDollars: number
   estimateToken: string | null
+  scheduledStart: string | null
+  scheduledEnd: string | null
+  address: string | null
 }) {
   const amountStr = Math.round(depositDollars).toLocaleString()
 
@@ -294,11 +307,32 @@ async function sendDepositConfirmation({
         <p style="font-size: 13px; color: #6b7280; margin: 0;">Aguirre Modern Tile · Greater Boston</p>
       </div>
     `.trim()
+    // Attach a calendar invite when we have install dates. iOS / Gmail /
+    // Outlook all render this as a tap-to-add event so the customer can
+    // drop the install onto their calendar in one tap.
+    const attachments = scheduledStart
+      ? [
+          {
+            filename: 'aguirre-install.ics',
+            contentType: 'text/calendar; charset=utf-8',
+            content: buildIcs({
+              uid: jobId,
+              startDate: scheduledStart,
+              endDate: scheduledEnd || scheduledStart,
+              summary: `Aguirre Modern Tile — ${title}`,
+              description: `Tile install. Deposit received.\n\nQuestions: text or call (617) 766-1259.`,
+              location: address || '',
+            }),
+          },
+        ]
+      : undefined
+
     await sendCustomerEmail({
       to: email,
       subject: `Deposit received — $${amountStr} for ${title}`,
       html,
       replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+      attachments,
     }).catch((err) => console.error('deposit_received email failed:', err))
   }
 }

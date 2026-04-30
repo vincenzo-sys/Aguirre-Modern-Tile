@@ -24,11 +24,20 @@ export type CustomerEmailResult = {
   usedFallback?: boolean
 }
 
+interface Attachment {
+  filename: string
+  // UTF-8 string content (Resend accepts strings as well as base64 buffers).
+  content: string
+  // Optional content type — Resend defaults to application/octet-stream.
+  contentType?: string
+}
+
 interface SendArgs {
   to: string
   subject: string
   html: string
   replyTo?: string
+  attachments?: Attachment[]
 }
 
 export async function sendCustomerEmail({
@@ -36,11 +45,20 @@ export async function sendCustomerEmail({
   subject,
   html,
   replyTo,
+  attachments,
 }: SendArgs): Promise<CustomerEmailResult> {
   if (!process.env.RESEND_API_KEY) {
     return { success: false, error: 'RESEND_API_KEY not set' }
   }
   const resend = new Resend(process.env.RESEND_API_KEY)
+
+  // Resend's TS types want Buffer-like content for attachments; we pass
+  // string content (e.g. an .ics file) and let it serialize as base64.
+  const resendAttachments = attachments?.map((a) => ({
+    filename: a.filename,
+    content: Buffer.from(a.content, 'utf8'),
+    contentType: a.contentType,
+  }))
 
   try {
     const sent = await resend.emails.send({
@@ -49,6 +67,7 @@ export async function sendCustomerEmail({
       subject,
       html,
       replyTo,
+      attachments: resendAttachments,
     })
     if (!sent.error) {
       return { success: true, id: sent.data?.id }
@@ -61,6 +80,7 @@ export async function sendCustomerEmail({
         subject,
         html,
         replyTo,
+        attachments: resendAttachments,
       })
       if (retry.error) {
         return { success: false, error: retry.error.message, usedFallback: true }

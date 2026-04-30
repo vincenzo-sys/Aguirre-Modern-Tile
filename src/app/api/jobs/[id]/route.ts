@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
+import { sendCustomerEmail } from '@/lib/email'
 import { requireApiAuth } from '@/lib/apiAuth'
 
 // Admin client — auth is already enforced upstream by requireApiAuth (which
@@ -146,6 +147,23 @@ export async function PATCH(
             })
           }).catch(console.error)
         }
+
+        // Job-completion close-out email — review request + final payment
+        // info + thank-you, sent the moment status flips to completed. The
+        // SMS template is generic; the email is the load-bearing close.
+        if (newStatus === 'completed') {
+          const clientEmail = (job as any).client_email
+          if (clientEmail) {
+            sendCompletionEmail({
+              email: clientEmail,
+              firstName: ((job as any).client_name || '').split(' ')[0] || '',
+              title: (job as any).title,
+              estimatedCost: Number((job as any).estimated_cost ?? 0),
+              amountPaid: Number((job as any).amount_paid ?? 0),
+              estimateToken: (job as any).estimate_token,
+            }).catch((err) => console.error('completion email failed:', err))
+          }
+        }
       }
     }
 
@@ -154,6 +172,80 @@ export async function PATCH(
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+async function sendCompletionEmail({
+  email,
+  firstName,
+  title,
+  estimatedCost,
+  amountPaid,
+  estimateToken,
+}: {
+  email: string
+  firstName: string
+  title: string
+  estimatedCost: number
+  amountPaid: number
+  estimateToken: string | null
+}) {
+  const balance = Math.max(0, estimatedCost - amountPaid)
+  const balanceStr = balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi there,'
+  const reviewUrl =
+    process.env.GOOGLE_REVIEW_URL ||
+    'https://www.google.com/maps/place/Aguirre+Modern+Tile'
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
+  const estimateUrl = estimateToken ? `${baseUrl}/estimates/${estimateToken}` : null
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111827;">
+      <p style="font-size: 16px; margin: 0 0 12px 0;">${greeting}</p>
+      <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+        <strong>${title}</strong> is complete. Thank you for trusting us with your home — we hope you love it.
+      </p>
+
+      ${
+        balance > 0
+          ? `<div style="background:#fefce8; border:1px solid #fde047; border-radius:8px; padding:16px 18px; margin: 0 0 20px 0;">
+              <p style="font-size: 14px; color:#854d0e; font-weight:600; margin: 0 0 6px 0;">Final payment</p>
+              <p style="font-size: 14px; color:#713f12; margin: 0 0 4px 0;">Balance due: <strong>$${balanceStr}</strong></p>
+              <p style="font-size: 13px; color:#854d0e; margin: 0;">An invoice with payment options is on the way separately. You can also Zelle, Venmo, or send a check — just reply if you need details.</p>
+            </div>`
+          : `<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:16px 18px; margin: 0 0 20px 0;">
+              <p style="font-size: 14px; color:#15803d; font-weight:600; margin: 0;">Paid in full — thank you!</p>
+            </div>`
+      }
+
+      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:18px; margin: 0 0 20px 0; text-align: center;">
+        <p style="font-size: 15px; color:#075985; margin: 0 0 12px 0;">Would you take 30 seconds to leave us a Google review?</p>
+        <p style="font-size: 13px; color:#0c4a6e; margin: 0 0 14px 0;">Five-star reviews are the single biggest reason new customers choose us — it really makes a difference for a small team like ours.</p>
+        <a href="${reviewUrl}" target="_blank" style="display:inline-block; padding:10px 20px; background:#0284c7; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;">Leave a Google review →</a>
+      </div>
+
+      <p style="font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; color:#374151;">
+        A couple of care tips for the first 72 hours: avoid heavy water on the grout while it cures, and don't move furniture across the floor. Beyond that, the tile is yours — enjoy it.
+      </p>
+      ${
+        estimateUrl
+          ? `<p style="font-size: 13px; color:#6b7280; margin: 0 0 16px 0;">Original estimate: <a href="${estimateUrl}" style="color:#0284c7;">${estimateUrl}</a></p>`
+          : ''
+      }
+      <p style="font-size: 16px; line-height: 1.5; margin: 0 0 16px 0;">
+        Anything come up — a chip, a question, a stain you're not sure about — just reply or text me at
+        <a href="tel:+16177661259" style="color:#0284c7;">(617) 766-1259</a>.
+      </p>
+      <p style="font-size: 16px; margin: 24px 0 4px 0;">— Vince</p>
+      <p style="font-size: 13px; color: #6b7280; margin: 0;">Aguirre Modern Tile · Greater Boston</p>
+    </div>
+  `.trim()
+
+  await sendCustomerEmail({
+    to: email,
+    subject: `${title} — all done. Thanks!`,
+    html,
+    replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+  })
 }
 
 // DELETE /api/jobs/[id] — Remove a job.

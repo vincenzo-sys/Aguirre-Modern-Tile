@@ -104,6 +104,11 @@ export interface Job {
   final_payment_method: 'cash' | 'check' | 'stripe' | 'zelle' | 'venmo' | 'other' | null
   final_payment_note: string | null
   final_payment_by_profile_id: string | null
+  crew_approval_status: 'pending' | 'approved' | 'rejected' | null
+  crew_approval_notes: string | null
+  crew_approval_requested_at: string | null
+  crew_approved_at: string | null
+  crew_approved_by: string | null
   created_by: string | null
   created_at: string
   updated_at: string

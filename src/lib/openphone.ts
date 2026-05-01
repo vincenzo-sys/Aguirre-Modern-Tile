@@ -191,4 +191,13 @@ export const AUTO_MESSAGES = {
 
   install_morning_of: (firstName: string) =>
     `Good morning ${firstName || ''}! Our crew is on the way for your tile install today. Should be there between 8 and 9am. - Aguirre Modern Tile`,
+
+  crew_approval_request: (jobTitle: string, total: string, days: string, dashUrl: string) =>
+    `Quick approval needed: ${jobTitle} — total $${total}, ${days} days. Tap to review and approve or flag: ${dashUrl}`,
+
+  crew_approval_result: (jobTitle: string, approved: boolean, notes: string) => {
+    const verb = approved ? 'approved' : 'flagged for changes'
+    const tail = notes ? ` Notes: ${notes}` : ''
+    return `Christian ${verb} the estimate for ${jobTitle}.${tail}`
+  },
 } as const

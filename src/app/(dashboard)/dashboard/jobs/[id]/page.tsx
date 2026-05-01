@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, User, Ruler, Clock, ImageIcon, DollarSign, CheckCi
 import JobStatusBadge from '@/components/dashboard/JobStatusBadge'
 import StatusUpdateDropdown from '@/components/dashboard/StatusUpdateDropdown'
 import JobMobileActionBar from '@/components/dashboard/JobMobileActionBar'
+import CrewApprovalCard from '@/components/dashboard/CrewApprovalCard'
 import CustomerCard from '@/components/dashboard/CustomerCard'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
@@ -389,6 +390,17 @@ export default async function JobDetailPage({
           <EstimateShareLink job={job} />
         </div>
       )}
+
+      {/* Crew approval — owner sees button + status, crew sees pending
+          banner with Approve / Needs changes when Vince has requested it. */}
+      <CrewApprovalCard
+        jobId={job.id}
+        isOwner={isOwner}
+        status={job.crew_approval_status}
+        notes={job.crew_approval_notes}
+        requestedAt={job.crew_approval_requested_at}
+        approvedAt={job.crew_approved_at}
+      />
 
       {/* Line Items */}
       <div className="mb-6">

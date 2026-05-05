@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, X, Trash2 } from 'lucide-react'
+import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
 
@@ -274,6 +274,75 @@ export default function AddEventModal({
               </p>
             </div>
           )}
+
+          {/* Customer details panel — appears the moment a job is linked.
+              Address, phone, and email are tap-through links: address opens
+              Apple/Google Maps for directions, phone opens the dialer, email
+              opens the mail composer. The whole point is that Christian can
+              pull up "where am I going / who do I call" without leaving the
+              calendar to dig through the job page. */}
+          {(() => {
+            const linkedJob = jobs.find((j) => j.id === jobId)
+            if (!linkedJob) return null
+            const mapsUrl = linkedJob.client_address
+              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(linkedJob.client_address)}`
+              : null
+            return (
+              <div className="rounded-md border border-primary-200 bg-primary-50 p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-sm font-semibold text-primary-900">
+                    {linkedJob.client_name}
+                  </div>
+                  <a
+                    href={`/dashboard/jobs/${linkedJob.id}`}
+                    className="inline-flex items-center gap-1 text-[11px] text-primary-700 hover:underline shrink-0"
+                  >
+                    Open job
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="text-[11px] text-primary-700">
+                  #{linkedJob.job_number} {linkedJob.title}
+                </div>
+                <div className="flex flex-col gap-1.5 pt-1">
+                  {linkedJob.client_address && (
+                    <a
+                      href={mapsUrl ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-start gap-2 text-sm text-primary-800 hover:underline"
+                    >
+                      <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span className="break-words">{linkedJob.client_address}</span>
+                    </a>
+                  )}
+                  {linkedJob.client_phone && (
+                    <a
+                      href={`tel:${linkedJob.client_phone}`}
+                      className="inline-flex items-center gap-2 text-sm text-primary-800 hover:underline"
+                    >
+                      <Phone className="w-4 h-4 shrink-0" />
+                      {linkedJob.client_phone}
+                    </a>
+                  )}
+                  {linkedJob.client_email && (
+                    <a
+                      href={`mailto:${linkedJob.client_email}`}
+                      className="inline-flex items-center gap-2 text-sm text-primary-800 hover:underline break-all"
+                    >
+                      <Mail className="w-4 h-4 shrink-0" />
+                      {linkedJob.client_email}
+                    </a>
+                  )}
+                  {!linkedJob.client_address && !linkedJob.client_phone && !linkedJob.client_email && (
+                    <p className="text-[11px] text-primary-700 italic">
+                      No contact info on this job yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>

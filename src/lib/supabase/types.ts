@@ -91,6 +91,13 @@ export interface Job {
   crew_instructions: string | null
   crew_log: string | null
   customer_provides: string | null
+  // Snapshotted from estimate_defaults at estimate-generate time. Editable
+  // per-job in the dashboard so wording can be tweaked without affecting
+  // already-issued estimates. Optional in TS since legacy rows + demo
+  // fixtures pre-date migration 029.
+  warranty_text?: string | null
+  payment_terms_text?: string | null
+  payment_methods?: string[] | null
   estimate_token: string | null
   estimate_sent_at: string | null
   estimate_viewed_at: string | null
@@ -121,6 +128,21 @@ export interface JobWithAssignee extends Job {
 export interface JobWithCustomer extends Job {
   customer?: Customer | null
   assignee?: Profile | null
+}
+
+export interface CalendarEvent {
+  id: string
+  title: string
+  start_at: string
+  end_at: string | null
+  all_day: boolean
+  job_id: string | null
+  customer_id: string | null
+  notes: string | null
+  color: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface JobPhoto {
@@ -310,6 +332,11 @@ export interface Database {
         Row: QuoteRequest
         Insert: Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>>
+      }
+      calendar_events: {
+        Row: CalendarEvent
+        Insert: Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>>
       }
     }
   }

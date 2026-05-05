@@ -1,6 +1,8 @@
 import { headers } from 'next/headers'
 import ScheduleCalendar from '@/components/dashboard/ScheduleCalendar'
 import IcsSubscribeButton from '@/components/dashboard/IcsSubscribeButton'
+import { createClient } from '@/lib/supabase/server'
+import type { JobWithAssignee, Job } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Schedule — Aguirre Modern Tile',
@@ -16,6 +18,23 @@ export default async function SchedulePage() {
   const proto = hdrs.get('x-forwarded-proto') ?? (host.includes('localhost') ? 'http' : 'https')
   const icsUrl = apiKey ? `${proto}://${host}/api/schedule.ics?key=${apiKey}` : ''
 
+  // Active jobs feed the AddEventModal's "Link to job" dropdown so a custom
+  // event can pull address/phone from the linked job. Filtered to non-archived
+  // statuses so the dropdown isn't drowned in old completed work.
+  let jobs: JobWithAssignee[] = []
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('jobs')
+      .select('*')
+      .in('status', ['accepted_not_scheduled', 'scheduled', 'in_progress', 'waiting_for_materials', 'completed'])
+      .order('scheduled_start', { ascending: false, nullsFirst: false })
+      .limit(100)
+    jobs = ((data ?? []) as Job[]).map((j) => ({ ...j, line_items: j.line_items ?? [], assignee: null }))
+  } catch {
+    // Schedule still works without the dropdown.
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
@@ -28,7 +47,7 @@ export default async function SchedulePage() {
         {icsUrl && <IcsSubscribeButton icsUrl={icsUrl} />}
       </div>
 
-      <ScheduleCalendar />
+      <ScheduleCalendar jobs={jobs} />
     </div>
   )
 }

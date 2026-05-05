@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Clock, Hammer, MapPin, Phone } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Hammer, MapPin, Phone, Plus, Sparkles } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import AddEventModal from './AddEventModal'
+import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
 
 type ScheduleEvent =
   | {
@@ -24,6 +26,18 @@ type ScheduleEvent =
       start: string
       end: string
       status: string
+      address: string | null
+      phone: string | null
+    }
+  | {
+      kind: 'custom'
+      id: string
+      title: string
+      start: string
+      end: string | null
+      all_day: boolean
+      notes: string | null
+      job_id: string | null
       address: string | null
       phone: string | null
     }
@@ -79,12 +93,19 @@ function addDays(d: Date, n: number): Date {
 
 type View = 'month' | 'week' | 'agenda'
 
-export default function ScheduleCalendar() {
+export default function ScheduleCalendar({
+  jobs = [],
+}: {
+  jobs?: JobWithAssignee[]
+} = {}) {
   const router = useRouter()
   const [view, setView] = useState<View>('month')
   const [cursor, setCursor] = useState<Date>(new Date())
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [modalDefaultDate, setModalDefaultDate] = useState<string | null>(null)
 
   // Compute the date window the calendar wants to fetch, based on view + cursor
   const window = useMemo(() => {
@@ -127,14 +148,23 @@ export default function ScheduleCalendar() {
     }
   }, [window.from, window.to])
 
-  // For installs that span multiple days, expand into per-day occurrences so
-  // each day in the grid shows the install bar. (Matches CalendarView pattern.)
+  // For installs (and multi-day custom events) that span multiple days,
+  // expand into per-day occurrences so each day in the grid shows the bar.
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>()
     for (const ev of events) {
       if (ev.kind === 'install') {
         const start = new Date(ev.start + 'T00:00:00')
         const end = new Date(ev.end + 'T00:00:00')
+        for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+          const key = ymd(d)
+          if (!map.has(key)) map.set(key, [])
+          map.get(key)!.push(ev)
+        }
+      } else if (ev.kind === 'custom' && ev.end) {
+        // Span multi-day custom events across each cell.
+        const start = new Date(ev.start)
+        const end = new Date(ev.end)
         for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
           const key = ymd(d)
           if (!map.has(key)) map.set(key, [])
@@ -166,9 +196,43 @@ export default function ScheduleCalendar() {
   function openEvent(ev: ScheduleEvent) {
     if (ev.kind === 'install') {
       router.push(`/dashboard/jobs/${ev.id}`)
-    } else {
+    } else if (ev.kind === 'estimate_visit') {
       router.push(`/dashboard/leads/${ev.lead_id}`)
+    } else {
+      // Custom event — open the edit modal in place. We re-hydrate a
+      // CalendarEvent shape from the slim ScheduleEvent the API returns.
+      setEditingEvent({
+        id: ev.id,
+        title: ev.title,
+        start_at: ev.start,
+        end_at: ev.end,
+        all_day: ev.all_day,
+        job_id: ev.job_id,
+        customer_id: null,
+        notes: ev.notes,
+        color: null,
+        created_by: null,
+        created_at: '',
+        updated_at: '',
+      })
+      setModalDefaultDate(null)
+      setModalOpen(true)
     }
+  }
+
+  function openAddEvent() {
+    setEditingEvent(null)
+    setModalDefaultDate(null)
+    setModalOpen(true)
+  }
+
+  // After save/delete, refetch the schedule. Cheaper than maintaining a
+  // local optimistic copy of the discriminated union.
+  function refetchSchedule() {
+    fetch(`/api/schedule?from=${window.from}&to=${window.to}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data) => setEvents(data.events as ScheduleEvent[]))
+      .catch(() => { /* swallow */ })
   }
 
   const headerLabel = useMemo(() => {
@@ -217,25 +281,35 @@ export default function ScheduleCalendar() {
           </button>
           <span className="ml-3 text-sm font-semibold text-gray-900">{headerLabel}</span>
         </div>
-        <div className="flex items-center gap-1 text-xs">
-          {(['month', 'week', 'agenda'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1 rounded font-medium capitalize ${
-                view === v
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openAddEvent}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-primary-600 rounded hover:bg-primary-700"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Add event</span>
+            <span className="sm:hidden">Event</span>
+          </button>
+          <div className="flex items-center gap-1 text-xs">
+            {(['month', 'week', 'agenda'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-3 py-1 rounded font-medium capitalize ${
+                  view === v
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-4 text-[11px] text-gray-600">
+      <div className="px-4 py-2 border-b border-gray-100 flex items-center flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-600">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-full bg-yellow-400 ring-2 ring-yellow-200" />
           Estimate visit
@@ -248,6 +322,10 @@ export default function ScheduleCalendar() {
           <span className="inline-block w-4 h-2 rounded-sm bg-orange-300" />
           In progress
         </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-4 h-2 rounded-sm bg-white border-2 border-primary-400" />
+          Custom event
+        </span>
       </div>
 
       {loading ? (
@@ -259,6 +337,16 @@ export default function ScheduleCalendar() {
       ) : (
         <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} />
       )}
+
+      <AddEventModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        event={editingEvent}
+        defaultDate={modalDefaultDate}
+        jobs={jobs}
+        onSaved={refetchSchedule}
+        onDeleted={refetchSchedule}
+      />
     </div>
   )
 }
@@ -450,6 +538,59 @@ function EventChip({
                 <Phone className="w-3 h-3" />
                 {event.phone}
               </span>
+            )}
+          </div>
+        )}
+      </button>
+    )
+  }
+
+  if (event.kind === 'custom') {
+    const time = event.all_day
+      ? null
+      : new Date(event.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    const mapsUrl = event.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`
+      : null
+    return (
+      <button
+        onClick={() => onOpen(event)}
+        className={`w-full text-left rounded-md border-2 border-primary-400 bg-white hover:bg-primary-50 transition-colors text-primary-900 ${
+          compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-3 py-2 text-sm'
+        }`}
+        title={event.notes || event.title}
+      >
+        <div className="flex items-center gap-1.5 truncate">
+          <Sparkles className={compact ? 'w-3 h-3 shrink-0' : 'w-4 h-4 shrink-0'} />
+          {time && <span className="font-semibold whitespace-nowrap">{time}</span>}
+          <span className="truncate">{event.title}</span>
+        </div>
+        {!compact && (event.address || event.phone || event.notes) && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-primary-800">
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 truncate max-w-[60%] hover:underline"
+              >
+                <MapPin className="w-3 h-3" />
+                {event.address}
+              </a>
+            )}
+            {event.phone && (
+              <a
+                href={`tel:${event.phone}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 hover:underline"
+              >
+                <Phone className="w-3 h-3" />
+                {event.phone}
+              </a>
+            )}
+            {event.notes && !event.address && !event.phone && (
+              <span className="truncate">{event.notes}</span>
             )}
           </div>
         )}

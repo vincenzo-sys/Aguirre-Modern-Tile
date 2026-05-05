@@ -31,6 +31,22 @@ export type ScheduleEvent =
       phone: string | null
       job_number: number
     }
+  | {
+      // Ad-hoc calendar entries from the calendar_events table (migration 033).
+      // Things like "glass door follow-up at 6pm" that don't belong in the
+      // jobs pipeline. The job_id (when present) is what lets the chip pull
+      // address/phone from the linked job for tap-through.
+      kind: 'custom'
+      id: string
+      title: string
+      start: string
+      end: string | null
+      all_day: boolean
+      notes: string | null
+      job_id: string | null
+      address: string | null
+      phone: string | null
+    }
 
 // GET /api/schedule?from=YYYY-MM-DD&to=YYYY-MM-DD
 //
@@ -74,7 +90,23 @@ export async function GET(req: NextRequest) {
       .or(`scheduled_end.gte.${from},scheduled_end.is.null`)
       .order('scheduled_start', { ascending: true })
 
-    const [visitsRes, jobsRes] = await Promise.all([visitsPromise, jobsPromise])
+    // Custom events: ad-hoc calendar entries. start_at is timestamptz, so
+    // compare against the from/to *date* boundaries by widening to whole days.
+    // Same overlap pattern as /api/calendar-events: events that start in the
+    // window OR started earlier and are still ongoing.
+    const fromIso = `${from}T00:00:00Z`
+    const toIso = `${to}T23:59:59Z`
+    const customPromise = supabase
+      .from('calendar_events')
+      .select('id, title, start_at, end_at, all_day, notes, job_id')
+      .or(`and(start_at.gte.${fromIso},start_at.lte.${toIso}),and(start_at.lt.${fromIso},end_at.gte.${fromIso})`)
+      .order('start_at', { ascending: true })
+
+    const [visitsRes, jobsRes, customRes] = await Promise.all([
+      visitsPromise,
+      jobsPromise,
+      customPromise,
+    ])
 
     if (visitsRes.error) {
       return NextResponse.json({ error: visitsRes.error.message }, { status: 500 })
@@ -99,7 +131,12 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Build a job lookup so custom events linked to a job can inherit the
+    // customer's address/phone — that's the whole point of the link: Christian
+    // taps the event and gets directions + a callable number.
+    const jobLookup = new Map<string, { address: string | null; phone: string | null }>()
     for (const j of jobsRes.data ?? []) {
+      jobLookup.set(j.id, { address: j.client_address, phone: j.client_phone })
       events.push({
         kind: 'install',
         id: j.id,
@@ -110,6 +147,26 @@ export async function GET(req: NextRequest) {
         status: j.status,
         address: j.client_address,
         phone: j.client_phone,
+      })
+    }
+
+    if (customRes.error) {
+      return NextResponse.json({ error: customRes.error.message }, { status: 500 })
+    }
+
+    for (const c of customRes.data ?? []) {
+      const linked = c.job_id ? jobLookup.get(c.job_id) : undefined
+      events.push({
+        kind: 'custom',
+        id: c.id,
+        title: c.title,
+        start: c.start_at as string,
+        end: (c.end_at as string) ?? null,
+        all_day: Boolean(c.all_day),
+        notes: c.notes,
+        job_id: c.job_id ?? null,
+        address: linked?.address ?? null,
+        phone: linked?.phone ?? null,
       })
     }
 

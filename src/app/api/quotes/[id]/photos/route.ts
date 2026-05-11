@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'crypto'
 import { rateLimit } from '@/lib/validation'
 import { requireApiAuth } from '@/lib/apiAuth'
+
+// POST /api/quotes/[id]/photos — RECORDER (since 2026-05-11).
+//
+// Previously this endpoint accepted multipart/form-data and proxied the
+// bytes through Vercel to Supabase Storage. That silently failed for any
+// photo over ~4 MB because Vercel functions cap request bodies at 4.5 MB —
+// the entire production history had exactly one successful upload (131 KB).
+//
+// New shape: client first hits /sign to get signed upload URLs, uploads
+// each file *directly* to Supabase Storage from the browser, then posts
+// back here with the completed paths. We verify the objects actually exist
+// in storage (so callers can't insert bogus row pointers) and write the
+// quote_request_photos rows.
+//
+// Body: { items: [{ storage_path, file_name, mime_type, size_bytes }] }
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const BUCKET = 'quote-photos'
-const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB per photo
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'])
 
 function getSupabaseAdmin() {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -17,23 +29,22 @@ function getSupabaseAdmin() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 }
 
-function safeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
+type Item = {
+  storage_path: string
+  file_name: string
+  mime_type: string
+  size_bytes: number
 }
 
-// POST /api/quotes/[id]/photos
-// Public endpoint — accepts multipart/form-data from the website quote form
-// after the quote_request row has been created. Uploads to the private
-// 'quote-photos' bucket and inserts rows into quote_request_photos.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const limit = rateLimit(ip, { maxRequests: 20, windowMs: 60_000 })
+    const limit = rateLimit(ip, { maxRequests: 30, windowMs: 60_000 })
     if (!limit.allowed) {
-      return NextResponse.json({ error: 'Too many uploads. Try again in a moment.' }, { status: 429 })
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
     const { id: quoteId } = await params
@@ -41,10 +52,15 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid quote id' }, { status: 400 })
     }
 
+    const body = await req.json().catch(() => null)
+    const items = Array.isArray(body?.items) ? (body.items as Item[]) : null
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: 'No items provided' }, { status: 400 })
+    }
+
     const supabase = getSupabaseAdmin()
 
-    // Verify the quote_request exists so anonymous callers can't create
-    // orphaned storage objects under arbitrary UUIDs.
+    // Verify the quote_request exists.
     const { data: quote, error: quoteErr } = await supabase
       .from('quote_requests')
       .select('id')
@@ -54,83 +70,66 @@ export async function POST(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    const form = await req.formData()
-    const files = form.getAll('photos').filter((v): v is File => v instanceof File)
-
-    if (files.length === 0) {
-      return NextResponse.json({ error: 'No photos provided' }, { status: 400 })
-    }
-    if (files.length > 10) {
-      return NextResponse.json({ error: 'Maximum 10 photos per submission' }, { status: 400 })
-    }
-
-    const uploaded: Array<{ id: string; file_name: string }> = []
+    const inserted: Array<{ id: string; file_name: string }> = []
     const failures: string[] = []
 
-    for (const file of files) {
-      if (file.size > MAX_FILE_BYTES) {
-        failures.push(`${file.name}: too large`)
-        continue
-      }
-      if (!ALLOWED_MIME.has(file.type)) {
-        failures.push(`${file.name}: unsupported type`)
-        continue
-      }
-
-      const fileName = safeName(file.name || 'photo.jpg')
-      const storagePath = `${quoteId}/${randomUUID()}-${fileName}`
-
-      const { error: uploadErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, file, {
-          contentType: file.type,
-          upsert: false,
-        })
-
-      if (uploadErr) {
-        console.error('Quote photo upload error:', uploadErr.message)
-        failures.push(`${file.name}: upload failed`)
+    for (const it of items) {
+      // Defense in depth: every storage path the client claims must live
+      // under {quoteId}/, otherwise this is a recorder for a different
+      // quote's upload and we refuse.
+      if (typeof it.storage_path !== 'string' || !it.storage_path.startsWith(`${quoteId}/`)) {
+        failures.push(`${it.file_name ?? 'unknown'}: invalid path`)
         continue
       }
 
-      const { data: row, error: insertErr } = await supabase
+      // Verify the object actually exists in storage. Cheap call; protects
+      // against the recorder inserting a row for an upload that 4xx'd.
+      const folder = quoteId
+      const filename = it.storage_path.slice(folder.length + 1)
+      const { data: listing } = await supabase.storage.from(BUCKET).list(folder, {
+        search: filename,
+        limit: 1,
+      })
+      if (!listing || listing.length === 0) {
+        failures.push(`${it.file_name}: object not found in storage`)
+        continue
+      }
+
+      const { data: row, error } = await supabase
         .from('quote_request_photos')
         .insert({
           quote_request_id: quoteId,
-          storage_path: storagePath,
-          file_name: fileName,
-          mime_type: file.type,
-          size_bytes: file.size,
+          storage_path: it.storage_path,
+          file_name: it.file_name,
+          mime_type: it.mime_type,
+          size_bytes: it.size_bytes,
         })
         .select('id, file_name')
         .single()
 
-      if (insertErr || !row) {
-        console.error('Quote photo row insert error:', insertErr?.message)
-        // Best-effort cleanup so we don't leave orphans in storage.
-        await supabase.storage.from(BUCKET).remove([storagePath])
-        failures.push(`${file.name}: record failed`)
+      if (error || !row) {
+        console.error('quote_request_photos insert error:', error?.message)
+        failures.push(`${it.file_name}: record failed`)
         continue
       }
-
-      uploaded.push(row)
+      inserted.push(row)
     }
 
     return NextResponse.json({
-      uploaded: uploaded.length,
+      recorded: inserted.length,
       failed: failures.length,
       failures: failures.length > 0 ? failures : undefined,
-      photos: uploaded,
+      photos: inserted,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('Quote photos POST error:', message)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Record failed' }, { status: 500 })
   }
 }
 
-// GET /api/quotes/[id]/photos
-// Authenticated dashboard route — returns photo rows with short-lived signed URLs.
+// GET /api/quotes/[id]/photos — Authenticated dashboard read with signed URLs.
+// (Unchanged from previous implementation.)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Upload, X, Camera, Check, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { validateContact } from '@/lib/validation'
+import { uploadQuotePhotos } from '@/lib/uploadQuotePhotos'
 
 export default function PhotoUploadForm() {
   const [files, setFiles] = useState<File[]>([])
@@ -14,6 +15,18 @@ export default function PhotoUploadForm() {
     email: '',
     description: '',
   })
+
+  // Pre-fill the description from ?description=... when the user arrives here
+  // from the QuoteCalculator. Saves them re-typing what they just told us.
+  // Reading window.location avoids needing a Suspense boundary that
+  // useSearchParams would require under static rendering.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const desc = new URLSearchParams(window.location.search).get('description')
+    if (desc) {
+      setFormData((prev) => (prev.description ? prev : { ...prev, description: desc }))
+    }
+  }, [])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -66,19 +79,59 @@ export default function PhotoUploadForm() {
     setIsSubmitting(true)
 
     try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          description: formData.description,
-          source: 'contact',
-        }),
-      })
+      // Run /api/quotes (creates quote_requests row + customer) and /api/contact
+      // (sends Vince the email + customer confirmation) in parallel. We need
+      // the quote id to attach photos, so we await both.
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        // /api/contact treats this as the project description; /api/quotes
+        // stores it inside answers.description.
+        description: formData.description,
+        // /api/quotes requires projectType — contact form doesn't ask, so
+        // use 'other' and let the description carry the detail.
+        projectType: 'other',
+        source: 'quote',
+        answers: formData.description ? { description: formData.description } : {},
+      }
 
-      if (!res.ok) throw new Error('Failed to send')
+      const [emailRes, quoteRes] = await Promise.all([
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+        fetch('/api/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }),
+      ])
+
+      if (!emailRes.ok && !quoteRes.ok) throw new Error('Failed to send')
+
+      // Upload photos via signed-URL flow (direct browser → Supabase). The
+      // lead is already saved, so a flaky upload shouldn't block the success
+      // state — but unlike the old multipart endpoint, we now surface per-
+      // file failures so the user knows if a photo didn't make it.
+      if (files.length > 0 && quoteRes.ok) {
+        try {
+          const quoteData = await quoteRes.clone().json()
+          const quoteId = quoteData?.id as string | undefined
+          if (quoteId) {
+            const results = await uploadQuotePhotos(quoteId, files)
+            const failed = results.filter((r) => !r.ok)
+            if (failed.length > 0) {
+              const names = failed.map((f) => f.file_name).join(', ')
+              toast(`${failed.length} photo${failed.length === 1 ? '' : 's'} failed to upload: ${names}`, 'warning')
+            }
+          }
+        } catch (err) {
+          console.error('Photo upload failed:', err)
+          toast('Photos could not be uploaded. Vince will follow up.', 'warning')
+        }
+      }
 
       setIsSubmitting(false)
       setIsSubmitted(true)
@@ -89,18 +142,36 @@ export default function PhotoUploadForm() {
   }
 
   if (isSubmitted) {
+    const firstName = formData.name.split(' ')[0] || ''
+    const photoNote = files.length > 0
+      ? `We've got your ${files.length} photo${files.length === 1 ? '' : 's'} — `
+      : ''
     return (
       <div className="bg-green-50 rounded-2xl p-8 text-center">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Check className="w-8 h-8 text-green-600" />
         </div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">
-          Request Received!
+          Got it{firstName ? `, ${firstName}` : ''} — request received
         </h3>
-        <p className="text-gray-600">
-          We'll review your photos and get back to you within a few hours with a
-          ballpark estimate. Talk soon!
+        <p className="text-gray-600 mb-4">
+          {photoNote}a confirmation is heading to your inbox and phone. Vince will
+          review the details and send a written estimate the same day.
         </p>
+        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          <a
+            href="sms:+16177661259"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-primary-700 border-2 border-primary-600 rounded-lg font-semibold text-sm hover:bg-primary-50 active:scale-95 transition"
+          >
+            Text Vince directly
+          </a>
+          <a
+            href="tel:+16177661259"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg font-semibold text-sm hover:bg-primary-700 active:scale-95 transition"
+          >
+            Call (617) 766-1259
+          </a>
+        </div>
       </div>
     )
   }
@@ -247,7 +318,7 @@ export default function PhotoUploadForm() {
       </button>
 
       <p className="text-center text-gray-500 text-sm">
-        We typically respond within a few hours with a ballpark estimate.
+        We answer in 5 minutes — written estimate same day.
       </p>
     </form>
   )

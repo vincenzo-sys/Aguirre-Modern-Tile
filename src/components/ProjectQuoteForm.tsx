@@ -5,6 +5,7 @@ import { Upload, X, Camera, Check, Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from '@/components/Toast'
 import { validateContact } from '@/lib/validation'
+import { uploadQuotePhotos } from '@/lib/uploadQuotePhotos'
 
 interface Question {
   id: string
@@ -105,22 +106,24 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
 
       if (!emailRes.ok && !quoteRes.ok) throw new Error('Failed to send')
 
-      // Upload photos if the quote row was created. Non-fatal — if this
-      // fails the lead is still saved and the user isn't blocked.
+      // Upload photos via signed-URL flow (direct browser → Supabase). See
+      // src/lib/uploadQuotePhotos.ts for the why. Per-file failures are
+      // surfaced to the user; the lead is already saved either way.
       if (files.length > 0 && quoteRes.ok) {
         try {
           const quoteData = await quoteRes.clone().json()
           const quoteId = quoteData?.id as string | undefined
           if (quoteId) {
-            const fd = new FormData()
-            files.forEach((file) => fd.append('photos', file))
-            await fetch(`/api/quotes/${quoteId}/photos`, {
-              method: 'POST',
-              body: fd,
-            })
+            const results = await uploadQuotePhotos(quoteId, files)
+            const failed = results.filter((r) => !r.ok)
+            if (failed.length > 0) {
+              const names = failed.map((f) => f.file_name).join(', ')
+              toast(`${failed.length} photo${failed.length === 1 ? '' : 's'} failed to upload: ${names}`, 'warning')
+            }
           }
         } catch (err) {
           console.error('Photo upload failed:', err)
+          toast('Photos could not be uploaded. Vince will follow up.', 'warning')
         }
       }
 
@@ -145,7 +148,8 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
         </h3>
         <p className="text-gray-700 mb-5">
           A confirmation is heading to your inbox and phone now. I&apos;ll review
-          the {projectTitle.toLowerCase()} details and send a written estimate within a few hours.
+          the {projectTitle.toLowerCase()} details and send a written estimate the same day —
+          usually within a couple hours.
         </p>
 
         <div className="bg-white rounded-lg border border-green-200 p-4 mb-5 text-left">
@@ -346,7 +350,7 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
       </button>
 
       <p className="text-center text-gray-500 text-sm">
-        We typically respond within a few hours.
+        We answer in 5 minutes — written estimate the same day.
       </p>
     </form>
   )

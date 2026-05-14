@@ -90,7 +90,7 @@ export default function LeadsPage() {
   const [counts, setCounts] = useState({ total: 0, quote_requests: 0, jobs: 0 })
   const [loading, setLoading] = useState(true)
   const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [stageFilter, setStageFilter] = useState<'new_inquiry' | 'all' | 'quoted'>('all')
+  const [stageFilter, setStageFilter] = useState<'all' | 'new_inquiry' | 'quoted' | 'to_revise'>('all')
   const [convertingId, setConvertingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -238,16 +238,25 @@ export default function LeadsPage() {
     return Array.from(set).sort()
   }, [items])
 
-  // Three-bucket counts: New inquiry = brand-new untouched leads;
-  // Quoted = anywhere the estimator has produced a number we've sent or revised.
+  // Four buckets — New + To revise are Vince's two action lists; when both are
+  // empty he's caught up. Quoted is passive (ball in customer's court). All is
+  // the full pipeline view. To revise = a quoted item whose follow-up date has
+  // passed, i.e. urgency >= 100 per /api/pipeline's scoring.
+  const isQuotedStage = (s: PipelineStage) =>
+    s === 'estimate_sent' || s === 'estimate_revised'
+  const isToReviseItem = (i: PipelineItem) =>
+    isQuotedStage(i.stage) && i.urgency >= 100
+
   const bucketCounts = useMemo(() => {
     let newInquiry = 0
     let quoted = 0
+    let toRevise = 0
     for (const i of items) {
       if (i.stage === 'new') newInquiry++
-      else if (i.stage === 'estimate_sent' || i.stage === 'estimate_revised') quoted++
+      if (isQuotedStage(i.stage)) quoted++
+      if (isToReviseItem(i)) toRevise++
     }
-    return { newInquiry, all: items.length, quoted }
+    return { all: items.length, newInquiry, quoted, toRevise }
   }, [items])
 
   const overdueCount = items.filter((i) => i.urgency >= 100).length
@@ -255,13 +264,8 @@ export default function LeadsPage() {
   const filtered = useMemo(() => {
     return items.filter((i) => {
       if (stageFilter === 'new_inquiry' && i.stage !== 'new') return false
-      if (
-        stageFilter === 'quoted' &&
-        i.stage !== 'estimate_sent' &&
-        i.stage !== 'estimate_revised'
-      ) {
-        return false
-      }
+      if (stageFilter === 'quoted' && !isQuotedStage(i.stage)) return false
+      if (stageFilter === 'to_revise' && !isToReviseItem(i)) return false
       if (sourceFilter !== 'all' && (i.source ?? 'website') !== sourceFilter) return false
       return true
     })
@@ -292,16 +296,10 @@ export default function LeadsPage() {
         </Link>
       </div>
 
-      {/* Stage filter chips — three buckets only: New inquiry / All / Quoted */}
+      {/* Stage filter chips — All / New / Quoted / To revise.
+          New + To revise are Vince's action lists; when both are empty he's
+          caught up. Quoted is passive (waiting on customer). */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 overflow-x-auto">
-        <button
-          onClick={() => setStageFilter('new_inquiry')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
-            stageFilter === 'new_inquiry' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          New inquiry ({bucketCounts.newInquiry})
-        </button>
         <button
           onClick={() => setStageFilter('all')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
@@ -311,12 +309,32 @@ export default function LeadsPage() {
           All ({bucketCounts.all})
         </button>
         <button
+          onClick={() => setStageFilter('new_inquiry')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            stageFilter === 'new_inquiry' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          New ({bucketCounts.newInquiry})
+        </button>
+        <button
           onClick={() => setStageFilter('quoted')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
             stageFilter === 'quoted' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
           }`}
         >
           Quoted ({bucketCounts.quoted})
+        </button>
+        <button
+          onClick={() => setStageFilter('to_revise')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            stageFilter === 'to_revise'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : bucketCounts.toRevise > 0
+                ? 'text-red-700 hover:text-red-800'
+                : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          To revise ({bucketCounts.toRevise})
         </button>
       </div>
 

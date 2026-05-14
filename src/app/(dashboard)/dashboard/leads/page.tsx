@@ -90,7 +90,7 @@ export default function LeadsPage() {
   const [counts, setCounts] = useState({ total: 0, quote_requests: 0, jobs: 0 })
   const [loading, setLoading] = useState(true)
   const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [stageFilter, setStageFilter] = useState<'all' | PipelineStage>('all')
+  const [stageFilter, setStageFilter] = useState<'new_inquiry' | 'all' | 'quoted'>('all')
   const [convertingId, setConvertingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -238,17 +238,30 @@ export default function LeadsPage() {
     return Array.from(set).sort()
   }, [items])
 
-  const stageCounts = useMemo(() => {
-    const map = new Map<PipelineStage, number>()
-    for (const i of items) map.set(i.stage, (map.get(i.stage) ?? 0) + 1)
-    return map
+  // Three-bucket counts: New inquiry = brand-new untouched leads;
+  // Quoted = anywhere the estimator has produced a number we've sent or revised.
+  const bucketCounts = useMemo(() => {
+    let newInquiry = 0
+    let quoted = 0
+    for (const i of items) {
+      if (i.stage === 'new') newInquiry++
+      else if (i.stage === 'estimate_sent' || i.stage === 'estimate_revised') quoted++
+    }
+    return { newInquiry, all: items.length, quoted }
   }, [items])
 
   const overdueCount = items.filter((i) => i.urgency >= 100).length
 
   const filtered = useMemo(() => {
     return items.filter((i) => {
-      if (stageFilter !== 'all' && i.stage !== stageFilter) return false
+      if (stageFilter === 'new_inquiry' && i.stage !== 'new') return false
+      if (
+        stageFilter === 'quoted' &&
+        i.stage !== 'estimate_sent' &&
+        i.stage !== 'estimate_revised'
+      ) {
+        return false
+      }
       if (sourceFilter !== 'all' && (i.source ?? 'website') !== sourceFilter) return false
       return true
     })
@@ -279,32 +292,32 @@ export default function LeadsPage() {
         </Link>
       </div>
 
-      {/* Stage filter chips */}
+      {/* Stage filter chips — three buckets only: New inquiry / All / Quoted */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 overflow-x-auto">
+        <button
+          onClick={() => setStageFilter('new_inquiry')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            stageFilter === 'new_inquiry' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          New inquiry ({bucketCounts.newInquiry})
+        </button>
         <button
           onClick={() => setStageFilter('all')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
             stageFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          All ({items.length})
+          All ({bucketCounts.all})
         </button>
-        {(Object.keys(stageMeta) as PipelineStage[]).map((stage) => {
-          const count = stageCounts.get(stage) ?? 0
-          if (count === 0) return null
-          const meta = stageMeta[stage]
-          return (
-            <button
-              key={stage}
-              onClick={() => setStageFilter(stage)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
-                stageFilter === stage ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {meta.label} ({count})
-            </button>
-          )
-        })}
+        <button
+          onClick={() => setStageFilter('quoted')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            stageFilter === 'quoted' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Quoted ({bucketCounts.quoted})
+        </button>
       </div>
 
       {/* Source filter (right-aligned) */}

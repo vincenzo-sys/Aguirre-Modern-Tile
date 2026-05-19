@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
 import ShareEstimateButton from './ShareEstimateButton'
+import EstimateMessages from '@/components/EstimateMessages'
 import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus, Calendar } from 'lucide-react'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { parseScopeNotes as parseStructuredScope } from '@/lib/scopeNotes'
@@ -15,6 +16,9 @@ type EstimateResponse = {
   square_footage: number | null
   scope_notes: string | null
   customer_provides: string | null
+  warranty_text: string | null
+  payment_terms_text: string | null
+  payment_methods: string[] | null
   line_items: JobLineItem[]
   estimated_cost: number | null
   deposit_amount: number
@@ -133,6 +137,20 @@ function renderCustomerGroup(
               <span className="text-gray-300">•</span>{' '}
               {item.quantity > 1 ? `${item.quantity} × ` : ''}
               {item.description}
+              {item.source_url && (
+                <>
+                  {' '}
+                  <a
+                    href={item.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={item.source_name || undefined}
+                    className="text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
+                  >
+                    (view)
+                  </a>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -261,13 +279,17 @@ export default async function EstimatePage({
   const validThrough = extractValidThrough(estimate.scope_notes)
   // Adapter to keep the existing JSX referencing `parsed.body`, `parsed.included`,
   // etc., while sourcing data from the shared lib + the local validThrough helper.
+  // Per-job warranty_text / payment_terms_text snapshotted at generate time
+  // win over whatever is parsed from scope_notes — so global default edits
+  // carry forward and per-job edits in the dashboard hold.
   const parsed = {
     body: structured.scopeOfWork || null,
-    warranty: structured.warranty || null,
+    warranty: estimate.warranty_text || structured.warranty || null,
     warrantyYears: structured.warrantyYears,
     included: structured.included,
     notIncluded: structured.notIncluded,
-    payment: structured.additionalNotes || null,
+    payment: estimate.payment_terms_text || structured.additionalNotes || null,
+    paymentMethods: estimate.payment_methods ?? null,
     validThrough,
   }
   const warrantyLabel = parsed.warrantyYears
@@ -561,18 +583,35 @@ export default async function EstimatePage({
           )}
         </section>
 
-        {/* Additional notes — renders the PAYMENT section content from
-            scope_notes (cleaned of auto-generator metadata). This is where
-            free-form policy paragraphs the user typed under PAYMENT land:
-            "no additional charges if longer," insulation rules, etc. */}
+        {/* Payment terms — sourced from job.payment_terms_text (snapshotted
+            from estimate_defaults at generate time, editable per-job). Falls
+            back to the additionalNotes block parsed from scope_notes for
+            legacy jobs that pre-date migration 029. */}
         {parsed.payment && (
           <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Additional notes
+              Payment terms
             </h3>
             <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
               {parsed.payment}
             </p>
+            {parsed.paymentMethods && parsed.paymentMethods.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  We accept
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {parsed.paymentMethods.map((m) => (
+                    <span
+                      key={m}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                    >
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -673,6 +712,18 @@ export default async function EstimatePage({
             />
           </section>
         )}
+
+        {/* Threaded conversation — customer can ask a question right on
+            the estimate, Vince replies from the dashboard. SMS + email
+            notifications fire both ways. Sits above the tap-to-text/call
+            row so the persistent thread reads as the primary path and the
+            phone/text buttons are the escape hatch. */}
+        <div className="mt-8">
+          <EstimateMessages
+            mode="customer"
+            endpoint={`/api/public/estimates/${token}/messages`}
+          />
+        </div>
 
         {/* Questions + share block. Three thumb-zone actions for the three
             most common stall points: a question (Text Vince), a phone

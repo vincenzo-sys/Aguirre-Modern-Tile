@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Loader2, Check } from 'lucide-react'
+import { useState, useRef, useEffect, type ComponentType } from 'react'
+import { Loader2, Check, ChevronDown, AlertCircle } from 'lucide-react'
 import { toast } from '@/components/Toast'
 
 // Notion-style inline-editable cells used by the leads pipeline table.
@@ -187,5 +187,133 @@ export function EditableNotesCell({
       {status === 'saving' && <Loader2 className="w-3 h-3 inline ml-1 animate-spin text-gray-400" />}
       {status === 'saved' && <Check className="w-3 h-3 inline ml-1 text-emerald-500" />}
     </button>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Editable stage cell — click chip → pick a new stage from a dropdown.
+// The parent owns the routing logic (PATCH-which-table, when-to-convert)
+// and just passes us a list of valid options + an async onSave.
+// ────────────────────────────────────────────────────────────────────────
+
+export type StageOption<S extends string> = {
+  stage: S
+  label: string
+  color: string                              // tailwind classes for the chip
+  icon: ComponentType<{ className?: string }>
+  disabled?: boolean
+  disabledReason?: string
+}
+
+export function EditableStageCell<S extends string>({
+  value,
+  options,
+  onSave,
+  urgencyBadge,
+}: {
+  value: S
+  options: StageOption<S>[]
+  onSave: (newStage: S) => Promise<void>
+  urgencyBadge?: { label: string; className: string } | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [status, setStatus, flash] = useSaveStatus()
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // Close on outside-click or Escape so the dropdown behaves like a popover.
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [open])
+
+  const current = options.find((o) => o.stage === value)
+  const CurrentIcon = current?.icon
+
+  async function pick(newStage: S) {
+    setOpen(false)
+    if (newStage === value) return
+    setStatus('saving')
+    try {
+      await onSave(newStage)
+      flash('saved')
+    } catch (err) {
+      flash('error', 2000)
+      toast(err instanceof Error ? err.message : 'Save failed', 'error')
+    }
+  }
+
+  return (
+    <div ref={wrapRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
+        className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full hover:ring-2 hover:ring-offset-1 hover:ring-primary-300 transition ${
+          current?.color ?? 'bg-gray-100 text-gray-700'
+        }`}
+        title="Click to change stage"
+      >
+        {CurrentIcon && <CurrentIcon className="w-3 h-3" />}
+        {current?.label ?? value}
+        {status === 'saving'
+          ? <Loader2 className="w-3 h-3 animate-spin opacity-70" />
+          : status === 'saved'
+            ? <Check className="w-3 h-3" />
+            : <ChevronDown className="w-3 h-3 opacity-60" />}
+      </button>
+
+      {urgencyBadge && (
+        <div className="mt-0.5">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${urgencyBadge.className}`}>
+            <AlertCircle className="w-2.5 h-2.5" />
+            {urgencyBadge.label}
+          </span>
+        </div>
+      )}
+
+      {open && (
+        <div
+          className="absolute z-20 mt-1 left-0 min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+          // Stop bubble so clicks inside the menu don't trigger row navigation.
+          onClick={(e) => e.stopPropagation()}
+        >
+          {options.map((opt) => {
+            const Icon = opt.icon
+            const isCurrent = opt.stage === value
+            const klass = opt.disabled
+              ? 'opacity-40 cursor-not-allowed'
+              : isCurrent
+                ? 'bg-gray-50 cursor-default'
+                : 'hover:bg-gray-50 cursor-pointer'
+            return (
+              <button
+                key={opt.stage}
+                type="button"
+                disabled={opt.disabled || isCurrent}
+                onClick={() => !opt.disabled && pick(opt.stage)}
+                title={opt.disabled ? opt.disabledReason : undefined}
+                className={`flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs ${klass}`}
+              >
+                <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${opt.color}`}>
+                  <Icon className="w-3 h-3" />
+                  {opt.label}
+                </span>
+                {isCurrent && <Check className="w-3 h-3 text-emerald-500 ml-auto" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

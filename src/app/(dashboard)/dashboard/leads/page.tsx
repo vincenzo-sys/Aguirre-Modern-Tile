@@ -14,7 +14,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Inbox, Plus, AlertTriangle, Briefcase, Hourglass, Snowflake, ChevronRight,
-  FileText, Calendar, FilePlus, FileCheck,
+  FileText, Calendar, FilePlus, FileCheck, LayoutGrid, List,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { type StageOption } from '@/components/dashboard/InlineEditCells'
@@ -22,8 +22,12 @@ import type { PipelineItem, PipelineStage } from '@/app/api/pipeline/route'
 import LeadCard, { type LeadCardHandlers } from '@/components/dashboard/LeadCard'
 import LeadActionSheet from '@/components/dashboard/leads/LeadActionSheet'
 import {
-  bucketize, BUCKET_META, BUCKET_ORDER, type BucketKey,
+  bucketize, BUCKET_META, BUCKET_ORDER, type BucketKey, sumEstimatedCost,
 } from '@/components/dashboard/leads/buckets'
+import PipelineSummaryStrip from '@/components/dashboard/leads/PipelineSummaryStrip'
+import SmartViewChips, { applySmartView, type SmartView } from '@/components/dashboard/leads/SmartViewChips'
+import KanbanBoard from '@/components/dashboard/leads/KanbanBoard'
+import { formatMoneyShort } from '@/components/dashboard/leads/formatters'
 
 // stageMeta drives the chip colors/labels/icons. Single source of truth
 // the EditableStageCell consumes via stageOptionsFor() below.
@@ -69,6 +73,10 @@ const sourceLabels: Record<string, string> = {
 }
 
 const COLLAPSED_KEY = 'leads_buckets_collapsed_v1'
+const VIEW_MODE_KEY = 'leads_view_mode_v1'
+const SMART_VIEW_KEY = 'leads_smart_view_v1'
+
+type ViewMode = 'cards' | 'kanban'
 
 const BUCKET_ICONS: Record<BucketKey, typeof AlertTriangle> = {
   actionNeeded: AlertTriangle,
@@ -92,6 +100,13 @@ export default function LeadsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [bucketCollapsed, setBucketCollapsed] = useState<Partial<Record<BucketKey, boolean>>>({})
   const [sheet, setSheet] = useState<SheetState>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [smartView, setSmartView] = useState<SmartView>('all')
+  // Set when the user clicks a segment in the pipeline summary strip
+  // (or the eventual filter-by-stage from a chip click). Drives kanban
+  // column scroll-into-view. Reset to null after one render so the
+  // scroll doesn't fire on every re-render.
+  const [focusedStage, setFocusedStage] = useState<PipelineStage | null>(null)
 
   // ── Data loading ─────────────────────────────────────────────────
   const loadPipeline = useCallback(async () => {
@@ -110,16 +125,28 @@ export default function LeadsPage() {
     loadPipeline().finally(() => setLoading(false))
   }, [loadPipeline])
 
-  // ── Bucket-collapsed persistence ─────────────────────────────────
+  // ── Persistence: bucket-collapsed, viewMode, smartView ──────────
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSED_KEY)
       if (raw) setBucketCollapsed(JSON.parse(raw))
+      const vm = localStorage.getItem(VIEW_MODE_KEY)
+      if (vm === 'cards' || vm === 'kanban') setViewMode(vm)
+      const sv = localStorage.getItem(SMART_VIEW_KEY)
+      if (sv === 'all' || sv === 'today' || sv === 'thisWeek' || sv === 'hotQuotes' || sv === 'stale') {
+        setSmartView(sv)
+      }
     } catch { /* ignore */ }
   }, [])
   useEffect(() => {
     try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(bucketCollapsed)) } catch { /* ignore */ }
   }, [bucketCollapsed])
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_MODE_KEY, viewMode) } catch { /* ignore */ }
+  }, [viewMode])
+  useEffect(() => {
+    try { localStorage.setItem(SMART_VIEW_KEY, smartView) } catch { /* ignore */ }
+  }, [smartView])
 
   // ── Optimistic local-update helper used by all PATCH-style handlers
   function updateItemLocally(itemId: string, kind: 'quote_request' | 'job', patch: Partial<PipelineItem>) {
@@ -311,20 +338,40 @@ export default function LeadsPage() {
     stageOptionsFor,
   }
 
-  // ── Source filter + bucketize ────────────────────────────────────
+  // ── Source filter + Smart View filter + bucketize ──────────────
   const availableSources = useMemo(() => {
     const set = new Set<string>()
     for (const i of items) if (i.source) set.add(i.source)
     return Array.from(set).sort()
   }, [items])
 
-  const filtered = useMemo(
+  // Source filter first (the "physical" filter on intake channel), then
+  // Smart View filter on top (the "work-list" filter). Chip counts in
+  // SmartViewChips reflect counts after the source filter has applied.
+  const sourceFiltered = useMemo(
     () => items.filter((i) => sourceFilter === 'all' || (i.source ?? 'website') === sourceFilter),
     [items, sourceFilter],
+  )
+  const filtered = useMemo(
+    () => applySmartView(sourceFiltered, smartView),
+    [sourceFiltered, smartView],
   )
 
   const buckets = useMemo(() => bucketize(filtered), [filtered])
   const overdueCount = items.filter((i) => i.urgency >= 100).length
+
+  function handlePickStage(stage: PipelineStage) {
+    setFocusedStage(stage)
+    // On md+, switch to kanban so the focused column is visible.
+    // On mobile we just set the state — kanban isn't rendered there,
+    // but the focus is harmless.
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      setViewMode('kanban')
+    }
+    // Clear focus after a short delay so re-renders don't keep
+    // re-scrolling. 800ms is enough for the smooth scroll to settle.
+    setTimeout(() => setFocusedStage(null), 800)
+  }
 
   function toggleBucket(key: BucketKey) {
     setBucketCollapsed((prev) => {
@@ -337,8 +384,13 @@ export default function LeadsPage() {
     return <div className="text-center py-12 text-gray-500">Loading pipeline…</div>
   }
 
+  // Kanban is desktop-only — at md+ we render the toggle and let the
+  // user pick; below md we force the cards view regardless of stored
+  // preference. Effective view = stored choice clamped by viewport.
+  const effectiveViewMode: ViewMode = viewMode === 'kanban' ? 'kanban' : 'cards'
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className={effectiveViewMode === 'kanban' ? 'max-w-none' : 'max-w-2xl mx-auto'}>
       {/* Page header */}
       <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
         <div>
@@ -350,34 +402,64 @@ export default function LeadsPage() {
             )}
           </p>
         </div>
-        <Link
-          href="/dashboard/leads/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Lead
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Cards | Kanban toggle — desktop only. Cards view is
+              the muscle-memory default; kanban is the new "where is
+              everything" pipeline visualization. */}
+          <div className="hidden md:inline-flex bg-gray-100 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md ${
+                effectiveViewMode === 'cards' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+              aria-pressed={effectiveViewMode === 'cards'}
+            >
+              <List className="w-4 h-4" />
+              Cards
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md ${
+                effectiveViewMode === 'kanban' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+              aria-pressed={effectiveViewMode === 'kanban'}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Kanban
+            </button>
+          </div>
+          <Link
+            href="/dashboard/leads/new"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Lead
+          </Link>
+        </div>
       </div>
 
-      {/* Source filter (only if there's more than one source in play) */}
-      {availableSources.length > 1 && (
-        <div className="flex justify-end mb-4">
-          <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-          >
-            <option value="all">All sources</option>
-            {availableSources.map((s) => (
-              <option key={s} value={s}>{sourceLabels[s] ?? s}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Pipeline summary strip — Pipedrive/HubSpot pattern. One-glance
+          distribution across stages. Click jumps to that column in kanban. */}
+      <PipelineSummaryStrip items={items} onPickStage={handlePickStage} />
 
-      {/* Bucketed card stream */}
+      {/* Smart Views — Close.com pattern. Source filter folded into the right side. */}
+      <SmartViewChips
+        items={sourceFiltered}
+        activeView={smartView}
+        onChange={setSmartView}
+        availableSources={availableSources}
+        sourceFilter={sourceFilter}
+        onSourceChange={setSourceFilter}
+        sourceLabels={sourceLabels}
+      />
+
+      {/* View body — bucketed card stream OR kanban board */}
       {filtered.length === 0 ? (
         <EmptyState />
+      ) : effectiveViewMode === 'kanban' ? (
+        <KanbanBoard items={filtered} handlers={handlers} focusedStage={focusedStage} />
       ) : (
         BUCKET_ORDER.map((key) => {
           const cards = buckets[key]
@@ -385,6 +467,7 @@ export default function LeadsPage() {
           const meta = BUCKET_META[key]
           const collapsed = bucketCollapsed[key] ?? !meta.defaultOpen
           const Icon = BUCKET_ICONS[key]
+          const bucketDollars = sumEstimatedCost(cards)
           return (
             <section key={key} className="mb-6">
               <button
@@ -400,9 +483,14 @@ export default function LeadsPage() {
                   <h2 className="text-sm font-semibold text-gray-900">{meta.label}</h2>
                   <p className="text-[11px] text-gray-500">{meta.hint}</p>
                 </div>
-                <span className={`inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full text-xs font-semibold ${meta.tint.countBg}`}>
-                  {cards.length}
-                </span>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className={`inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full text-xs font-semibold ${meta.tint.countBg}`}>
+                    {cards.length}
+                  </span>
+                  {bucketDollars > 0 && (
+                    <span className="text-[10px] text-gray-500 leading-none">{formatMoneyShort(bucketDollars)}</span>
+                  )}
+                </div>
                 <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
               </button>
               {!collapsed && (

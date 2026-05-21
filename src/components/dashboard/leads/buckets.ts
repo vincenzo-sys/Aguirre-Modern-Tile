@@ -103,3 +103,16 @@ export const BUCKET_META: Record<BucketKey, {
 }
 
 export const BUCKET_ORDER: BucketKey[] = ['actionNeeded', 'working', 'waiting', 'stale']
+
+// Sum estimated_cost across a list of items, skipping nulls.
+// quote_requests don't carry a cost yet — they contribute 0 to the
+// total, which is the right behavior (we haven't quoted them yet).
+export function sumEstimatedCost(items: PipelineItem[]): number {
+  let sum = 0
+  for (const it of items) {
+    if (typeof it.estimated_cost === 'number' && Number.isFinite(it.estimated_cost)) {
+      sum += it.estimated_cost
+    }
+  }
+  return sum
+}

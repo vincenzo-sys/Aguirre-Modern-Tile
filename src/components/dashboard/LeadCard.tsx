@@ -19,6 +19,7 @@ import {
   EditableNotesCell,
   type StageOption,
 } from '@/components/dashboard/InlineEditCells'
+import { daysSince } from '@/components/dashboard/leads/formatters'
 
 export type LeadCardHandlers = {
   saveStage: (item: PipelineItem, newStage: PipelineStage) => Promise<void>
@@ -68,7 +69,13 @@ function primaryActionFor(item: PipelineItem, h: LeadCardHandlers): PrimaryActio
   }
 }
 
-export default function LeadCard({ item, handlers }: { item: PipelineItem; handlers: LeadCardHandlers }) {
+export default function LeadCard({
+  item, handlers, compact = false,
+}: {
+  item: PipelineItem
+  handlers: LeadCardHandlers
+  compact?: boolean
+}) {
   const urgency = urgencyBadgeFor(item)
   const primary = primaryActionFor(item, handlers)
   const PrimaryIcon = primary.icon
@@ -105,14 +112,17 @@ export default function LeadCard({ item, handlers }: { item: PipelineItem; handl
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-      {/* Top row: stage chip, overflow menu */}
+      {/* Top row: stage chip + days-in-stage, overflow menu */}
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
-        <EditableStageCell<PipelineStage>
-          value={item.stage}
-          urgencyBadge={urgency}
-          options={handlers.stageOptionsFor(item)}
-          onSave={(s) => handlers.saveStage(item, s)}
-        />
+        <div className="flex items-start gap-2 flex-wrap">
+          <EditableStageCell<PipelineStage>
+            value={item.stage}
+            urgencyBadge={urgency}
+            options={handlers.stageOptionsFor(item)}
+            onSave={(s) => handlers.saveStage(item, s)}
+          />
+          <DaysInStageChip iso={item.updated_at} />
+        </div>
         <div ref={menuRef} className="relative">
           <button
             type="button"
@@ -200,7 +210,8 @@ export default function LeadCard({ item, handlers }: { item: PipelineItem; handl
         )}
       </div>
 
-      {/* Meta line: contact + follow-up + visit */}
+      {/* Meta line: contact + follow-up + visit (hidden in compact / kanban mode) */}
+      {!compact && (
       <div className="px-4 mt-2 text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
         {item.last_contact_at && (
           <span>Last contact <strong className="text-gray-700">{formatShort(item.last_contact_at)}</strong></span>
@@ -217,9 +228,10 @@ export default function LeadCard({ item, handlers }: { item: PipelineItem; handl
           </span>
         )}
       </div>
+      )}
 
-      {/* Notes — inline editable. Collapsed by default unless something's there. */}
-      {(item.notes || showNotes) && (
+      {/* Notes — inline editable. Hidden in compact mode (kanban). */}
+      {!compact && (item.notes || showNotes) && (
         <div className="px-4 mt-3">
           <EditableNotesCell
             value={item.notes}
@@ -292,6 +304,30 @@ function formatShort(iso: string): string {
 function formatVisit(iso: string): string {
   const d = new Date(iso)
   return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+}
+
+// "Days in this stage" — mirrors Pipedrive's deal-rotting indicator.
+// updated_at is a strong proxy for stage-transition time: every PATCH
+// that flips status bumps updated_at, and bumps from unrelated edits
+// (notes, dates) are rare enough that the signal stays useful.
+// Thresholds match Pipedrive defaults — adjust if Aguirre's pipeline
+// turns out to move faster/slower than that.
+function DaysInStageChip({ iso }: { iso: string | null | undefined }) {
+  const d = daysSince(iso)
+  if (d == null) return null
+  const cls =
+    d >= 14 ? 'bg-red-50 text-red-700 border border-red-200'
+    : d >= 7  ? 'bg-orange-50 text-orange-700 border border-orange-200'
+    : d >= 3  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+    : 'bg-gray-50 text-gray-600 border border-gray-200'
+  return (
+    <span
+      className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${cls}`}
+      title={`Last updated ${d} ${d === 1 ? 'day' : 'days'} ago`}
+    >
+      {d}d here
+    </span>
+  )
 }
 
 function defaultSmsBody(item: PipelineItem): string {

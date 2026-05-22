@@ -110,8 +110,32 @@ export default function LeadCard({
     : null
   const telHref = item.client_phone ? `tel:${item.client_phone.replace(/[^\d+]/g, '')}` : null
 
+  // C2: native HTML5 drag is only enabled in compact (kanban) mode.
+  // The card uses a custom MIME so the drop target can distinguish
+  // lead-card drags from any other dragged content.
+  const [dragging, setDragging] = useState(false)
+  const dragProps = compact
+    ? {
+        draggable: true,
+        onDragStart: (e: React.DragEvent<HTMLDivElement>) => {
+          e.dataTransfer.setData(
+            'application/x-lead-card',
+            JSON.stringify({ id: item.id, kind: item.kind }),
+          )
+          e.dataTransfer.effectAllowed = 'move'
+          setDragging(true)
+        },
+        onDragEnd: () => setDragging(false),
+      }
+    : {}
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+    <div
+      {...dragProps}
+      className={`bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow ${
+        dragging ? 'opacity-60' : ''
+      } ${compact ? 'cursor-grab active:cursor-grabbing' : ''}`}
+    >
       {/* Top row: stage chip + days-in-stage, overflow menu */}
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
         <div className="flex items-start gap-2 flex-wrap">

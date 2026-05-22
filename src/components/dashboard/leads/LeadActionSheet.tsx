@@ -37,15 +37,69 @@ export type LeadActionSheetProps =
   | ({ open: boolean; onClose: () => void } & PickFollowupMode)
 
 export default function LeadActionSheet(props: LeadActionSheetProps) {
+  // Hooks must run only when the sheet is actually mounted on screen;
+  // delegating to a child component that runs them on every mount/unmount
+  // keeps the open/close lifecycle clean.
   if (!props.open) return null
+  return <SheetShell {...props} />
+}
+
+function SheetShell(props: LeadActionSheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
+
+  // B4: focus management.
+  // On open: remember the element that had focus (so we can return on
+  // close), then focus the first focusable inside the dialog.
+  // While open: Esc closes; Tab/Shift+Tab cycle focus within the dialog.
+  // On close: focus the trigger element if it's still in the DOM.
+  useEffect(() => {
+    triggerRef.current = document.activeElement as HTMLElement | null
+
+    // Prefer the input opted-in via data-autofocus (the form's primary
+    // input), so we don't land on the close ✕ button.
+    const preferred = dialogRef.current?.querySelector<HTMLElement>('[data-autofocus]')
+    const fallback = dialogRef.current?.querySelector<HTMLElement>(
+      'input:not([disabled]), textarea:not([disabled])',
+    )
+    ;(preferred ?? fallback)?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.preventDefault(); props.onClose(); return }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'input, textarea, button, a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute('disabled') && el.tabIndex !== -1)
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      // Restore focus only if the trigger is still mounted (it may have
+      // been removed if the sheet's action unmounted it).
+      const t = triggerRef.current
+      if (t && document.contains(t)) t.focus()
+    }
+  }, [props.onClose])
+
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/40"
+        className="fixed inset-0 z-50 bg-black/40 animate-in fade-in"
         onClick={props.onClose}
         aria-hidden
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-xl pb-[env(safe-area-inset-bottom)] max-h-[85vh] overflow-y-auto md:max-w-lg md:mx-auto md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:bottom-8 md:rounded-2xl"
@@ -92,9 +146,8 @@ function ScheduleVisitForm(p: ScheduleVisitMode & { onClose: () => void }) {
   const [at, setAt] = useState(() => isoToLocalInput(p.initialAt))
   const [notes, setNotes] = useState(p.initialNotes ?? '')
   const [saving, setSaving] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { inputRef.current?.focus() }, [])
+  // Auto-focus is handled by SheetShell via the data-autofocus attribute
+  // on the datetime input below.
 
   async function save() {
     if (!at) { toast('Pick a date and time first', 'error'); return }
@@ -120,7 +173,7 @@ function ScheduleVisitForm(p: ScheduleVisitMode & { onClose: () => void }) {
       <label className="block">
         <span className="block text-xs font-medium text-gray-700 mb-1">When</span>
         <input
-          ref={inputRef}
+          data-autofocus
           type="datetime-local"
           value={at}
           onChange={(e) => setAt(e.target.value)}
@@ -179,6 +232,7 @@ function ShareEstimateBody(p: ShareEstimateMode & { onClose: () => void }) {
       <label className="block">
         <span className="block text-xs font-medium text-gray-700 mb-1">Public link</span>
         <input
+          data-autofocus
           readOnly
           value={p.url}
           onFocus={(e) => e.currentTarget.select()}
@@ -255,12 +309,13 @@ function PickFollowupForm(p: PickFollowupMode & { onClose: () => void }) {
     <div className="space-y-4">
       <p className="text-sm text-gray-600">When do you want to be reminded to follow up?</p>
       <div className="grid grid-cols-3 gap-2">
-        {[3, 7, 14].map((n) => (
+        {[3, 7, 14].map((n, i) => (
           <button
             key={n}
             type="button"
             disabled={saving}
             onClick={() => quick(n)}
+            data-autofocus={i === 1 ? '' : undefined}
             className="px-3 py-2.5 text-sm font-medium border-2 border-gray-200 rounded-lg active:scale-95 transition disabled:opacity-60"
           >
             +{n} days

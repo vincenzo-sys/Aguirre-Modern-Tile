@@ -1,25 +1,27 @@
 'use client'
 
-// Action-focused redesign of /dashboard/leads. Replaces the dense
-// 8-column table with bucketed `<LeadCard>` stream — see
-// C:\Users\vince\.claude\plans\typed-soaring-cloud.md for the design.
+// Action-focused leads pipeline page (v3 polish pass).
 //
-// State + persistence stays here. <LeadCard> is dumb and only fires
-// callbacks. Three flows that need a bigger input surface (schedule
-// visit, share estimate link, pick follow-up date) open a shared
-// <LeadActionSheet>.
+// State + persistence stays here. All the persistence-heavy work
+// (PATCH/POST orchestration, optimistic updates, rollback) is owned by
+// useLeadHandlers; the page passes its returned `handlers` straight
+// through to every LeadCard and KanbanBoard.
+//
+// Three persisted preferences (bucketCollapsed, viewMode, smartView)
+// use useLocalStorageState — no inline useEffect boilerplate. Stage
+// metadata + transitions are imported from `@/lib/leadStages` so
+// every surface that renders a stage chip shows identical data.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Inbox, Plus, AlertTriangle, Briefcase, Hourglass, Snowflake, ChevronRight,
-  FileText, Calendar, FilePlus, FileCheck, LayoutGrid, List,
+  Plus, AlertTriangle, Briefcase, Hourglass, Snowflake, ChevronRight,
+  Inbox, LayoutGrid, List, RefreshCw, Search,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
-import { type StageOption } from '@/components/dashboard/InlineEditCells'
 import type { PipelineItem, PipelineStage } from '@/app/api/pipeline/route'
-import LeadCard, { type LeadCardHandlers } from '@/components/dashboard/LeadCard'
+import LeadCard from '@/components/dashboard/LeadCard'
 import LeadActionSheet from '@/components/dashboard/leads/LeadActionSheet'
 import {
   bucketize, BUCKET_META, BUCKET_ORDER, type BucketKey, sumEstimatedCost,
@@ -28,44 +30,10 @@ import PipelineSummaryStrip from '@/components/dashboard/leads/PipelineSummarySt
 import SmartViewChips, { applySmartView, type SmartView } from '@/components/dashboard/leads/SmartViewChips'
 import KanbanBoard from '@/components/dashboard/leads/KanbanBoard'
 import { formatMoneyShort } from '@/components/dashboard/leads/formatters'
-
-// stageMeta drives the chip colors/labels/icons. Single source of truth
-// the EditableStageCell consumes via stageOptionsFor() below.
-const stageMeta: Record<PipelineStage, { label: string; color: string; icon: typeof Inbox }> = {
-  new:               { label: 'New inquiry',     color: 'bg-blue-100 text-blue-700',     icon: Inbox },
-  reviewed:          { label: 'Reviewed',        color: 'bg-yellow-100 text-yellow-800', icon: FileText },
-  visit_scheduled:   { label: 'Visit scheduled', color: 'bg-amber-100 text-amber-800',   icon: Calendar },
-  lead_in_progress:  { label: 'Active lead',     color: 'bg-indigo-100 text-indigo-800', icon: FileText },
-  estimate_sent:     { label: 'Estimate sent',   color: 'bg-purple-100 text-purple-800', icon: FilePlus },
-  estimate_revised:  { label: 'Estimate revised', color: 'bg-pink-100 text-pink-800',    icon: FileCheck },
-}
-
-const PIPELINE_STAGES: PipelineStage[] = [
-  'new', 'reviewed', 'visit_scheduled',
-  'lead_in_progress', 'estimate_sent', 'estimate_revised',
-]
-
-// QR rows can pick any stage (job-stages auto-convert via /api/leads/{id}/convert).
-// Job rows can only switch among job-stages — moving back to a QR stage would
-// require un-converting, which the API doesn't support, so those options are
-// shown but disabled (with a tooltip).
-function stageOptionsFor(item: PipelineItem): StageOption<PipelineStage>[] {
-  return PIPELINE_STAGES.map((stage) => {
-    const meta = stageMeta[stage]
-    const isQrStage = stage === 'new' || stage === 'reviewed' || stage === 'visit_scheduled'
-    const disabled = item.kind === 'job' && isQrStage
-    return {
-      stage,
-      label: meta.label,
-      color: meta.color,
-      icon: meta.icon,
-      disabled,
-      disabledReason: disabled
-        ? 'Job already created — moving back to an inquiry stage isn’t supported. Use Archive to remove from the pipeline.'
-        : undefined,
-    }
-  })
-}
+import { useLocalStorageState } from '@/lib/useLocalStorageState'
+import { useLeadHandlers } from '@/components/dashboard/leads/useLeadHandlers'
+import { LeadsPageSkeleton } from '@/components/dashboard/leads/LeadCardSkeleton'
+import CommandPalette from '@/components/dashboard/leads/CommandPalette'
 
 const sourceLabels: Record<string, string> = {
   website: 'Website', phone: 'Phone', referral: 'Referral',
@@ -85,38 +53,45 @@ const BUCKET_ICONS: Record<BucketKey, typeof AlertTriangle> = {
   stale: Snowflake,
 }
 
-// Sheet state is a discriminated union — only one sheet open at a time.
-type SheetState =
-  | { mode: 'schedule-visit'; item: PipelineItem }
-  | { mode: 'share-estimate'; item: PipelineItem; url: string }
-  | { mode: 'pick-followup';  item: PipelineItem }
-  | null
-
 export default function LeadsPage() {
   const router = useRouter()
   const [items, setItems] = useState<PipelineItem[]>([])
   const [counts, setCounts] = useState({ total: 0, quote_requests: 0, jobs: 0 })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<string>('all')
-  const [bucketCollapsed, setBucketCollapsed] = useState<Partial<Record<BucketKey, boolean>>>({})
-  const [sheet, setSheet] = useState<SheetState>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('cards')
-  const [smartView, setSmartView] = useState<SmartView>('all')
-  // Set when the user clicks a segment in the pipeline summary strip
-  // (or the eventual filter-by-stage from a chip click). Drives kanban
-  // column scroll-into-view. Reset to null after one render so the
-  // scroll doesn't fire on every re-render.
   const [focusedStage, setFocusedStage] = useState<PipelineStage | null>(null)
+
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  const [bucketCollapsed, setBucketCollapsed] = useLocalStorageState<Partial<Record<BucketKey, boolean>>>(
+    COLLAPSED_KEY,
+    {},
+    (v): v is Partial<Record<BucketKey, boolean>> => typeof v === 'object' && v !== null && !Array.isArray(v),
+  )
+  const [viewMode, setViewMode] = useLocalStorageState<ViewMode>(
+    VIEW_MODE_KEY,
+    'cards',
+    (v): v is ViewMode => v === 'cards' || v === 'kanban',
+  )
+  const [smartView, setSmartView] = useLocalStorageState<SmartView>(
+    SMART_VIEW_KEY,
+    'all',
+    (v): v is SmartView => v === 'all' || v === 'today' || v === 'thisWeek' || v === 'hotQuotes' || v === 'stale',
+  )
 
   // ── Data loading ─────────────────────────────────────────────────
   const loadPipeline = useCallback(async () => {
+    setError(null)
     try {
       const r = await fetch('/api/pipeline')
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const data = await r.json()
       setItems(data.items as PipelineItem[])
       setCounts(data.counts)
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(msg)
       toast('Failed to load pipeline', 'error')
     }
   }, [])
@@ -125,218 +100,26 @@ export default function LeadsPage() {
     loadPipeline().finally(() => setLoading(false))
   }, [loadPipeline])
 
-  // ── Persistence: bucket-collapsed, viewMode, smartView ──────────
+  // C1: global Cmd-K / Ctrl-K opens the command palette. Slash also
+  // opens it (Linear/Notion convention) — except while the user is
+  // typing in an input, so we don't hijack the regular '/' key.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(COLLAPSED_KEY)
-      if (raw) setBucketCollapsed(JSON.parse(raw))
-      const vm = localStorage.getItem(VIEW_MODE_KEY)
-      if (vm === 'cards' || vm === 'kanban') setViewMode(vm)
-      const sv = localStorage.getItem(SMART_VIEW_KEY)
-      if (sv === 'all' || sv === 'today' || sv === 'thisWeek' || sv === 'hotQuotes' || sv === 'stale') {
-        setSmartView(sv)
+    function onKey(e: KeyboardEvent) {
+      const isMeta = (e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')
+      const isSlash = e.key === '/' && !isTypingInInput(e.target)
+      if (isMeta || isSlash) {
+        e.preventDefault()
+        setPaletteOpen(true)
       }
-    } catch { /* ignore */ }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [])
-  useEffect(() => {
-    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify(bucketCollapsed)) } catch { /* ignore */ }
-  }, [bucketCollapsed])
-  useEffect(() => {
-    try { localStorage.setItem(VIEW_MODE_KEY, viewMode) } catch { /* ignore */ }
-  }, [viewMode])
-  useEffect(() => {
-    try { localStorage.setItem(SMART_VIEW_KEY, smartView) } catch { /* ignore */ }
-  }, [smartView])
 
-  // ── Optimistic local-update helper used by all PATCH-style handlers
-  function updateItemLocally(itemId: string, kind: 'quote_request' | 'job', patch: Partial<PipelineItem>) {
-    setItems((prev) => prev.map((it) => (it.id === itemId && it.kind === kind ? { ...it, ...patch } : it)))
-  }
-
-  // ── Stage editor (re-used from the prior pass) ────────────────────
-  async function saveStage(item: PipelineItem, newStage: PipelineStage) {
-    // Same-table: QR → QR stage
-    if (item.kind === 'quote_request' && (newStage === 'new' || newStage === 'reviewed' || newStage === 'visit_scheduled')) {
-      let patch: Record<string, unknown>
-      let local: Partial<PipelineItem>
-      if (newStage === 'visit_scheduled') {
-        // If no existing site_visit_at, prompt for a date. Anything more
-        // elaborate (the bottom-sheet picker) is reachable via the
-        // primary CTA on a `reviewed` card.
-        let dt = item.site_visit_at
-        if (!dt) {
-          const input = window.prompt('When is the site visit?\n(YYYY-MM-DD HH:MM, e.g. 2026-05-22 14:00)')
-          if (!input) return
-          const parsed = new Date(input.replace(' ', 'T'))
-          if (Number.isNaN(parsed.getTime())) { toast('Invalid date format', 'error'); return }
-          dt = parsed.toISOString()
-        }
-        patch = { site_visit_at: dt }
-        local = { stage: 'visit_scheduled', site_visit_at: dt }
-      } else {
-        patch = { status: newStage, site_visit_at: null }
-        local = { stage: newStage, site_visit_at: null }
-      }
-      const prev = { stage: item.stage, site_visit_at: item.site_visit_at }
-      updateItemLocally(item.id, 'quote_request', local)
-      const res = await fetch(`/api/leads/${item.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-      })
-      if (!res.ok) { updateItemLocally(item.id, 'quote_request', prev as Partial<PipelineItem>); throw new Error(`Stage save failed: ${res.status}`) }
-      return
-    }
-    // Same-table: Job → Job stage
-    if (item.kind === 'job' && (newStage === 'lead_in_progress' || newStage === 'estimate_sent' || newStage === 'estimate_revised')) {
-      const jobStatus = newStage === 'lead_in_progress' ? 'lead' : newStage === 'estimate_sent' ? 'quoted' : 'estimate_revised'
-      const prev = { stage: item.stage, job_status: item.job_status }
-      updateItemLocally(item.id, 'job', { stage: newStage, job_status: jobStatus })
-      const res = await fetch(`/api/jobs/${item.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: jobStatus }),
-      })
-      if (!res.ok) { updateItemLocally(item.id, 'job', prev as Partial<PipelineItem>); throw new Error(`Stage save failed: ${res.status}`) }
-      return
-    }
-    // Cross-table: QR → Job stage (auto-promote)
-    if (item.kind === 'quote_request') {
-      const convertRes = await fetch(`/api/leads/${item.id}/convert`, { method: 'POST' })
-      const convertData = await convertRes.json()
-      if (!convertRes.ok) throw new Error(convertData.error ?? 'Conversion failed')
-      const newJobId: string = convertData.job?.id
-      const targetJobStatus = newStage === 'lead_in_progress' ? 'lead' : newStage === 'estimate_sent' ? 'quoted' : 'estimate_revised'
-      if (newJobId && targetJobStatus !== 'lead') {
-        await fetch(`/api/jobs/${newJobId}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: targetJobStatus }),
-        })
-      }
-      await loadPipeline()
-      toast('Lead promoted to job', 'success')
-      return
-    }
-    // Backward (job → QR): disallowed
-    throw new Error('Cannot move a job back to inquiry stage. Use Archive instead.')
-  }
-
-  // ── Notes ──────────────────────────────────────────────────────────
-  async function saveNotes(item: PipelineItem, newValue: string | null) {
-    const path = item.kind === 'quote_request' ? `/api/leads/${item.id}` : `/api/jobs/${item.id}`
-    updateItemLocally(item.id, item.kind, { notes: newValue })
-    const res = await fetch(path, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: newValue }),
-    })
-    if (!res.ok) { updateItemLocally(item.id, item.kind, { notes: item.notes }); throw new Error(`Save failed: ${res.status}`) }
-  }
-
-  // ── Mark contacted now ────────────────────────────────────────────
-  async function markContactedNow(item: PipelineItem) {
-    const targetQrId = item.kind === 'quote_request' ? item.id : item.linked_quote_request_id
-    if (!targetQrId) { toast('No editable lead record for this row', 'error'); return }
-    const now = new Date().toISOString()
-    updateItemLocally(item.id, item.kind, { last_contact_at: now })
-    const res = await fetch(`/api/leads/${targetQrId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ last_contact_at: now }),
-    })
-    if (!res.ok) {
-      updateItemLocally(item.id, item.kind, { last_contact_at: item.last_contact_at })
-      toast('Failed to mark contacted', 'error')
-      return
-    }
-    toast('Marked contacted just now', 'success')
-  }
-
-  // ── Archive (QR-only) ─────────────────────────────────────────────
-  async function archiveLead(item: PipelineItem) {
-    if (item.kind !== 'quote_request') return
-    if (!confirm(`Archive ${item.client_name}'s inquiry? They'll move out of the active pipeline.`)) return
-    setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'quote_request')))
-    const res = await fetch(`/api/leads/${item.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }),
-    })
-    if (!res.ok) { toast('Failed to archive — refresh to recover', 'error'); return }
-    toast('Archived', 'success')
-  }
-
-  // ── Send to Jobs (customer accepted — locks deal) ────────────────
-  async function sendToJobs(item: PipelineItem) {
-    if (item.kind !== 'job') return
-    if (!confirm(`Mark ${item.project_name} as accepted? This moves it to the operations workflow.`)) return
-    setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'job')))
-    const res = await fetch(`/api/jobs/${item.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'accepted_not_scheduled' }),
-    })
-    if (!res.ok) { toast('Failed to advance — refresh to recover', 'error'); return }
-    toast('Sent to Jobs', 'success')
-    router.push(`/dashboard/jobs/${item.id}`)
-  }
-
-  // ── Convert (manual override; QR-only) ────────────────────────────
-  async function convertLead(item: PipelineItem) {
-    if (item.kind !== 'quote_request') return
-    try {
-      const res = await fetch(`/api/leads/${item.id}/convert`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) {
-        if (res.status === 409 && data.existing_job_id) {
-          toast('Lead already converted — opening job', 'success')
-          router.push(`/dashboard/jobs/${data.existing_job_id}`)
-          return
-        }
-        throw new Error(data.error || 'Failed to convert')
-      }
-      toast('Job created — pick a template, use Claude, or edit line items', 'success')
-      router.push(`/dashboard/jobs/${data.job.id}`)
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
-    }
-  }
-
-  // ── Schedule visit (sheet-driven) ─────────────────────────────────
-  async function scheduleVisit(item: PipelineItem, isoAt: string, notes: string | null) {
-    const targetQrId = item.kind === 'quote_request' ? item.id : item.linked_quote_request_id
-    if (!targetQrId) throw new Error('No editable lead record for this row')
-    const prev = { stage: item.stage, site_visit_at: item.site_visit_at, site_visit_notes: item.site_visit_notes }
-    updateItemLocally(item.id, item.kind, { site_visit_at: isoAt, site_visit_notes: notes, stage: 'visit_scheduled' })
-    const res = await fetch(`/api/leads/${targetQrId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ site_visit_at: isoAt, site_visit_notes: notes }),
-    })
-    if (!res.ok) { updateItemLocally(item.id, item.kind, prev as Partial<PipelineItem>); throw new Error(`Save failed: ${res.status}`) }
-  }
-
-  // ── Pick follow-up (sheet-driven) ─────────────────────────────────
-  async function pickFollowup(item: PipelineItem, date: string | null) {
-    const targetQrId = item.kind === 'quote_request' ? item.id : item.linked_quote_request_id
-    if (!targetQrId) throw new Error('No editable lead record for this row')
-    updateItemLocally(item.id, item.kind, { next_follow_up: date })
-    const res = await fetch(`/api/leads/${targetQrId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ next_follow_up: date }),
-    })
-    if (!res.ok) { updateItemLocally(item.id, item.kind, { next_follow_up: item.next_follow_up }); throw new Error(`Save failed: ${res.status}`) }
-  }
-
-  // ── Open the share-estimate sheet (generates the link first) ─────
-  async function openShareEstimate(item: PipelineItem) {
-    if (item.kind !== 'job') {
-      toast('Convert this lead to a job first', 'error')
-      return
-    }
-    try {
-      const res = await fetch(`/api/jobs/${item.id}/estimate-link`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to generate link')
-      setSheet({ mode: 'share-estimate', item, url: data.url })
-      // The endpoint flips the job to 'quoted' the first time; pull fresh state
-      await loadPipeline()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not generate link', 'error')
-    }
-  }
-
-  const handlers: LeadCardHandlers = {
-    saveStage, saveNotes, markContactedNow, archiveLead, convertLead, sendToJobs,
-    openScheduleVisit: (item) => setSheet({ mode: 'schedule-visit', item }),
-    openShareEstimate,
-    openPickFollowup: (item) => setSheet({ mode: 'pick-followup', item }),
-    stageOptionsFor,
-  }
+  // ── Handlers (extracted into a hook — see useLeadHandlers.ts) ───
+  const { handlers, sheet, closeSheet, scheduleVisit, pickFollowup } = useLeadHandlers({
+    items, setItems, loadPipeline,
+  })
 
   // ── Source filter + Smart View filter + bucketize ──────────────
   const availableSources = useMemo(() => {
@@ -345,9 +128,6 @@ export default function LeadsPage() {
     return Array.from(set).sort()
   }, [items])
 
-  // Source filter first (the "physical" filter on intake channel), then
-  // Smart View filter on top (the "work-list" filter). Chip counts in
-  // SmartViewChips reflect counts after the source filter has applied.
   const sourceFiltered = useMemo(
     () => items.filter((i) => sourceFilter === 'all' || (i.source ?? 'website') === sourceFilter),
     [items, sourceFilter],
@@ -362,14 +142,9 @@ export default function LeadsPage() {
 
   function handlePickStage(stage: PipelineStage) {
     setFocusedStage(stage)
-    // On md+, switch to kanban so the focused column is visible.
-    // On mobile we just set the state — kanban isn't rendered there,
-    // but the focus is harmless.
     if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
       setViewMode('kanban')
     }
-    // Clear focus after a short delay so re-renders don't keep
-    // re-scrolling. 800ms is enough for the smooth scroll to settle.
     setTimeout(() => setFocusedStage(null), 800)
   }
 
@@ -380,13 +155,10 @@ export default function LeadsPage() {
     })
   }
 
-  if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading pipeline…</div>
-  }
+  // Loading + error states
+  if (loading) return <LeadsPageSkeleton />
+  if (error) return <PipelineErrorState message={error} onRetry={() => { setLoading(true); loadPipeline().finally(() => setLoading(false)) }} />
 
-  // Kanban is desktop-only — at md+ we render the toggle and let the
-  // user pick; below md we force the cards view regardless of stored
-  // preference. Effective view = stored choice clamped by viewport.
   const effectiveViewMode: ViewMode = viewMode === 'kanban' ? 'kanban' : 'cards'
 
   return (
@@ -397,15 +169,23 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500 mt-1">
             {counts.total} active · {counts.quote_requests} new inquiries · {counts.jobs} active leads
-            {overdueCount > 0 && (
-              <span className="text-red-600 font-medium"> · {overdueCount} overdue</span>
-            )}
+            {overdueCount > 0 && <span className="text-red-600 font-medium"> · {overdueCount} overdue</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Cards | Kanban toggle — desktop only. Cards view is
-              the muscle-memory default; kanban is the new "where is
-              everything" pipeline visualization. */}
+          {/* C1: search trigger — keyboard users can hit Cmd/Ctrl+K or /
+              instead; this button covers mobile where there's no
+              keyboard shortcut path. */}
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            aria-label="Search leads"
+          >
+            <Search className="w-4 h-4" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden md:inline text-[10px] text-gray-500 border border-gray-300 rounded px-1 ml-1">⌘K</kbd>
+          </button>
           <div className="hidden md:inline-flex bg-gray-100 rounded-lg p-0.5">
             <button
               type="button"
@@ -440,11 +220,10 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Pipeline summary strip — Pipedrive/HubSpot pattern. One-glance
-          distribution across stages. Click jumps to that column in kanban. */}
+      {/* Pipeline summary strip (click a segment → jump to kanban column) */}
       <PipelineSummaryStrip items={items} onPickStage={handlePickStage} />
 
-      {/* Smart Views — Close.com pattern. Source filter folded into the right side. */}
+      {/* Smart View chips + source filter folded into the same row */}
       <SmartViewChips
         items={sourceFiltered}
         activeView={smartView}
@@ -455,7 +234,7 @@ export default function LeadsPage() {
         sourceLabels={sourceLabels}
       />
 
-      {/* View body — bucketed card stream OR kanban board */}
+      {/* View body: bucketed card stream OR kanban board */}
       {filtered.length === 0 ? (
         <EmptyState />
       ) : effectiveViewMode === 'kanban' ? (
@@ -493,49 +272,125 @@ export default function LeadsPage() {
                 </div>
                 <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
               </button>
-              {!collapsed && (
-                <div className="space-y-3 mt-3">
-                  {cards.map((item) => (
-                    <LeadCard key={`${item.kind}-${item.id}`} item={item} handlers={handlers} />
-                  ))}
+              {/* B2: animated collapse via grid-template-rows: 0fr ↔ 1fr.
+                  Browsers that don't support animating grid rows (old
+                  Safari) fall back to an instant toggle — graceful. */}
+              <div
+                className="grid transition-[grid-template-rows] duration-200 ease-out"
+                style={{ gridTemplateRows: collapsed ? '0fr' : '1fr' }}
+                aria-hidden={collapsed}
+              >
+                <div className="overflow-hidden">
+                  <div className="space-y-3 mt-3">
+                    {cards.map((item) => (
+                      <LeadCard key={`${item.kind}-${item.id}`} item={item} handlers={handlers} />
+                    ))}
+                  </div>
                 </div>
-              )}
+              </div>
             </section>
           )
         })
       )}
 
-      {/* Active bottom sheet */}
-      {sheet?.mode === 'schedule-visit' && (
+      {/* A6: single render-point for the bottom sheet. The discriminated
+          union on `sheet` makes the per-mode props type-safe inside. */}
+      <SheetHost
+        sheet={sheet}
+        onClose={closeSheet}
+        scheduleVisit={scheduleVisit}
+        pickFollowup={pickFollowup}
+      />
+
+      {/* C1: command palette (Cmd/Ctrl+K, /, or the Search button) */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={items}
+        onMarkContacted={handlers.markContactedNow}
+        onPickFollowupQuick={(item) => {
+          const d = new Date()
+          d.setDate(d.getDate() + 7)
+          return pickFollowup(item, d.toISOString().slice(0, 10))
+        }}
+      />
+    </div>
+  )
+}
+
+// Don't hijack '/' when the user is typing in an input/textarea/contenteditable.
+function isTypingInInput(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (target.isContentEditable) return true
+  return false
+}
+
+// ── Sub-components ────────────────────────────────────────────────
+
+function SheetHost({
+  sheet, onClose, scheduleVisit, pickFollowup,
+}: {
+  sheet: ReturnType<typeof useLeadHandlers>['sheet']
+  onClose: () => void
+  scheduleVisit: (item: PipelineItem, isoAt: string, notes: string | null) => Promise<void>
+  pickFollowup: (item: PipelineItem, date: string | null) => Promise<void>
+}) {
+  if (!sheet) return null
+  switch (sheet.mode) {
+    case 'schedule-visit':
+      return (
         <LeadActionSheet
           open
           mode="schedule-visit"
           initialAt={sheet.item.site_visit_at}
           initialNotes={sheet.item.site_visit_notes ?? null}
           customerName={sheet.item.client_name}
-          onClose={() => setSheet(null)}
+          onClose={onClose}
           onSave={(isoAt, notes) => scheduleVisit(sheet.item, isoAt, notes)}
         />
-      )}
-      {sheet?.mode === 'share-estimate' && (
+      )
+    case 'share-estimate':
+      return (
         <LeadActionSheet
           open
           mode="share-estimate"
           url={sheet.url}
           customerName={sheet.item.client_name}
           customerPhone={sheet.item.client_phone}
-          onClose={() => setSheet(null)}
+          onClose={onClose}
         />
-      )}
-      {sheet?.mode === 'pick-followup' && (
+      )
+    case 'pick-followup':
+      return (
         <LeadActionSheet
           open
           mode="pick-followup"
           initialDate={sheet.item.next_follow_up ? sheet.item.next_follow_up.slice(0, 10) : null}
-          onClose={() => setSheet(null)}
+          onClose={onClose}
           onSave={(d) => pickFollowup(sheet.item, d)}
         />
-      )}
+      )
+  }
+}
+
+function PipelineErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center mt-12">
+        <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+        <h2 className="text-base font-semibold text-red-900">Couldn’t load the pipeline</h2>
+        <p className="text-sm text-red-700 mt-1">{message}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
     </div>
   )
 }

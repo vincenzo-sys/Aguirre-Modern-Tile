@@ -5,18 +5,28 @@ import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 
+// Optional inline action ("Undo", "Retry", etc.) rendered as a button
+// next to the close (X). Clicking it fires `onClick` AND dismisses the
+// toast. When an action is present, the auto-dismiss timer extends to
+// 5s so the user has room to react. Without an action, stays at 4s.
+type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
 interface ToastMessage {
   id: number
   message: string
   type: ToastType
+  action?: ToastAction
 }
 
-let addToastFn: ((message: string, type: ToastType) => void) | null = null
+let addToastFn: ((message: string, type: ToastType, action?: ToastAction) => void) | null = null
 let nextId = 0
 
-export function toast(message: string, type: ToastType = 'info') {
+export function toast(message: string, type: ToastType = 'info', action?: ToastAction) {
   if (addToastFn) {
-    addToastFn(message, type)
+    addToastFn(message, type, action)
   }
 }
 
@@ -34,16 +44,28 @@ const styles: Record<ToastType, string> = {
   info: 'bg-white border-gray-200 text-gray-800',
 }
 
+// Action button picks up the toast type's accent color so an Undo
+// inside a success toast feels native (green), Retry inside an error
+// reads red, etc.
+const actionStyles: Record<ToastType, string> = {
+  success: 'text-green-700 hover:bg-green-100',
+  error: 'text-red-700 hover:bg-red-100',
+  warning: 'text-amber-700 hover:bg-amber-100',
+  info: 'text-blue-700 hover:bg-blue-100',
+}
+
 export default function ToastContainer() {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
-  const addToast = useCallback((message: string, type: ToastType) => {
-    const id = nextId++
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, 4000)
+  const dismiss = useCallback((id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
+
+  const addToast = useCallback((message: string, type: ToastType, action?: ToastAction) => {
+    const id = nextId++
+    setToasts(prev => [...prev, { id, message, type, action }])
+    setTimeout(() => dismiss(id), action ? 5000 : 4000)
+  }, [dismiss])
 
   useEffect(() => {
     addToastFn = addToast
@@ -61,9 +83,18 @@ export default function ToastContainer() {
         >
           {icons[t.type]}
           <p className="flex-1">{t.message}</p>
+          {t.action && (
+            <button
+              onClick={() => { t.action!.onClick(); dismiss(t.id) }}
+              className={`flex-shrink-0 px-2 py-1 rounded font-semibold text-xs uppercase tracking-wide ${actionStyles[t.type]}`}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
-            onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+            onClick={() => dismiss(t.id)}
             className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+            aria-label="Dismiss"
           >
             <X className="w-4 h-4" />
           </button>

@@ -220,25 +220,21 @@ export function EditableStageCell<S extends string>({
   const [status, setStatus, flash] = useSaveStatus()
   const wrapRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside-click or Escape so the dropdown behaves like a popover.
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [open])
+  // Indices of options the user can actually pick (skips disabled + current).
+  // Computed lazily; recomputes each render but the list is short (6) and
+  // memoizing for a 6-element walk would be overkill.
+  const enabledIndices = options
+    .map((opt, i) => ({ i, ok: !opt.disabled && opt.stage !== value }))
+    .filter((x) => x.ok)
+    .map((x) => x.i)
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
 
-  const current = options.find((o) => o.stage === value)
-  const CurrentIcon = current?.icon
+  // Whenever the menu opens, focus the first enabled option (B5).
+  useEffect(() => {
+    if (open) setFocusedIndex(enabledIndices[0] ?? null)
+    else setFocusedIndex(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   async function pick(newStage: S) {
     setOpen(false)
@@ -252,6 +248,44 @@ export function EditableStageCell<S extends string>({
       toast(err instanceof Error ? err.message : 'Save failed', 'error')
     }
   }
+
+  // B5: outside-click + Escape + arrow nav + Enter.
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { setOpen(false); return }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (enabledIndices.length === 0) return
+        e.preventDefault()
+        setFocusedIndex((prev) => {
+          const pos = prev == null ? -1 : enabledIndices.indexOf(prev)
+          const next = e.key === 'ArrowDown'
+            ? enabledIndices[(pos + 1) % enabledIndices.length]
+            : enabledIndices[(pos - 1 + enabledIndices.length) % enabledIndices.length]
+          return next ?? prev
+        })
+        return
+      }
+      if (e.key === 'Enter' && focusedIndex != null) {
+        e.preventDefault()
+        const opt = options[focusedIndex]
+        if (opt && !opt.disabled && opt.stage !== value) pick(opt.stage)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, focusedIndex, enabledIndices.join(',')])
+
+  const current = options.find((o) => o.stage === value)
+  const CurrentIcon = current?.icon
 
   return (
     <div ref={wrapRef} className="relative inline-block">
@@ -287,20 +321,24 @@ export function EditableStageCell<S extends string>({
           // Stop bubble so clicks inside the menu don't trigger row navigation.
           onClick={(e) => e.stopPropagation()}
         >
-          {options.map((opt) => {
+          {options.map((opt, idx) => {
             const Icon = opt.icon
             const isCurrent = opt.stage === value
+            const isFocused = idx === focusedIndex
             const klass = opt.disabled
               ? 'opacity-40 cursor-not-allowed'
               : isCurrent
                 ? 'bg-gray-50 cursor-default'
-                : 'hover:bg-gray-50 cursor-pointer'
+                : isFocused
+                  ? 'bg-primary-50 cursor-pointer'
+                  : 'hover:bg-gray-50 cursor-pointer'
             return (
               <button
                 key={opt.stage}
                 type="button"
                 disabled={opt.disabled || isCurrent}
                 onClick={() => !opt.disabled && pick(opt.stage)}
+                onMouseEnter={() => !opt.disabled && !isCurrent && setFocusedIndex(idx)}
                 title={opt.disabled ? opt.disabledReason : undefined}
                 className={`flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs ${klass}`}
               >

@@ -37,8 +37,8 @@ describe('bucketize', () => {
 
   it('urgency >= 90 lands in actionNeeded regardless of stage', () => {
     const a = item({ stage: 'new', urgency: 90 })
-    const b = item({ stage: 'estimate_sent', urgency: 100 })
-    const c = item({ stage: 'lead_in_progress', urgency: 95 })
+    const b = item({ stage: 'quoted', urgency: 100 })
+    const c = item({ stage: 'awaiting_response', urgency: 95 })
     const out = bucketize([a, b, c])
     expect(out.actionNeeded).toHaveLength(3)
     expect(out.working).toEqual([])
@@ -46,16 +46,17 @@ describe('bucketize', () => {
   })
 
   it('quoted stages with urgency < 100 land in waiting', () => {
-    const sent = item({ stage: 'estimate_sent', urgency: 50 })
-    const revised = item({ stage: 'estimate_revised', urgency: 60 })
-    const out = bucketize([sent, revised])
-    expect(out.waiting).toHaveLength(2)
+    const sent = item({ stage: 'quoted', urgency: 50 })
+    const revised = item({ stage: 'edits_needed', urgency: 60 })
+    const chasing = item({ stage: 'awaiting_response', urgency: 60 })
+    const out = bucketize([sent, revised, chasing])
+    expect(out.waiting).toHaveLength(3)
     expect(out.stale).toEqual([])
   })
 
   it('urgency 50 / 70 lands in stale unless already in actionNeeded', () => {
     const a = item({ stage: 'new', urgency: 50 })
-    const b = item({ stage: 'reviewed', urgency: 70 })
+    const b = item({ stage: 'in_person_estimate_scheduled', urgency: 70 })
     const c = item({ stage: 'new', urgency: 90 })  // actionNeeded wins
     const out = bucketize([a, b, c])
     expect(out.stale.length).toBe(2)
@@ -64,9 +65,9 @@ describe('bucketize', () => {
 
   it('working stages with low urgency land in working', () => {
     const a = item({ stage: 'new', urgency: 10 })
-    const b = item({ stage: 'reviewed', urgency: 10 })
-    const c = item({ stage: 'visit_scheduled', urgency: 10 })
-    const d = item({ stage: 'lead_in_progress', urgency: 10 })
+    const b = item({ stage: 'in_person_estimate_scheduled', urgency: 10 })
+    const c = item({ stage: 'accepted_not_scheduled', urgency: 10 })
+    const d = item({ stage: 'scheduled', urgency: 10 })
     const out = bucketize([a, b, c, d])
     expect(out.working).toHaveLength(4)
   })
@@ -79,7 +80,7 @@ describe('bucketize', () => {
   })
 
   it('quoted at urgency 100 stays in actionNeeded, not waiting', () => {
-    const overdue = item({ stage: 'estimate_sent', urgency: 100 })
+    const overdue = item({ stage: 'quoted', urgency: 100 })
     const out = bucketize([overdue])
     expect(out.actionNeeded).toHaveLength(1)
     expect(out.waiting).toEqual([])

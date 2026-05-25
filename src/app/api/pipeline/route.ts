@@ -9,16 +9,18 @@ function getSupabase() {
   )
 }
 
-// A unified pipeline item — either a raw quote_request or a job that's still
-// in a sales-stage status. The Leads page renders these in a single ranked
-// list so Vince can work the whole pipeline without flipping between tabs.
+// A unified pipeline item — either a raw quote_request or a job in any
+// pre-install sales stage. The Leads page is the single deal-flow view: it
+// keeps the lead/job all the way through to "install on the calendar" so
+// Vince doesn't have to flip tabs between accepted/scheduled and the rest.
 export type PipelineStage =
-  | 'new'                  // quote_request just came in
-  | 'reviewed'             // quote_request triaged
-  | 'visit_scheduled'      // estimate site visit booked
-  | 'lead_in_progress'     // job created but no estimate yet
-  | 'estimate_sent'        // job in 'quoted' status
-  | 'estimate_revised'     // job in 'estimate_revised' status
+  | 'new'                          // quote_request just came in
+  | 'in_person_estimate_scheduled' // site visit on the calendar (QR or job)
+  | 'quoted'                       // estimate sent, customer reviewing
+  | 'edits_needed'                 // customer asked for revisions
+  | 'awaiting_response'            // estimate sat too long — Vince is now chasing
+  | 'accepted_not_scheduled'       // deposit paid / signed, install not booked yet
+  | 'scheduled'                    // install date locked in
 
 export type PipelineItem = {
   kind: 'quote_request' | 'job'
@@ -123,7 +125,18 @@ export async function GET(req: NextRequest) {
       supabase
         .from('jobs')
         .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, scope_notes, created_at, updated_at')
-        .in('status', ['lead', 'quoted', 'estimate_revised'])
+        // Extended pipeline: leads + quoted + the new 'awaiting_response' chase
+        // bucket + accepted/scheduled jobs that aren't yet on the install bench.
+        // Stops at 'in_progress' — once the crew is on-site the job lives on
+        // /dashboard/jobs, not on /leads.
+        .in('status', [
+          'lead',
+          'quoted',
+          'estimate_revised',
+          'awaiting_response',
+          'accepted_not_scheduled',
+          'scheduled',
+        ])
         .order('created_at', { ascending: false }),
       supabase
         .from('quote_requests')
@@ -154,11 +167,12 @@ export async function GET(req: NextRequest) {
     const items: PipelineItem[] = []
 
     for (const q of quoteRes.data ?? []) {
+      // QR-only stages: either there's a visit on the books, or it's still in
+      // the 'New' bucket. (The old 'reviewed' bucket was merged into 'new' —
+      // it was a redundant state Vince never moved cards through.)
       const stage: PipelineStage = q.site_visit_at
-        ? 'visit_scheduled'
-        : q.status === 'reviewed'
-          ? 'reviewed'
-          : 'new'
+        ? 'in_person_estimate_scheduled'
+        : 'new'
       const answers = (q.answers ?? {}) as { address?: string; description?: string; projectDescription?: string; bathroomSize?: string; tileType?: string }
       // Synthesize a project name from the intake form fields. Falls back to
       // a generic "<type> project" if there's nothing to riff on.
@@ -197,11 +211,18 @@ export async function GET(req: NextRequest) {
     }
 
     for (const j of jobRes.data ?? []) {
-      const stage: PipelineStage =
-        j.status === 'quoted' ? 'estimate_sent'
-        : j.status === 'estimate_revised' ? 'estimate_revised'
-        : 'lead_in_progress'
       const linkedQr = jobToQr.get(j.id)
+      // A job with a future site_visit_at on its linked QR is a "visit scoped,
+      // estimate not yet sent" — surface it as in_person_estimate_scheduled
+      // even though the job row exists. Otherwise map jobs.status 1:1.
+      const stage: PipelineStage =
+        j.status === 'quoted' ? 'quoted'
+        : j.status === 'estimate_revised' ? 'edits_needed'
+        : j.status === 'awaiting_response' ? 'awaiting_response'
+        : j.status === 'accepted_not_scheduled' ? 'accepted_not_scheduled'
+        : j.status === 'scheduled' ? 'scheduled'
+        : linkedQr?.site_visit_at ? 'in_person_estimate_scheduled'
+        : 'quoted'  // pre-estimate job with no visit — show in Quoted column as the most-actionable bucket
       items.push({
         kind: 'job',
         id: j.id,

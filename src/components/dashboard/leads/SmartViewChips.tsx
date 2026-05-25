@@ -38,7 +38,7 @@ export function applySmartView(items: PipelineItem[], view: SmartView): Pipeline
         return Boolean(followUpSoon || createdRecently)
       }
       case 'hotQuotes':
-        return (it.stage === 'estimate_sent' || it.stage === 'estimate_revised') && it.urgency < 60
+        return (it.stage === 'quoted' || it.stage === 'edits_needed' || it.stage === 'awaiting_response') && it.urgency < 60
       case 'stale':
         return it.urgency === 50 || it.urgency === 70
     }

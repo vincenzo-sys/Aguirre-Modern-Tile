@@ -55,17 +55,19 @@ type PrimaryAction = {
 function primaryActionFor(item: PipelineItem, h: LeadCardHandlers): PrimaryAction {
   switch (item.stage) {
     case 'new':
-      return { label: 'Mark reviewed', icon: FileText, onClick: () => h.saveStage(item, 'reviewed') }
-    case 'reviewed':
       return { label: 'Schedule visit', icon: Calendar, onClick: () => h.openScheduleVisit(item) }
-    case 'visit_scheduled':
+    case 'in_person_estimate_scheduled':
       return { label: 'Mark contacted', icon: Clock, onClick: () => h.markContactedNow(item) }
-    case 'lead_in_progress':
-      return { label: 'Send estimate', icon: Send, onClick: () => h.openShareEstimate(item) }
-    case 'estimate_sent':
-      return { label: 'Follow up now', icon: Clock, onClick: () => h.markContactedNow(item) }
-    case 'estimate_revised':
+    case 'quoted':
       return { label: 'Re-send estimate', icon: Send, onClick: () => h.openShareEstimate(item) }
+    case 'edits_needed':
+      return { label: 'Re-send estimate', icon: Send, onClick: () => h.openShareEstimate(item) }
+    case 'awaiting_response':
+      return { label: 'Follow up now', icon: Clock, onClick: () => h.markContactedNow(item) }
+    case 'accepted_not_scheduled':
+      return { label: 'Schedule install', icon: Calendar, onClick: () => h.openScheduleVisit(item) }
+    case 'scheduled':
+      return { label: 'Mark contacted', icon: Clock, onClick: () => h.markContactedNow(item) }
   }
 }
 
@@ -179,7 +181,7 @@ export default function LeadCard({
                 <ExternalLink className="w-4 h-4 text-gray-400" />
                 Open detail page
               </Link>
-              {item.kind === 'job' && (item.stage === 'estimate_sent' || item.stage === 'estimate_revised') && (
+              {item.kind === 'job' && (item.stage === 'quoted' || item.stage === 'edits_needed' || item.stage === 'awaiting_response') && (
                 <>
                   <div className="my-1 border-t border-gray-100" />
                   <MenuItem
@@ -358,14 +360,16 @@ function defaultSmsBody(item: PipelineItem): string {
   const name = item.client_name?.split(/\s+/)[0] ?? 'there'
   switch (item.stage) {
     case 'new':
-    case 'reviewed':
       return `Hi ${name} — Vince from Aguirre Modern Tile. Got your inquiry. When's a good time to chat about the project?`
-    case 'visit_scheduled':
+    case 'in_person_estimate_scheduled':
       return `Hi ${name} — quick reminder about our site visit. Let me know if anything changed on your end.`
-    case 'lead_in_progress':
-      return `Hi ${name} — putting your estimate together. Should have it over to you shortly.`
-    case 'estimate_sent':
-    case 'estimate_revised':
+    case 'quoted':
+    case 'edits_needed':
+    case 'awaiting_response':
       return `Hi ${name} — checking in on the estimate. Let me know if you have any questions.`
+    case 'accepted_not_scheduled':
+      return `Hi ${name} — thanks for accepting. Looking to lock in your install date — what dates work on your end?`
+    case 'scheduled':
+      return `Hi ${name} — checking in ahead of your install. Anything we should know before we arrive?`
   }
 }

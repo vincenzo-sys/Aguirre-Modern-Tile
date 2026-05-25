@@ -23,8 +23,13 @@ export type BucketKey = 'actionNeeded' | 'waiting' | 'working' | 'stale'
 
 export type Buckets = Record<BucketKey, PipelineItem[]>
 
-const QUOTED_STAGES = new Set(['estimate_sent', 'estimate_revised'])
-const WORKING_STAGES = new Set(['new', 'reviewed', 'visit_scheduled', 'lead_in_progress'])
+// "Waiting" bucket = ball is in customer's court (estimate out, not yet accepted).
+// "Working" bucket = ball is in Vince's court (new inquiry, visit booked, etc).
+// Post-acceptance stages (accepted_not_scheduled, scheduled) are buckets unto
+// themselves — they bypass the urgency classifier and fall through to 'working'
+// by default unless they're actively overdue.
+const QUOTED_STAGES = new Set(['quoted', 'edits_needed', 'awaiting_response'])
+const WORKING_STAGES = new Set(['new', 'in_person_estimate_scheduled', 'accepted_not_scheduled', 'scheduled'])
 
 export function bucketize(items: PipelineItem[]): Buckets {
   const buckets: Buckets = { actionNeeded: [], waiting: [], working: [], stale: [] }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Clock, Hammer, MapPin, Phone, Plus, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, GripVertical, Hammer, MapPin, Phone, Plus, Sparkles } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import AddEventModal from './AddEventModal'
+import ScheduleInstallModal from './ScheduleInstallModal'
 import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
 
 type ScheduleEvent =
@@ -106,6 +107,19 @@ export default function ScheduleCalendar({
   const [modalOpen, setModalOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [modalDefaultDate, setModalDefaultDate] = useState<string | null>(null)
+  const [installModalOpen, setInstallModalOpen] = useState(false)
+  const [editingInstall, setEditingInstall] = useState<
+    { id: string; job_number: number; title: string; start: string; end: string } | null
+  >(null)
+  // While the user is dragging the right edge of an install bar, this holds
+  // the install's id + the live previewed end ymd. The renderer treats the
+  // preview as truth so the bar grows/shrinks under the pointer in real time;
+  // on pointerup we PATCH the job and refetch. Held in a ref too so the
+  // pointerup listener (which captures its closure once) can read the
+  // latest value without re-binding.
+  const [resizing, setResizing] = useState<{ id: string; previewEndYmd: string } | null>(null)
+  const resizingRef = useRef<typeof resizing>(null)
+  useEffect(() => { resizingRef.current = resizing }, [resizing])
 
   // Compute the date window the calendar wants to fetch, based on view + cursor
   const window = useMemo(() => {
@@ -150,12 +164,15 @@ export default function ScheduleCalendar({
 
   // For installs (and multi-day custom events) that span multiple days,
   // expand into per-day occurrences so each day in the grid shows the bar.
+  // While dragging the right edge of an install, use the preview end date
+  // instead of the persisted one so the bar grows under the pointer.
   const eventsByDay = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>()
     for (const ev of events) {
       if (ev.kind === 'install') {
         const start = new Date(ev.start + 'T00:00:00')
-        const end = new Date(ev.end + 'T00:00:00')
+        const liveEndYmd = resizing?.id === ev.id ? resizing.previewEndYmd : ev.end
+        const end = new Date(liveEndYmd + 'T00:00:00')
         for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
           const key = ymd(d)
           if (!map.has(key)) map.set(key, [])
@@ -195,7 +212,17 @@ export default function ScheduleCalendar({
 
   function openEvent(ev: ScheduleEvent) {
     if (ev.kind === 'install') {
-      router.push(`/dashboard/jobs/${ev.id}`)
+      // Re-schedule modal in place instead of a full page nav. The "Open
+      // job" link inside the modal still routes to the job detail when
+      // Vince needs the full record.
+      setEditingInstall({
+        id: ev.id,
+        job_number: ev.job_number,
+        title: ev.title,
+        start: ev.start,
+        end: ev.end,
+      })
+      setInstallModalOpen(true)
     } else if (ev.kind === 'estimate_visit') {
       router.push(`/dashboard/leads/${ev.lead_id}`)
     } else {
@@ -224,6 +251,68 @@ export default function ScheduleCalendar({
     setEditingEvent(null)
     setModalDefaultDate(null)
     setModalOpen(true)
+  }
+
+  // Drag-resize an install's right edge across day cells. We attach
+  // document-level pointer listeners so the drag survives the pointer
+  // leaving the original chip element (which shrinks/grows under it).
+  // Day cells carry data-day="YYYY-MM-DD"; elementFromPoint lets us look
+  // up the day the pointer is currently over.
+  function startResizeInstall(installId: string, e: React.PointerEvent<HTMLElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    const install = events.find((x) => x.kind === 'install' && x.id === installId)
+    if (!install || install.kind !== 'install') return
+    const originalEnd = install.end
+    const startYmd = install.start.slice(0, 10)
+    setResizing({ id: installId, previewEndYmd: originalEnd })
+
+    function findDayUnder(x: number, y: number): string | null {
+      const stack = document.elementsFromPoint(x, y)
+      for (const el of stack) {
+        const cell = (el as HTMLElement).closest('[data-day]') as HTMLElement | null
+        if (cell?.dataset.day) return cell.dataset.day
+      }
+      return null
+    }
+
+    function onMove(moveEvt: PointerEvent) {
+      const dayYmd = findDayUnder(moveEvt.clientX, moveEvt.clientY)
+      if (!dayYmd) return
+      // Don't allow shrinking before the start day.
+      const clamped = dayYmd < startYmd ? startYmd : dayYmd
+      setResizing((prev) => (prev && prev.previewEndYmd !== clamped ? { ...prev, previewEndYmd: clamped } : prev))
+    }
+    async function onUp() {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
+      const final = resizingRef.current?.previewEndYmd
+      setResizing(null)
+      if (!final || final === originalEnd) return
+      // Optimistic local update so the bar holds its new size while the
+      // PATCH is in flight (refetch overwrites with server truth on return).
+      setEvents((prev) =>
+        prev.map((p) => (p.kind === 'install' && p.id === installId ? { ...p, end: final } : p)),
+      )
+      try {
+        const res = await fetch(`/api/jobs/${installId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheduled_end: final }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Save failed')
+        toast(`Install now ends ${final}`, 'success')
+        refetchSchedule()
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Save failed', 'error')
+        refetchSchedule()  // pull server truth back
+      }
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
   }
 
   // After save/delete, refetch the schedule. Cheaper than maintaining a
@@ -283,6 +372,14 @@ export default function ScheduleCalendar({
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => { setEditingInstall(null); setInstallModalOpen(true) }}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded hover:bg-primary-100"
+          >
+            <Hammer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Schedule install</span>
+            <span className="sm:hidden">Install</span>
+          </button>
+          <button
             onClick={openAddEvent}
             className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-primary-600 rounded hover:bg-primary-700"
           >
@@ -333,9 +430,9 @@ export default function ScheduleCalendar({
       ) : view === 'agenda' ? (
         <AgendaView events={events} onOpen={openEvent} />
       ) : view === 'week' ? (
-        <WeekGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} />
+        <WeekGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onResizeRight={startResizeInstall} resizing={resizing} />
       ) : (
-        <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} />
+        <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onResizeRight={startResizeInstall} resizing={resizing} />
       )}
 
       <AddEventModal
@@ -347,6 +444,15 @@ export default function ScheduleCalendar({
         onSaved={refetchSchedule}
         onDeleted={refetchSchedule}
       />
+
+      <ScheduleInstallModal
+        open={installModalOpen}
+        onClose={() => setInstallModalOpen(false)}
+        jobs={jobs}
+        install={editingInstall}
+        defaultStart={modalDefaultDate}
+        onSaved={refetchSchedule}
+      />
     </div>
   )
 }
@@ -355,10 +461,14 @@ function MonthGrid({
   cursor,
   eventsByDay,
   onOpen,
+  onResizeRight,
+  resizing,
 }: {
   cursor: Date
   eventsByDay: Map<string, ScheduleEvent[]>
   onOpen: (ev: ScheduleEvent) => void
+  onResizeRight: (installId: string, e: React.PointerEvent<HTMLElement>) => void
+  resizing: { id: string; previewEndYmd: string } | null
 }) {
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
@@ -395,6 +505,7 @@ function MonthGrid({
           return (
             <div
               key={key}
+              data-day={key}
               className={`min-h-[110px] border-b border-r border-gray-100 p-1.5 flex flex-col gap-1 ${
                 isToday ? 'bg-primary-50/40' : ''
               }`}
@@ -403,9 +514,22 @@ function MonthGrid({
                 {cell.date.getDate()}
               </span>
               <div className="flex flex-col gap-1 overflow-hidden">
-                {dayEvents.slice(0, 4).map((ev) => (
-                  <EventChip key={`${ev.kind}-${ev.id}`} event={ev} onOpen={onOpen} compact />
-                ))}
+                {dayEvents.slice(0, 4).map((ev) => {
+                  // The resize handle only renders on the LAST day of an
+                  // install's span (using the live preview if dragging).
+                  const isLastDayOfInstall = ev.kind === 'install' &&
+                    key === (resizing?.id === ev.id ? resizing.previewEndYmd : ev.end.slice(0, 10))
+                  return (
+                    <EventChip
+                      key={`${ev.kind}-${ev.id}`}
+                      event={ev}
+                      onOpen={onOpen}
+                      compact
+                      showResizeHandle={isLastDayOfInstall}
+                      onResizeStart={isLastDayOfInstall ? (e) => onResizeRight(ev.id, e) : undefined}
+                    />
+                  )
+                })}
                 {dayEvents.length > 4 && (
                   <span className="text-[10px] text-gray-500 px-1">+{dayEvents.length - 4} more</span>
                 )}
@@ -422,10 +546,14 @@ function WeekGrid({
   cursor,
   eventsByDay,
   onOpen,
+  onResizeRight,
+  resizing,
 }: {
   cursor: Date
   eventsByDay: Map<string, ScheduleEvent[]>
   onOpen: (ev: ScheduleEvent) => void
+  onResizeRight: (installId: string, e: React.PointerEvent<HTMLElement>) => void
+  resizing: { id: string; previewEndYmd: string } | null
 }) {
   const start = startOfWeek(cursor)
   const today = ymd(new Date())
@@ -438,7 +566,11 @@ function WeekGrid({
         const dayEvents = eventsByDay.get(key) ?? []
         const isToday = key === today
         return (
-          <div key={key} className={`flex gap-3 px-4 py-3 ${isToday ? 'bg-primary-50/40' : ''}`}>
+          <div
+            key={key}
+            data-day={key}
+            className={`flex gap-3 px-4 py-3 ${isToday ? 'bg-primary-50/40' : ''}`}
+          >
             <div className="w-16 shrink-0 text-center">
               <div className="text-[11px] font-semibold text-gray-500 uppercase">
                 {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -451,9 +583,19 @@ function WeekGrid({
               {dayEvents.length === 0 ? (
                 <span className="text-xs text-gray-300 italic mt-2">Nothing scheduled</span>
               ) : (
-                dayEvents.map((ev) => (
-                  <EventChip key={`${ev.kind}-${ev.id}`} event={ev} onOpen={onOpen} />
-                ))
+                dayEvents.map((ev) => {
+                  const isLastDayOfInstall = ev.kind === 'install' &&
+                    key === (resizing?.id === ev.id ? resizing.previewEndYmd : ev.end.slice(0, 10))
+                  return (
+                    <EventChip
+                      key={`${ev.kind}-${ev.id}`}
+                      event={ev}
+                      onOpen={onOpen}
+                      showResizeHandle={isLastDayOfInstall}
+                      onResizeStart={isLastDayOfInstall ? (e) => onResizeRight(ev.id, e) : undefined}
+                    />
+                  )
+                })
               )}
             </div>
           </div>
@@ -505,10 +647,17 @@ function EventChip({
   event,
   onOpen,
   compact = false,
+  showResizeHandle = false,
+  onResizeStart,
 }: {
   event: ScheduleEvent
   onOpen: (ev: ScheduleEvent) => void
   compact?: boolean
+  // Set on the LAST day's chip of a multi-day install so the user can grab
+  // the right edge and drag-resize across day cells. Calendar parent handles
+  // the actual pointer tracking + PATCH.
+  showResizeHandle?: boolean
+  onResizeStart?: (e: React.PointerEvent<HTMLElement>) => void
 }) {
   if (event.kind === 'estimate_visit') {
     const time = formatVisitTime(event.start)
@@ -601,24 +750,42 @@ function EventChip({
   // Install
   const colorClass = installStatusBg[event.status] ?? 'bg-gray-200 text-gray-900 hover:bg-gray-300'
   return (
-    <button
-      onClick={() => onOpen(event)}
-      className={`w-full text-left rounded-sm transition-colors ${colorClass} ${
-        compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-3 py-2 text-sm'
-      }`}
-      title={`#${event.job_number} — ${event.title}`}
-    >
-      <div className="flex items-center gap-1.5 truncate">
-        <Hammer className={compact ? 'w-3 h-3 shrink-0' : 'w-4 h-4 shrink-0'} />
-        <span className="font-semibold">#{event.job_number}</span>
-        <span className="truncate">{event.title}</span>
-      </div>
-      {!compact && event.address && (
-        <div className="mt-1 text-[11px] opacity-80 inline-flex items-center gap-1 truncate">
-          <MapPin className="w-3 h-3" />
-          {event.address}
+    <div className="relative">
+      <button
+        onClick={() => onOpen(event)}
+        className={`w-full text-left rounded-sm transition-colors ${colorClass} ${
+          compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-3 py-2 text-sm'
+        } ${showResizeHandle ? 'pr-5' : ''}`}
+        title={`#${event.job_number} — ${event.title}`}
+      >
+        <div className="flex items-center gap-1.5 truncate">
+          <Hammer className={compact ? 'w-3 h-3 shrink-0' : 'w-4 h-4 shrink-0'} />
+          <span className="font-semibold">#{event.job_number}</span>
+          <span className="truncate">{event.title}</span>
         </div>
+        {!compact && event.address && (
+          <div className="mt-1 text-[11px] opacity-80 inline-flex items-center gap-1 truncate">
+            <MapPin className="w-3 h-3" />
+            {event.address}
+          </div>
+        )}
+      </button>
+      {showResizeHandle && onResizeStart && (
+        // Right-edge grab handle — pointer-driven; parent calendar tracks
+        // movement and PATCHes the job on release. The cursor + tooltip
+        // are the only affordances; click is suppressed so the bar's main
+        // onClick (open job) doesn't fire when the user releases here.
+        <span
+          onPointerDown={(e) => onResizeStart(e as React.PointerEvent<HTMLElement>)}
+          onClick={(e) => e.stopPropagation()}
+          role="separator"
+          aria-label="Drag to change end date"
+          title="Drag to change end date"
+          className="absolute top-0 right-0 h-full w-4 flex items-center justify-center cursor-ew-resize touch-none select-none opacity-60 hover:opacity-100"
+        >
+          <GripVertical className="w-3 h-3" />
+        </span>
       )}
-    </button>
+    </div>
   )
 }

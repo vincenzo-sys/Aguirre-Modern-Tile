@@ -91,13 +91,13 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
   // QR row → QR-only stage. Mostly a status flip; visit_scheduled
   // also needs a site_visit_at date (prompt the user if missing).
   // Going to 'new' or 'reviewed' clears site_visit_at so the derived
-  // stage (see /api/pipeline) doesn't keep returning 'visit_scheduled'.
-  // Soft-undo limitation: clearing site_visit_at on a move TO new/reviewed
-  // loses the visit date; Undo can re-set the stage but not restore the
-  // old date.
+  // stage (see /api/pipeline) doesn't keep returning the visit-scheduled
+  // stage. Soft-undo limitation: clearing site_visit_at on a move back TO
+  // 'new' loses the visit date; Undo can re-set the stage but not restore
+  // the old date.
   const saveStageQrToQr = useCallback(
-    async (item: PipelineItem, newStage: 'new' | 'reviewed' | 'visit_scheduled') => {
-      if (newStage === 'visit_scheduled') {
+    async (item: PipelineItem, newStage: 'new' | 'in_person_estimate_scheduled') => {
+      if (newStage === 'in_person_estimate_scheduled') {
         let dt = item.site_visit_at
         if (!dt) {
           const input = window.prompt('When is the site visit?\n(YYYY-MM-DD HH:MM, e.g. 2026-05-22 14:00)')
@@ -111,7 +111,7 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
         }
         await optimisticPatch(
           item,
-          { stage: 'visit_scheduled', site_visit_at: dt },
+          { stage: 'in_person_estimate_scheduled', site_visit_at: dt },
           `/api/leads/${item.id}`,
           { site_visit_at: dt },
         )
@@ -128,8 +128,12 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     [optimisticPatch],
   )
 
+  // The set of stages a job-row can drag into. Mirrors STAGE_ORDER minus the
+  // QR-only stages.
+  type JobStage = Exclude<PipelineStage, 'new' | 'in_person_estimate_scheduled'>
+
   const saveStageJobToJob = useCallback(
-    async (item: PipelineItem, newStage: 'lead_in_progress' | 'estimate_sent' | 'estimate_revised') => {
+    async (item: PipelineItem, newStage: JobStage) => {
       const jobStatus = jobStatusForStage(newStage)!
       await optimisticPatch(
         item,
@@ -171,13 +175,14 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
       const prevStage = item.stage
       if (
         item.kind === 'quote_request' &&
-        (newStage === 'new' || newStage === 'reviewed' || newStage === 'visit_scheduled')
+        (newStage === 'new' || newStage === 'in_person_estimate_scheduled')
       ) {
         const committed = await saveStageQrToQr(item, newStage)
         if (!committed) return
       } else if (
         item.kind === 'job' &&
-        (newStage === 'lead_in_progress' || newStage === 'estimate_sent' || newStage === 'estimate_revised')
+        newStage !== 'new' &&
+        newStage !== 'in_person_estimate_scheduled'
       ) {
         await saveStageJobToJob(item, newStage)
       } else if (item.kind === 'quote_request') {
@@ -312,7 +317,7 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
       if (!targetQrId) throw new Error('No editable lead record for this row')
       await optimisticPatch(
         item,
-        { site_visit_at: isoAt, site_visit_notes: notes, stage: 'visit_scheduled' },
+        { site_visit_at: isoAt, site_visit_notes: notes, stage: 'in_person_estimate_scheduled' },
         `/api/leads/${targetQrId}`,
         { site_visit_at: isoAt, site_visit_notes: notes },
       )

@@ -7,7 +7,7 @@
 // here. Components import what they need by name.
 
 import {
-  Inbox, FileText, Calendar, FilePlus, FileCheck,
+  Inbox, Calendar, FilePlus, FileEdit, Clock, CheckCircle2, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react'
 import type { PipelineStage } from '@/app/api/pipeline/route'
@@ -15,12 +15,21 @@ import type { StageOption } from '@/components/dashboard/InlineEditCells'
 
 export type { PipelineStage }
 
-// Canonical left-to-right order. Used by the summary strip, kanban
-// columns, the EditableStageCell dropdown, and anywhere else stages
-// are enumerated.
+// Canonical left-to-right order — mirrors the real Aguirre deal flow:
+//   inquiry → site-visit booked → estimate out → revisions → chasing →
+//   customer said yes (no install date) → install on the calendar.
+//
+// Each stage represents a distinct "whose turn is it" + "what's the next
+// action" combination. Two QR-only stages (new, in_person_estimate_scheduled)
+// live on quote_requests; the rest are job-status driven.
 export const STAGE_ORDER: PipelineStage[] = [
-  'new', 'reviewed', 'visit_scheduled',
-  'lead_in_progress', 'estimate_sent', 'estimate_revised',
+  'new',
+  'in_person_estimate_scheduled',
+  'quoted',
+  'edits_needed',
+  'awaiting_response',
+  'accepted_not_scheduled',
+  'scheduled',
 ]
 
 type StageMeta = {
@@ -36,53 +45,60 @@ type StageMeta = {
 // not parallel records.
 export const STAGE_META: Record<PipelineStage, StageMeta> = {
   new: {
-    label: 'New inquiry', shortLabel: 'New',
+    label: 'New', shortLabel: 'New',
     chip: 'bg-blue-100 text-blue-700',
     topBorder: 'border-t-blue-400',
     iconBg: 'bg-blue-100 text-blue-700',
     icon: Inbox,
   },
-  reviewed: {
-    label: 'Reviewed', shortLabel: 'Reviewed',
-    chip: 'bg-yellow-100 text-yellow-800',
-    topBorder: 'border-t-yellow-400',
-    iconBg: 'bg-yellow-100 text-yellow-800',
-    icon: FileText,
-  },
-  visit_scheduled: {
-    label: 'Visit scheduled', shortLabel: 'Visit',
+  in_person_estimate_scheduled: {
+    label: 'In-person estimate scheduled', shortLabel: 'Visit',
     chip: 'bg-amber-100 text-amber-800',
     topBorder: 'border-t-amber-400',
     iconBg: 'bg-amber-100 text-amber-800',
     icon: Calendar,
   },
-  lead_in_progress: {
-    label: 'Active lead', shortLabel: 'Active',
-    chip: 'bg-indigo-100 text-indigo-800',
-    topBorder: 'border-t-indigo-400',
-    iconBg: 'bg-indigo-100 text-indigo-800',
-    icon: FileText,
-  },
-  estimate_sent: {
-    label: 'Estimate sent', shortLabel: 'Sent',
+  quoted: {
+    label: 'Quoted', shortLabel: 'Quoted',
     chip: 'bg-purple-100 text-purple-800',
     topBorder: 'border-t-purple-400',
     iconBg: 'bg-purple-100 text-purple-800',
     icon: FilePlus,
   },
-  estimate_revised: {
-    label: 'Estimate revised', shortLabel: 'Revised',
+  edits_needed: {
+    label: 'Edits needed', shortLabel: 'Edits',
     chip: 'bg-pink-100 text-pink-800',
     topBorder: 'border-t-pink-400',
     iconBg: 'bg-pink-100 text-pink-800',
-    icon: FileCheck,
+    icon: FileEdit,
+  },
+  awaiting_response: {
+    label: 'Waiting for response', shortLabel: 'Waiting',
+    chip: 'bg-orange-100 text-orange-800',
+    topBorder: 'border-t-orange-400',
+    iconBg: 'bg-orange-100 text-orange-800',
+    icon: Clock,
+  },
+  accepted_not_scheduled: {
+    label: 'Accepted — waiting to schedule', shortLabel: 'Accepted',
+    chip: 'bg-emerald-100 text-emerald-800',
+    topBorder: 'border-t-emerald-400',
+    iconBg: 'bg-emerald-100 text-emerald-800',
+    icon: CheckCircle2,
+  },
+  scheduled: {
+    label: 'Scheduled', shortLabel: 'Scheduled',
+    chip: 'bg-teal-100 text-teal-800',
+    topBorder: 'border-t-teal-400',
+    iconBg: 'bg-teal-100 text-teal-800',
+    icon: CalendarCheck,
   },
 }
 
 // QR-stages live on quote_requests; job-stages live on jobs. The
 // difference matters in saveStage (which table to PATCH) and in
 // stageOptionsFor (job rows can't move back to QR stages).
-const QR_STAGES = new Set<PipelineStage>(['new', 'reviewed', 'visit_scheduled'])
+const QR_STAGES = new Set<PipelineStage>(['new', 'in_person_estimate_scheduled'])
 export function isQrStage(stage: PipelineStage): boolean {
   return QR_STAGES.has(stage)
 }
@@ -94,9 +110,11 @@ export function isJobStage(stage: PipelineStage): boolean {
 // Used by saveStage to translate "set stage to X" into the right
 // concrete column write.
 const JOB_STATUS_FOR_STAGE: Partial<Record<PipelineStage, string>> = {
-  lead_in_progress: 'lead',
-  estimate_sent: 'quoted',
-  estimate_revised: 'estimate_revised',
+  quoted: 'quoted',
+  edits_needed: 'estimate_revised',
+  awaiting_response: 'awaiting_response',
+  accepted_not_scheduled: 'accepted_not_scheduled',
+  scheduled: 'scheduled',
 }
 export function jobStatusForStage(stage: PipelineStage): string | null {
   return JOB_STATUS_FOR_STAGE[stage] ?? null

@@ -38,11 +38,11 @@ describe('applySmartView', () => {
     expect(out).toEqual([a, b])
   })
 
-  it("'hotQuotes' = sent/revised AND urgency < 60", () => {
-    const inHot = item({ stage: 'estimate_sent', urgency: 50 })
-    const tooUrgent = item({ stage: 'estimate_sent', urgency: 60 })
+  it("'hotQuotes' = quoted/edits/waiting AND urgency < 60", () => {
+    const inHot = item({ stage: 'quoted', urgency: 50 })
+    const tooUrgent = item({ stage: 'quoted', urgency: 60 })
     const wrongStage = item({ stage: 'new', urgency: 50 })
-    const revised = item({ stage: 'estimate_revised', urgency: 30 })
+    const revised = item({ stage: 'edits_needed', urgency: 30 })
     const out = applySmartView([inHot, tooUrgent, wrongStage, revised], 'hotQuotes')
     expect(out).toEqual([inHot, revised])
   })

@@ -53,7 +53,11 @@ export function parseScopeNotes(notes: string | null | undefined): StructuredSco
 
   const get = (name: string) => parts.find((p) => p.header === name)?.text ?? ''
   const preamble = parts.find((p) => p.header === 'PREAMBLE')?.text ?? ''
-  const scopeOfWork = get('SCOPE OF WORK') || preamble
+  // SCOPE OF WORK body sometimes has the Python estimator's per-section labor
+  // totals embedded (e.g. "...95 sf, 3.25 days ($4,271.00 labor + materials)").
+  // Those go stale the moment line items are edited, so strip them — the
+  // live section subtotals already render in the line-items table headers.
+  const scopeOfWork = stripStaleDollarBreakdowns(get('SCOPE OF WORK') || preamble)
   const warranty = get('WARRANTY')
   const includedText = get("WHAT'S INCLUDED")
   const notIncludedText = get("WHAT'S NOT INCLUDED")
@@ -71,6 +75,9 @@ export function parseScopeNotes(notes: string | null | undefined): StructuredSco
       return true
     })
     .join('\n')
+    // The embedded "10% deposit ($X.XX)" goes stale after line-item edits;
+    // the live deposit_amount in the bottom callout is authoritative.
+    .replace(/(10%\s+deposit)\s*\(\$[\d,]+(?:\.\d+)?\)/gi, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
@@ -97,6 +104,18 @@ export function parseScopeNotes(notes: string | null | undefined): StructuredSco
     additionalNotes,
     isStructured: matches.length > 0,
   }
+}
+
+// Strip the "($X labor + materials)" suffix the Python estimator emits on each
+// per-section bullet in the SCOPE OF WORK body. Those go stale the moment line
+// items are edited (which happens for almost every estimate Vince sends — he
+// tweaks rates, adds niches, swaps thinsets). The live subtotals already
+// render in the line-items table section headers, so we drop the duplicates.
+// Conservative: only strips the exact "$X labor + materials" parenthetical;
+// leaves any other dollar references in the body (e.g. plumber referral
+// pricing) untouched.
+function stripStaleDollarBreakdowns(body: string): string {
+  return body.replace(/\s*\(\$[\d,]+(?:\.\d+)?\s+labor\s*\+\s*materials\)/gi, '')
 }
 
 // Emit the canonical text format from a structured scope. Empty sections are

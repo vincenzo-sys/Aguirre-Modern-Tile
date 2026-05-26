@@ -10,15 +10,17 @@ import Link from 'next/link'
 import {
   Calendar, Clock, Send, FileText, Phone, MessageSquare, MoreHorizontal,
   CalendarPlus, FilePen, ExternalLink, Archive, Sparkles, Loader2, CheckCircle2,
+  ArrowRight, ChevronDown,
   type LucideIcon,
 } from 'lucide-react'
 import type { PipelineItem } from '@/app/api/pipeline/route'
 import type { PipelineStage } from '@/app/api/pipeline/route'
 import {
-  EditableStageCell,
   EditableNotesCell,
   type StageOption,
 } from '@/components/dashboard/InlineEditCells'
+import { STAGE_ORDER, STAGE_META, isJobStage } from '@/lib/leadStages'
+import StagePickerSheet from '@/components/dashboard/leads/StagePickerSheet'
 import { daysSince } from '@/components/dashboard/leads/formatters'
 
 export type LeadCardHandlers = {
@@ -82,10 +84,39 @@ export default function LeadCard({
   const primary = primaryActionFor(item, handlers)
   const PrimaryIcon = primary.icon
   const [busyPrimary, setBusyPrimary] = useState(false)
+  const [busyAdvance, setBusyAdvance] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
+  const [stageSheetOpen, setStageSheetOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const detailHref = `/dashboard/leads/${item.id}`
+
+  // Linear "next stage" target for the one-tap advance button. We only
+  // surface this when:
+  //  - There IS a next stage (i.e. not on the terminal 'scheduled' stage)
+  //  - The next stage is reachable via saveStage on the current row's
+  //    table (no cross-table QR → job conversion magic). The convert
+  //    flow has its own affordance in the overflow menu.
+  // For QR rows, "next" stays within QR stages (new → in_person_…).
+  // For job rows, "next" walks through job stages.
+  const currentStageMeta = STAGE_META[item.stage]
+  const currentIdx = STAGE_ORDER.indexOf(item.stage)
+  const nextStage: PipelineStage | null =
+    currentIdx >= 0 && currentIdx < STAGE_ORDER.length - 1
+      ? STAGE_ORDER[currentIdx + 1]
+      : null
+  // Suppress the advance button when crossing the QR/job boundary —
+  // that transition needs the convert endpoint, not saveStage.
+  const advanceTo: PipelineStage | null =
+    nextStage && isJobStage(item.stage) === isJobStage(nextStage) ? nextStage : null
+  const advanceMeta = advanceTo ? STAGE_META[advanceTo] : null
+
+  async function runAdvance() {
+    if (!advanceTo) return
+    setBusyAdvance(true)
+    try { await handlers.saveStage(item, advanceTo) }
+    finally { setBusyAdvance(false) }
+  }
 
   // Close overflow menu on outside-click / Esc
   useEffect(() => {
@@ -138,15 +169,30 @@ export default function LeadCard({
         dragging ? 'opacity-60' : ''
       } ${compact ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
-      {/* Top row: stage chip + days-in-stage, overflow menu */}
+      {/* Top row: BIG stage chip (was a 22px-tall pill — way too small to
+          tap; Vince said so directly). Now a proper button with text-sm,
+          py-1.5, full-width tap target on mobile. Tap opens StagePickerSheet
+          which is a real bottom sheet with 56px-tall rows, not a tiny
+          dropdown. The chip still inherits STAGE_META colors so it visually
+          matches the kanban column it belongs to. */}
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
-        <div className="flex items-start gap-2 flex-wrap">
-          <EditableStageCell<PipelineStage>
-            value={item.stage}
-            urgencyBadge={urgency}
-            options={handlers.stageOptionsFor(item)}
-            onSave={(s) => handlers.saveStage(item, s)}
-          />
+        <div className="flex items-start gap-2 flex-wrap min-w-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setStageSheetOpen(true) }}
+            title="Tap to change stage"
+            aria-haspopup="dialog"
+            className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full transition active:scale-95 hover:ring-2 hover:ring-offset-1 hover:ring-primary-300 ${currentStageMeta.chip}`}
+          >
+            {currentStageMeta.icon && <currentStageMeta.icon className="w-3.5 h-3.5" />}
+            <span>{currentStageMeta.label}</span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
+          {urgency && (
+            <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded ${urgency.className}`}>
+              {urgency.label}
+            </span>
+          )}
           <DaysInStageChip iso={item.updated_at} />
         </div>
         <div ref={menuRef} className="relative">
@@ -266,7 +312,13 @@ export default function LeadCard({
         </div>
       )}
 
-      {/* Action row */}
+      {/* Action row.
+          Layout: [primary CTA (flex-1)] [Next stage →] [tel] [sms]
+          The "Next →" button is the one-tap linear advance for the most
+          common case ("I just sent the estimate, move to Quoted"). When
+          there's no next stage in this row's table (e.g. scheduled, or a
+          new QR that needs the convert endpoint to advance), this slot is
+          empty and the primary CTA gets the full row. */}
       <div className="px-4 py-3 mt-3 border-t border-gray-100 flex items-stretch gap-2">
         <button
           type="button"
@@ -277,6 +329,25 @@ export default function LeadCard({
           {busyPrimary ? <Loader2 className="w-4 h-4 animate-spin" /> : <PrimaryIcon className="w-4 h-4" />}
           {primary.label}
         </button>
+        {advanceTo && advanceMeta && (
+          <button
+            type="button"
+            onClick={runAdvance}
+            disabled={busyAdvance}
+            title={`Move to ${advanceMeta.label}`}
+            aria-label={`Advance stage to ${advanceMeta.label}`}
+            className="inline-flex items-center justify-center gap-1 px-3 border-2 border-primary-200 bg-primary-50 text-primary-700 rounded-lg text-xs font-semibold active:scale-95 transition disabled:opacity-60 min-h-[44px] whitespace-nowrap"
+          >
+            {busyAdvance ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                <span className="hidden sm:inline">{advanceMeta.shortLabel}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        )}
         {telHref && (
           <a
             href={telHref}
@@ -296,6 +367,16 @@ export default function LeadCard({
           </a>
         )}
       </div>
+
+      {/* Mobile-first stage picker — replaces the old 11px-text dropdown */}
+      <StagePickerSheet
+        open={stageSheetOpen}
+        onClose={() => setStageSheetOpen(false)}
+        currentStage={item.stage}
+        options={handlers.stageOptionsFor(item)}
+        onPick={(s) => handlers.saveStage(item, s)}
+        title={`Change stage — ${item.client_name}`}
+      />
     </div>
   )
 }

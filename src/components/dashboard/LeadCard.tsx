@@ -8,18 +8,17 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Calendar, Clock, Send, FileText, Phone, MessageSquare, MoreHorizontal,
-  CalendarPlus, FilePen, ExternalLink, Archive, Sparkles, Loader2, CheckCircle2,
-  ArrowRight, ChevronDown,
-  type LucideIcon,
+  MoreHorizontal, CalendarPlus, FilePen, ExternalLink, Archive, Sparkles,
+  CheckCircle2, ChevronDown,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { PipelineItem } from '@/app/api/pipeline/route'
 import type { PipelineStage } from '@/app/api/pipeline/route'
 import {
   EditableNotesCell,
   type StageOption,
 } from '@/components/dashboard/InlineEditCells'
-import { STAGE_ORDER, STAGE_META, isJobStage } from '@/lib/leadStages'
+import { STAGE_META } from '@/lib/leadStages'
 import StagePickerSheet from '@/components/dashboard/leads/StagePickerSheet'
 import { daysSince } from '@/components/dashboard/leads/formatters'
 
@@ -48,31 +47,6 @@ function urgencyBadgeFor(item: PipelineItem): UrgencyBadge {
   return null
 }
 
-type PrimaryAction = {
-  label: string
-  icon: LucideIcon
-  onClick: () => void | Promise<void>
-}
-
-function primaryActionFor(item: PipelineItem, h: LeadCardHandlers): PrimaryAction {
-  switch (item.stage) {
-    case 'new':
-      return { label: 'Schedule visit', icon: Calendar, onClick: () => h.openScheduleVisit(item) }
-    case 'in_person_estimate_scheduled':
-      return { label: 'Mark contacted', icon: Clock, onClick: () => h.markContactedNow(item) }
-    case 'quoted':
-      return { label: 'Re-send estimate', icon: Send, onClick: () => h.openShareEstimate(item) }
-    case 'edits_needed':
-      return { label: 'Re-send estimate', icon: Send, onClick: () => h.openShareEstimate(item) }
-    case 'awaiting_response':
-      return { label: 'Follow up now', icon: Clock, onClick: () => h.markContactedNow(item) }
-    case 'accepted_not_scheduled':
-      return { label: 'Schedule install', icon: Calendar, onClick: () => h.openScheduleVisit(item) }
-    case 'scheduled':
-      return { label: 'Mark contacted', icon: Clock, onClick: () => h.markContactedNow(item) }
-  }
-}
-
 export default function LeadCard({
   item, handlers, compact = false,
 }: {
@@ -81,42 +55,13 @@ export default function LeadCard({
   compact?: boolean
 }) {
   const urgency = urgencyBadgeFor(item)
-  const primary = primaryActionFor(item, handlers)
-  const PrimaryIcon = primary.icon
-  const [busyPrimary, setBusyPrimary] = useState(false)
-  const [busyAdvance, setBusyAdvance] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
   const [stageSheetOpen, setStageSheetOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const detailHref = `/dashboard/leads/${item.id}`
 
-  // Linear "next stage" target for the one-tap advance button. We only
-  // surface this when:
-  //  - There IS a next stage (i.e. not on the terminal 'scheduled' stage)
-  //  - The next stage is reachable via saveStage on the current row's
-  //    table (no cross-table QR → job conversion magic). The convert
-  //    flow has its own affordance in the overflow menu.
-  // For QR rows, "next" stays within QR stages (new → in_person_…).
-  // For job rows, "next" walks through job stages.
   const currentStageMeta = STAGE_META[item.stage]
-  const currentIdx = STAGE_ORDER.indexOf(item.stage)
-  const nextStage: PipelineStage | null =
-    currentIdx >= 0 && currentIdx < STAGE_ORDER.length - 1
-      ? STAGE_ORDER[currentIdx + 1]
-      : null
-  // Suppress the advance button when crossing the QR/job boundary —
-  // that transition needs the convert endpoint, not saveStage.
-  const advanceTo: PipelineStage | null =
-    nextStage && isJobStage(item.stage) === isJobStage(nextStage) ? nextStage : null
-  const advanceMeta = advanceTo ? STAGE_META[advanceTo] : null
-
-  async function runAdvance() {
-    if (!advanceTo) return
-    setBusyAdvance(true)
-    try { await handlers.saveStage(item, advanceTo) }
-    finally { setBusyAdvance(false) }
-  }
 
   // Close overflow menu on outside-click / Esc
   useEffect(() => {
@@ -133,14 +78,6 @@ export default function LeadCard({
     }
   }, [menuOpen])
 
-  async function runPrimary() {
-    setBusyPrimary(true)
-    try { await primary.onClick() } finally { setBusyPrimary(false) }
-  }
-
-  const smsHref = item.client_phone
-    ? `sms:${item.client_phone.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(defaultSmsBody(item))}`
-    : null
   const telHref = item.client_phone ? `tel:${item.client_phone.replace(/[^\d+]/g, '')}` : null
 
   // C2: native HTML5 drag is only enabled in compact (kanban) mode.
@@ -165,9 +102,9 @@ export default function LeadCard({
   return (
     <div
       {...dragProps}
-      className={`bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow ${
+      className={`relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow pb-3 ${
         dragging ? 'opacity-60' : ''
-      } ${compact ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      } ${compact ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
       {/* Top row: BIG stage chip (was a 22px-tall pill — way too small to
           tap; Vince said so directly). Now a proper button with text-sm,
@@ -175,7 +112,7 @@ export default function LeadCard({
           which is a real bottom sheet with 56px-tall rows, not a tiny
           dropdown. The chip still inherits STAGE_META colors so it visually
           matches the kanban column it belongs to. */}
-      <div className="flex items-start justify-between gap-3 px-4 pt-3">
+      <div className="relative z-20 flex items-start justify-between gap-3 px-4 pt-3">
         <div className="flex items-start gap-2 flex-wrap min-w-0">
           <button
             type="button"
@@ -258,20 +195,25 @@ export default function LeadCard({
         </div>
       </div>
 
-      {/* Identity */}
+      {/* Identity — non-interactive text. Clicks here fall through to the
+          card-wide link overlay above. The phone number is the only inline
+          interactive element and uses z-20 to capture its own click. */}
       <div className="px-4 mt-2">
-        <Link
-          href={detailHref}
-          className="block font-semibold text-gray-900 hover:text-primary-700 leading-snug"
-        >
+        <div className="font-semibold text-gray-900 leading-snug">
           {item.project_name}
-        </Link>
+        </div>
         <div className="mt-0.5 text-sm text-gray-600 flex items-center gap-2 flex-wrap">
           <span>{item.client_name}</span>
-          {item.client_phone && (
+          {item.client_phone && telHref && (
             <>
               <span className="text-gray-300">·</span>
-              <a href={telHref ?? '#'} className="hover:text-primary-700">{item.client_phone}</a>
+              <a
+                href={telHref}
+                onClick={(e) => e.stopPropagation()}
+                className="relative z-20 hover:text-primary-700"
+              >
+                {item.client_phone}
+              </a>
             </>
           )}
         </div>
@@ -302,9 +244,13 @@ export default function LeadCard({
       </div>
       )}
 
-      {/* Notes — inline editable. Hidden in compact mode (kanban). */}
+      {/* Notes — inline editable. Hidden in compact mode (kanban).
+          z-20 + stopPropagation so editing notes doesn't navigate away. */}
       {!compact && (item.notes || showNotes) && (
-        <div className="px-4 mt-3">
+        <div
+          className="relative z-20 px-4 mt-3"
+          onClick={(e) => e.stopPropagation()}
+        >
           <EditableNotesCell
             value={item.notes}
             onSave={(v) => handlers.saveNotes(item, v)}
@@ -312,61 +258,17 @@ export default function LeadCard({
         </div>
       )}
 
-      {/* Action row.
-          Layout: [primary CTA (flex-1)] [Next stage →] [tel] [sms]
-          The "Next →" button is the one-tap linear advance for the most
-          common case ("I just sent the estimate, move to Quoted"). When
-          there's no next stage in this row's table (e.g. scheduled, or a
-          new QR that needs the convert endpoint to advance), this slot is
-          empty and the primary CTA gets the full row. */}
-      <div className="px-4 py-3 mt-3 border-t border-gray-100 flex items-stretch gap-2">
-        <button
-          type="button"
-          onClick={runPrimary}
-          disabled={busyPrimary}
-          className="flex-1 inline-flex items-center justify-center gap-2 bg-primary-600 text-white rounded-lg py-3 font-semibold text-sm active:scale-95 transition disabled:opacity-60 min-h-[44px]"
-        >
-          {busyPrimary ? <Loader2 className="w-4 h-4 animate-spin" /> : <PrimaryIcon className="w-4 h-4" />}
-          {primary.label}
-        </button>
-        {advanceTo && advanceMeta && (
-          <button
-            type="button"
-            onClick={runAdvance}
-            disabled={busyAdvance}
-            title={`Move to ${advanceMeta.label}`}
-            aria-label={`Advance stage to ${advanceMeta.label}`}
-            className="inline-flex items-center justify-center gap-1 px-3 border-2 border-primary-200 bg-primary-50 text-primary-700 rounded-lg text-xs font-semibold active:scale-95 transition disabled:opacity-60 min-h-[44px] whitespace-nowrap"
-          >
-            {busyAdvance ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <span className="hidden sm:inline">{advanceMeta.shortLabel}</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        )}
-        {telHref && (
-          <a
-            href={telHref}
-            aria-label={`Call ${item.client_name}`}
-            className="inline-flex items-center justify-center w-12 border-2 border-gray-200 rounded-lg text-gray-700 active:scale-95 transition"
-          >
-            <Phone className="w-5 h-5" />
-          </a>
-        )}
-        {smsHref && (
-          <a
-            href={smsHref}
-            aria-label={`Text ${item.client_name}`}
-            className="inline-flex items-center justify-center w-12 border-2 border-gray-200 rounded-lg text-gray-700 active:scale-95 transition"
-          >
-            <MessageSquare className="w-5 h-5" />
-          </a>
-        )}
-      </div>
+      {/* Whole-card click → detail page (Vince: "I'm fine clicking into them").
+          Stretched-link pattern: the <a> is absolutely positioned over the
+          entire card at z-10. Interactive children (stage chip, overflow
+          menu, customer phone link, notes editor) sit at z-20 so they
+          capture their own clicks. Non-interactive areas (identity text,
+          meta line, blank padding) fall through to the link. */}
+      <Link
+        href={detailHref}
+        aria-label={`Open ${item.client_name}`}
+        className="absolute inset-0 z-10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400"
+      />
 
       {/* Mobile-first stage picker — replaces the old 11px-text dropdown */}
       <StagePickerSheet
@@ -437,20 +339,3 @@ function DaysInStageChip({ iso }: { iso: string | null | undefined }) {
   )
 }
 
-function defaultSmsBody(item: PipelineItem): string {
-  const name = item.client_name?.split(/\s+/)[0] ?? 'there'
-  switch (item.stage) {
-    case 'new':
-      return `Hi ${name} — Vince from Aguirre Modern Tile. Got your inquiry. When's a good time to chat about the project?`
-    case 'in_person_estimate_scheduled':
-      return `Hi ${name} — quick reminder about our site visit. Let me know if anything changed on your end.`
-    case 'quoted':
-    case 'edits_needed':
-    case 'awaiting_response':
-      return `Hi ${name} — checking in on the estimate. Let me know if you have any questions.`
-    case 'accepted_not_scheduled':
-      return `Hi ${name} — thanks for accepting. Looking to lock in your install date — what dates work on your end?`
-    case 'scheduled':
-      return `Hi ${name} — checking in ahead of your install. Anything we should know before we arrive?`
-  }
-}

@@ -29,6 +29,8 @@ import {
 import PipelineSummaryStrip from '@/components/dashboard/leads/PipelineSummaryStrip'
 import SmartViewChips, { applySmartView, type SmartView } from '@/components/dashboard/leads/SmartViewChips'
 import KanbanBoard from '@/components/dashboard/leads/KanbanBoard'
+import FocusedStageList from '@/components/dashboard/leads/FocusedStageList'
+import { STAGE_ORDER } from '@/lib/leadStages'
 import { formatMoneyShort } from '@/components/dashboard/leads/formatters'
 import { useLocalStorageState } from '@/lib/useLocalStorageState'
 import { useLeadHandlers } from '@/components/dashboard/leads/useLeadHandlers'
@@ -43,6 +45,9 @@ const sourceLabels: Record<string, string> = {
 const COLLAPSED_KEY = 'leads_buckets_collapsed_v1'
 const VIEW_MODE_KEY = 'leads_view_mode_v1'
 const SMART_VIEW_KEY = 'leads_smart_view_v1'
+const STAGE_FILTER_KEY = 'leads_stage_filter_v1'
+
+const STAGE_VALUES = new Set<PipelineStage>(STAGE_ORDER)
 
 type ViewMode = 'cards' | 'kanban'
 
@@ -60,7 +65,19 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<string>('all')
+  // Transient highlight target for the kanban view (briefly rings a column
+  // after the user taps a strip segment while in kanban mode). Cleared on
+  // a timer so the highlight fades — see handlePickStage.
   const [focusedStage, setFocusedStage] = useState<PipelineStage | null>(null)
+  // Persisted stage filter. When set, the cards-mode body collapses to a
+  // single-column FocusedStageList instead of the urgency buckets. null
+  // means "show buckets" (the default landing).
+  const [stageFilter, setStageFilter] = useLocalStorageState<PipelineStage | null>(
+    STAGE_FILTER_KEY,
+    null,
+    (v): v is PipelineStage | null =>
+      v === null || (typeof v === 'string' && STAGE_VALUES.has(v as PipelineStage)),
+  )
 
   const [paletteOpen, setPaletteOpen] = useState(false)
 
@@ -141,11 +158,17 @@ export default function LeadsPage() {
   const overdueCount = items.filter((i) => i.urgency >= 100).length
 
   function handlePickStage(stage: PipelineStage) {
-    setFocusedStage(stage)
-    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
-      setViewMode('kanban')
+    // Kanban view: keep the legacy scroll-into-view + briefly highlight
+    // the target column. The stage filter doesn't apply to kanban (all
+    // columns stay visible).
+    if (viewMode === 'kanban') {
+      setFocusedStage(stage)
+      setTimeout(() => setFocusedStage(null), 800)
+      return
     }
-    setTimeout(() => setFocusedStage(null), 800)
+    // Cards view: toggle the focused-stage filter. Tapping the active
+    // segment clears the filter and returns to the bucket view.
+    setStageFilter((prev) => (prev === stage ? null : stage))
   }
 
   function toggleBucket(key: BucketKey) {
@@ -220,8 +243,15 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Pipeline summary strip (click a segment → jump to kanban column) */}
-      <PipelineSummaryStrip items={items} onPickStage={handlePickStage} />
+      {/* Pipeline summary strip. In cards mode, tapping a segment
+          focuses that stage (single-column FocusedStageList). In kanban
+          mode, it scroll-highlights the matching column. The active
+          segment in cards mode shows a ring/bg treatment. */}
+      <PipelineSummaryStrip
+        items={items}
+        onPickStage={handlePickStage}
+        activeStage={effectiveViewMode === 'cards' ? stageFilter : null}
+      />
 
       {/* Smart View chips + source filter folded into the same row */}
       <SmartViewChips
@@ -234,11 +264,21 @@ export default function LeadsPage() {
         sourceLabels={sourceLabels}
       />
 
-      {/* View body: bucketed card stream OR kanban board */}
-      {filtered.length === 0 ? (
+      {/* View body. Three branches:
+            - kanban: 7-column kanban
+            - cards + stageFilter set: focused single-stage list
+            - cards (default): the 4 urgency-bucket sections */}
+      {filtered.length === 0 && stageFilter === null ? (
         <EmptyState />
       ) : effectiveViewMode === 'kanban' ? (
         <KanbanBoard items={filtered} handlers={handlers} focusedStage={focusedStage} />
+      ) : stageFilter !== null ? (
+        <FocusedStageList
+          stage={stageFilter}
+          items={filtered}
+          handlers={handlers}
+          onClearFilter={() => setStageFilter(null)}
+        />
       ) : (
         BUCKET_ORDER.map((key) => {
           const cards = buckets[key]

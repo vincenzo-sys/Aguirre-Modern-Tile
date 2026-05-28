@@ -5,13 +5,12 @@
 // renders an item, exposes the right primary CTA for its stage, and
 // fires callbacks for every action. State lives upstream.
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   MoreHorizontal, CalendarPlus, FilePen, ExternalLink, Archive, Sparkles,
   CheckCircle2, ChevronDown, Phone, MessageSquare, Check,
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import type { PipelineItem } from '@/app/api/pipeline/route'
 import type { PipelineStage } from '@/app/api/pipeline/route'
 import {
@@ -20,6 +19,7 @@ import {
 } from '@/components/dashboard/InlineEditCells'
 import { STAGE_META } from '@/lib/leadStages'
 import StagePickerSheet from '@/components/dashboard/leads/StagePickerSheet'
+import LeadMoreSheet, { type LeadMoreAction } from '@/components/dashboard/leads/LeadMoreSheet'
 import { daysSince } from '@/components/dashboard/leads/formatters'
 
 export type LeadCardHandlers = {
@@ -55,28 +55,12 @@ export default function LeadCard({
   compact?: boolean
 }) {
   const urgency = urgencyBadgeFor(item)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
   const [stageSheetOpen, setStageSheetOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
   const detailHref = `/dashboard/leads/${item.id}`
 
   const currentStageMeta = STAGE_META[item.stage]
-
-  // Close overflow menu on outside-click / Esc
-  useEffect(() => {
-    if (!menuOpen) return
-    function onDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setMenuOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menuOpen])
 
   const phoneDigits = item.client_phone ? item.client_phone.replace(/[^\d+]/g, '') : null
   const telHref = phoneDigits ? `tel:${phoneDigits}` : null
@@ -136,67 +120,15 @@ export default function LeadCard({
           )}
           <DaysInStageChip iso={item.updated_at} />
         </div>
-        <div ref={menuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="More actions"
-            className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
-          >
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
-          {menuOpen && (
-            <div
-              className="absolute right-0 z-20 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MenuItem
-                icon={CalendarPlus}
-                label="Set follow-up"
-                onClick={() => { setMenuOpen(false); handlers.openPickFollowup(item) }}
-              />
-              <MenuItem
-                icon={FilePen}
-                label={showNotes ? 'Hide notes' : 'Edit notes'}
-                onClick={() => { setMenuOpen(false); setShowNotes((v) => !v) }}
-              />
-              <Link
-                href={detailHref}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                onClick={() => setMenuOpen(false)}
-              >
-                <ExternalLink className="w-4 h-4 text-gray-400" />
-                Open detail page
-              </Link>
-              {item.kind === 'job' && (item.stage === 'quoted' || item.stage === 'edits_needed' || item.stage === 'awaiting_response') && (
-                <>
-                  <div className="my-1 border-t border-gray-100" />
-                  <MenuItem
-                    icon={CheckCircle2}
-                    label="Customer accepted → Jobs"
-                    onClick={() => { setMenuOpen(false); handlers.sendToJobs(item) }}
-                  />
-                </>
-              )}
-              {item.kind === 'quote_request' && (
-                <>
-                  <MenuItem
-                    icon={Sparkles}
-                    label="Convert to job"
-                    onClick={() => { setMenuOpen(false); handlers.convertLead(item) }}
-                  />
-                  <div className="my-1 border-t border-gray-100" />
-                  <MenuItem
-                    icon={Archive}
-                    label="Archive (lost)"
-                    danger
-                    onClick={() => { setMenuOpen(false); handlers.archiveLead(item) }}
-                  />
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMoreSheetOpen(true) }}
+          aria-label="More actions"
+          aria-haspopup="dialog"
+          className="relative z-20 p-1.5 rounded hover:bg-gray-100 text-gray-500"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Identity — non-interactive text. Clicks here fall through to the
@@ -338,30 +270,84 @@ export default function LeadCard({
         onPick={(s) => handlers.saveStage(item, s)}
         title={`Change stage — ${item.client_name}`}
       />
+
+      {/* "..." more-actions sheet — replaces the old absolute dropdown
+          that covered card content on phone and got cut off below the
+          fold on lower cards. Same actions, same handlers, just hosted
+          in a bottom-sheet / centered-modal container. */}
+      <LeadMoreSheet
+        open={moreSheetOpen}
+        onClose={() => setMoreSheetOpen(false)}
+        title={item.client_name}
+        actions={buildMoreActions({ item, handlers, showNotes, toggleNotes: () => setShowNotes((v) => !v), detailHref })}
+      />
     </div>
   )
 }
 
-function MenuItem({
-  icon: Icon, label, onClick, danger,
+// Builds the action list shown in LeadMoreSheet. Kept as a free function
+// so the JSX above stays scannable. Same conditional branches as the
+// old inline dropdown — quoted/edits/waiting jobs get the "accepted"
+// shortcut, quote-requests get convert + archive.
+function buildMoreActions({
+  item, handlers, showNotes, toggleNotes, detailHref,
 }: {
-  icon: LucideIcon
-  label: string
-  onClick: () => void
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 ${
-        danger ? 'text-red-600' : 'text-gray-700'
-      }`}
-    >
-      <Icon className={`w-4 h-4 ${danger ? 'text-red-400' : 'text-gray-400'}`} />
-      {label}
-    </button>
-  )
+  item: PipelineItem
+  handlers: LeadCardHandlers
+  showNotes: boolean
+  toggleNotes: () => void
+  detailHref: string
+}): LeadMoreAction[] {
+  const actions: LeadMoreAction[] = [
+    {
+      key: 'follow-up',
+      icon: CalendarPlus,
+      label: 'Set follow-up',
+      onSelect: () => handlers.openPickFollowup(item),
+    },
+    {
+      key: 'notes',
+      icon: FilePen,
+      label: showNotes ? 'Hide notes' : 'Edit notes',
+      onSelect: toggleNotes,
+    },
+    {
+      key: 'open',
+      icon: ExternalLink,
+      label: 'Open detail page',
+      href: detailHref,
+    },
+  ]
+
+  if (item.kind === 'job' && (item.stage === 'quoted' || item.stage === 'edits_needed' || item.stage === 'awaiting_response')) {
+    actions.push({
+      key: 'accepted',
+      icon: CheckCircle2,
+      label: 'Customer accepted → Jobs',
+      hint: 'Move out of leads and into the operations workflow.',
+      dividerBefore: true,
+      onSelect: () => handlers.sendToJobs(item),
+    })
+  }
+
+  if (item.kind === 'quote_request') {
+    actions.push({
+      key: 'convert',
+      icon: Sparkles,
+      label: 'Convert to job',
+      onSelect: () => handlers.convertLead(item),
+    })
+    actions.push({
+      key: 'archive',
+      icon: Archive,
+      label: 'Archive (lost)',
+      danger: true,
+      dividerBefore: true,
+      onSelect: () => handlers.archiveLead(item),
+    })
+  }
+
+  return actions
 }
 
 function formatShort(iso: string): string {

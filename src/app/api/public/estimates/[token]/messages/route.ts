@@ -142,7 +142,7 @@ async function notifyVince(
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111827;">
       <p style="font-size: 13px; color: #6b7280; margin: 0 0 8px 0;">Estimate question</p>
-      <h2 style="font-size: 18px; margin: 0 0 16px 0;">${senderName}${job.title ? ` — ${escapeHtml(job.title)}` : ''}</h2>
+      <h2 style="font-size: 18px; margin: 0 0 16px 0;">${escapeHtml(senderName)}${job.title ? ` — ${escapeHtml(job.title)}` : ''}</h2>
       <div style="background: #f3f4f6; border-radius: 8px; padding: 16px; margin: 0 0 20px 0;">
         <p style="font-size: 15px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${escapeHtml(messageBody)}</p>
       </div>

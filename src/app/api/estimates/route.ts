@@ -40,6 +40,10 @@ export interface EstimateResult {
     profit: number
     profit_percent: number
   }
+  warranty_text: string | null
+  payment_terms_text: string | null
+  payment_methods: string[] | null
+  customer_provides: string | null
 }
 
 // GET /api/estimates?job_id=xxx — Generate estimate for a job
@@ -244,6 +248,10 @@ export async function GET(req: NextRequest) {
       client_name: (job as any).client_name,
       items,
       summary,
+      warranty_text: (job as any).warranty_text ?? null,
+      payment_terms_text: (job as any).payment_terms_text ?? null,
+      payment_methods: (job as any).payment_methods ?? null,
+      customer_provides: (job as any).customer_provides ?? null,
     }
 
     return NextResponse.json(result)

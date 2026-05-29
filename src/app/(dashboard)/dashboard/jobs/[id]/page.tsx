@@ -13,6 +13,8 @@ import CrewLog from '@/components/dashboard/CrewLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
+import EstimateTextEditor from '@/components/dashboard/EstimateTextEditor'
+import EstimateMessages from '@/components/EstimateMessages'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import DeleteJobButton from '@/components/dashboard/DeleteJobButton'
@@ -329,15 +331,17 @@ export default async function JobDetailPage({
             </div>
           </div>
 
-          {/* Customer providing — always visible when set */}
-          {job.customer_provides && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-blue-900 uppercase tracking-wider mb-2">
-                Customer is providing
-              </h3>
-              <p className="text-sm text-blue-900 whitespace-pre-wrap">{job.customer_provides}</p>
-            </div>
-          )}
+          {/* Estimate text — warranty + payment terms + payment methods +
+              customer-provides. Snapshotted from estimate_defaults at
+              estimate-generate time, editable per-job here. Also covers the
+              old read-only "Customer is providing" block. */}
+          <EstimateTextEditor
+            jobId={job.id}
+            warrantyText={job.warranty_text ?? null}
+            paymentTermsText={job.payment_terms_text ?? null}
+            paymentMethods={job.payment_methods ?? null}
+            customerProvides={job.customer_provides}
+          />
 
           {/* Crew Instructions — always visible when set */}
           {job.crew_instructions && (
@@ -388,6 +392,19 @@ export default async function JobDetailPage({
       {isOwner && (
         <div className="mb-6">
           <EstimateShareLink job={job} />
+        </div>
+      )}
+
+      {/* Customer ↔ Aguirre conversation thread tied to this job's estimate.
+          Reads + writes through /api/jobs/[id]/messages; sends SMS + email
+          to the customer on Aguirre replies. */}
+      {job.estimate_token && (
+        <div className="mb-6">
+          <EstimateMessages
+            mode="aguirre"
+            endpoint={`/api/jobs/${job.id}/messages`}
+            defaultSenderName={profile?.full_name || 'Vince'}
+          />
         </div>
       )}
 

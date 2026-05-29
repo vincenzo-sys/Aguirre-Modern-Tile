@@ -34,6 +34,10 @@ interface EstimateData {
     profit: number
     profit_percent: number
   }
+  warranty_text: string | null
+  payment_terms_text: string | null
+  payment_methods: string[] | null
+  customer_provides: string | null
 }
 
 function fmt(n: number): string {
@@ -394,11 +398,45 @@ export default function EstimatePage() {
             </div>
           </div>
 
-          {/* Terms */}
-          <div className="px-6 py-4 text-xs text-gray-500 border-t border-gray-100">
-            <p className="font-medium text-gray-700 mb-1">Payment Terms</p>
-            <p>10% deposit to schedule · Progress payment at midpoint · Balance upon completion</p>
-            <p className="mt-2">Estimate valid for 30 days. Price does not include tile, grout, or materials noted as customer-provided.</p>
+          {/* Terms — sourced from the job's snapshotted estimate text. Falls
+              back to a generic line for jobs that pre-date migration 029. */}
+          <div className="px-6 py-4 text-xs text-gray-500 border-t border-gray-100 space-y-3">
+            {data.payment_terms_text ? (
+              <div>
+                <p className="font-medium text-gray-700 mb-1">Payment terms</p>
+                <p className="whitespace-pre-wrap">{data.payment_terms_text}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="font-medium text-gray-700 mb-1">Payment Terms</p>
+                <p>10% deposit reserves your install date. Final payment due upon completion.</p>
+              </div>
+            )}
+            {data.payment_methods && data.payment_methods.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-700 mb-1">We accept</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {data.payment_methods.map((m) => (
+                    <span key={m} className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px]">
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data.warranty_text && (
+              <div>
+                <p className="font-medium text-gray-700 mb-1">Warranty</p>
+                <p className="whitespace-pre-wrap">{data.warranty_text}</p>
+              </div>
+            )}
+            {data.customer_provides && (
+              <div>
+                <p className="font-medium text-gray-700 mb-1">Customer is providing</p>
+                <p className="whitespace-pre-wrap">{data.customer_provides}</p>
+              </div>
+            )}
+            <p className="pt-1 border-t border-gray-100">Estimate valid for 30 days. Price does not include tile, grout, or materials noted as customer-provided.</p>
           </div>
         </div>
       )}

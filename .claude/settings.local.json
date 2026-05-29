@@ -141,7 +141,30 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://aguirre-modern-tile-cms.vercel.app/api/content-queue)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://cms-nine-psi.vercel.app/api/content-queue)",
       "Bash(npm run:*)",
-      "mcp__playwright__browser_press_key"
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_file_upload",
+      "Bash(python -m json.tool)",
+      "Bash(chmod +x tmp_bill_estimate.sh)",
+      "Bash(bash tmp_bill_estimate.sh)",
+      "Bash(python -c ' *)",
+      "Bash(export TILE_API_KEY=$\\(grep '^TILE_API_KEY=' .env.local)",
+      "Bash(python -c \"import psycopg2; print\\('ok'\\)\")",
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(export DATABASE_URI=$\\(grep '^DATABASE_URI=' .env.local)",
+      "Bash(TILE_API_KEY=test node --check \"C:/Users/vince/OneDrive/Vincenzo/Claude/outputs/aguirre-modern-tile/mcp/tile-crm/src/index.js\")",
+      "Bash(git stash *)",
+      "Bash(export TILE_API_KEY=$\\(grep TILE_API_KEY .env.local)",
+      "mcp__playwright__browser_resize",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(awk '{print $5}')",
+      "Bash(awk -F= '{ key=$1; val=$2; gsub\\(/\"/,\"\",val\\); len=length\\(val\\); printf \"%-25s = %s%s \\(%d chars\\)\\\\n\", key, substr\\(val,1,8\\), len>8?\"...\":\"\", len }')",
+      "Read(//c/Users/vince/.claude/**)",
+      "WebFetch(domain:www.flooranddecor.com)",
+      "Bash(cd *)",
+      "PowerShell(Test-Path *)"
     ]
   }
 }

@@ -33,7 +33,7 @@ export default function MobileStickyCTA({ phone }: Props) {
           <span className="font-normal text-primary-100 truncate">{phone}</span>
         </a>
         <Link
-          href="/#top"
+          href="/contact"
           className="flex items-center justify-center gap-2 bg-white text-primary-700 border-2 border-primary-600 rounded-lg px-4 py-3 font-semibold text-sm active:scale-95 transition"
         >
           <MessageCircle className="w-4 h-4" />

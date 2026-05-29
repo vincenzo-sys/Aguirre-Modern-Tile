@@ -14,7 +14,7 @@ export async function GET(
     const { data: job, error } = await supabase
       .from('jobs')
       .select(
-        'id, title, client_name, client_address, job_type, square_footage, scope_notes, customer_provides, line_items, estimated_cost, estimated_days, scheduled_start, amount_paid, estimate_accepted_at, estimate_viewed_at'
+        'id, title, client_name, client_address, job_type, square_footage, scope_notes, customer_provides, warranty_text, payment_terms_text, payment_methods, line_items, estimated_cost, estimated_days, scheduled_start, amount_paid, estimate_accepted_at, estimate_viewed_at'
       )
       .eq('estimate_token', token)
       .single()
@@ -39,6 +39,9 @@ export async function GET(
       square_footage: job.square_footage,
       scope_notes: job.scope_notes,
       customer_provides: job.customer_provides,
+      warranty_text: job.warranty_text ?? null,
+      payment_terms_text: job.payment_terms_text ?? null,
+      payment_methods: job.payment_methods ?? null,
       line_items: job.line_items ?? [],
       estimated_cost: job.estimated_cost,
       deposit_amount: job.estimated_cost

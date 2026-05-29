@@ -124,17 +124,19 @@ export default function GenerateEstimateModal({
   const [preview, setPreview] = useState<Result | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
-  // Fetch live templates (with sub_areas metadata) the first time the modal
-  // opens. Cached in component state across reopens since templates rarely
-  // change. Falls back to FALLBACK_TEMPLATE_NAMES if the request fails so
-  // the modal is never empty even when the API is down.
+  // Fetch live templates (with sub_areas metadata) every time the modal
+  // opens. Previously cached in component state across reopens, but that
+  // bit us when migrations added/edited templates — the modal kept showing
+  // the stale list until a hard page refresh. One small API call per open
+  // is a fair tradeoff for "settings changes show up immediately."
+  // Falls back to FALLBACK_TEMPLATE_NAMES if the request fails.
   useEffect(() => {
-    if (!open || templates.length > 0) return
-    fetch('/api/reference?table=job_templates')
+    if (!open) return
+    fetch('/api/reference?table=job_templates', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Template[]) => setTemplates(Array.isArray(data) ? data : []))
       .catch(() => setTemplates([]))
-  }, [open, templates.length])
+  }, [open])
 
   // Reset scopes when reopening so a closed-then-reopened modal doesn't carry
   // stale entries from the previous interaction.

@@ -16,6 +16,7 @@ const VALID_TABLES = [
   'add_ons',
   'job_templates',
   'trade_contacts',
+  'estimate_defaults',
 ] as const
 
 // PATCH /api/reference/[table]/[id] — update a single reference row

@@ -4,6 +4,7 @@ import {
   Star,
   Shield,
   CheckCircle,
+  Check,
   Award,
   Wrench,
   Droplets,
@@ -200,16 +201,18 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Instant Ballpark Calculator — catches the visitor who isn't ready
-          to fill out a form yet. Three taps, instant range, then a soft
-          CTA to /contact for an exact quote. */}
+      {/* Honest Project Planner — replaces the old fake-precise dollar
+          calculator. Educates the visitor about labor days, what's actually
+          in scope at our pricing tier, and what we'd need to know to give a
+          real number. The three lead magnets are: (1) send photos for a
+          written estimate, (2) text Vince a tile for a quick spec review. */}
       <section className="py-12 sm:py-16 bg-gray-50">
         <div className="container-custom px-4">
           <div className="max-w-2xl mx-auto">
             <div className="text-center mb-6 sm:mb-8">
-              <h2 className="heading-secondary mb-2">Curious what it costs?</h2>
+              <h2 className="heading-secondary mb-2">How much should your project cost?</h2>
               <p className="text-gray-600">
-                No phone number, no email — just tap your project for an instant ballpark.
+                We won&apos;t quote you a fake number from a webpage. Here&apos;s how we actually price tile work — and what your project looks like at our shop.
               </p>
             </div>
             <QuoteCalculator />
@@ -247,6 +250,211 @@ export default async function HomePage() {
                 </span>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing-tier explainer. Sets the frame: tile pricing is labor days
+          × crew rate, plus materials. Homeowners who get a $4,500 and an
+          $18,000 quote for the same bathroom are paralyzed; this teaches
+          them to read the math behind any quote and shows where we sit. */}
+      <section className="section-padding bg-white">
+        <div className="container-custom">
+          <div className="text-center mb-10 max-w-3xl mx-auto">
+            <h2 className="heading-secondary mb-4">How tile pricing actually works</h2>
+            <p className="text-body">
+              Most quotes come back with a single number and no math. But every tile job has the same line items —
+              labor days, waterproofing system, substrate prep, materials. Knowing what each contractor cuts (or
+              includes) at their price is how you compare apples to apples.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
+            {/* Bargain tier */}
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Bargain</p>
+              <p className="text-2xl font-bold text-gray-900 mb-1">$400–600<span className="text-base font-normal text-gray-500">/day, 2 guys</span></p>
+              <p className="text-sm text-gray-500 mb-5">Day-labor crews, side jobs, low-overhead shops.</p>
+              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">What gets cut</p>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex gap-2"><span className="text-red-500 flex-shrink-0">✕</span><span>No proper waterproofing membrane in showers (mastic over drywall)</span></li>
+                <li className="flex gap-2"><span className="text-red-500 flex-shrink-0">✕</span><span>Spot-bonded thinset — voids under tile = future cracks</span></li>
+                <li className="flex gap-2"><span className="text-red-500 flex-shrink-0">✕</span><span>Often unlicensed, uninsured, no written warranty</span></li>
+                <li className="flex gap-2"><span className="text-red-500 flex-shrink-0">✕</span><span>Hard to reach if something fails 6 months later</span></li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-5 italic">
+                Looks fine on day one. The leaks show up in year two.
+              </p>
+            </div>
+
+            {/* Aguirre middle tier — featured */}
+            <div className="bg-primary-600 text-white rounded-2xl p-6 shadow-xl ring-2 ring-primary-700 md:scale-[1.02] relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-primary-700 text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
+                Where we sit
+              </div>
+              <p className="text-xs font-semibold text-primary-100 uppercase tracking-wider mb-2">Aguirre Modern Tile</p>
+              <p className="text-2xl font-bold mb-1">$800–1,200<span className="text-base font-normal text-primary-200">/day, 2 guys</span></p>
+              <p className="text-sm text-primary-100 mb-5">Licensed, insured, full system installs.</p>
+              <p className="text-xs font-semibold text-primary-100 uppercase tracking-wider mb-3">What you get</p>
+              <ul className="space-y-2 text-sm">
+                <li className="flex gap-2"><Check className="w-4 h-4 text-green-300 flex-shrink-0 mt-0.5" /><span>Schluter KERDI / GO-BOARD waterproofing (full system, not patches)</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-green-300 flex-shrink-0 mt-0.5" /><span>Full thinset coverage, modified mortar, level prep</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-green-300 flex-shrink-0 mt-0.5" /><span>Licensed (MA HIC), $2M insured, 2-year workmanship warranty</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-green-300 flex-shrink-0 mt-0.5" /><span>Daily photo updates · 5-min response · same-day written estimates</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-green-300 flex-shrink-0 mt-0.5" /><span>15+ years, 220+ bathrooms a year, 150+ five-star reviews</span></li>
+              </ul>
+              <p className="text-xs text-primary-100 mt-5 italic">
+                The mid-tier price for a job done to spec — not bargain shortcuts, not boutique markup.
+              </p>
+            </div>
+
+            {/* Premium tier */}
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Boutique / Designer</p>
+              <p className="text-2xl font-bold text-gray-900 mb-1">$1,500+<span className="text-base font-normal text-gray-500">/day, 2 guys</span></p>
+              <p className="text-sm text-gray-500 mb-5">Design-build firms, GC-managed, brand-name shops.</p>
+              <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">What you&apos;re paying for</p>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex gap-2"><Check className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" /><span>Designer-led project management + showroom curation</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" /><span>Premium markup on tile + fixtures sourced through their channels</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" /><span>Often a GC layer between you and the install crew</span></li>
+                <li className="flex gap-2"><Check className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" /><span>Same install standards we already use</span></li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-5 italic">
+                Right choice for full-home gut renovations and curated design. Probably overkill for one bathroom.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-center mt-10">
+            <p className="text-gray-600 mb-4">
+              Comparing quotes? Ask any contractor what waterproofing system they use, what their day rate is, and what&apos;s in their warranty.
+              If they can&apos;t answer in one sentence each, that&apos;s your answer.
+            </p>
+            <a href="/contact" className="btn-cta inline-flex items-center gap-2">
+              Get our written estimate <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Lead magnet: contractor screening checklist + tile-review offer.
+          Ungated on purpose — the value is the questions themselves, which
+          quietly disqualify cheap competitors who can't answer them. */}
+      <section className="section-padding bg-gray-50">
+        <div className="container-custom">
+          <div className="grid lg:grid-cols-5 gap-8 max-w-5xl mx-auto">
+            {/* Checklist — 3 cols */}
+            <div className="lg:col-span-3">
+              <p className="text-xs font-semibold text-primary-700 uppercase tracking-wider mb-2">
+                Free homeowner&apos;s guide
+              </p>
+              <h2 className="heading-secondary mb-4">5 questions to ask any tile contractor before you sign</h2>
+              <p className="text-gray-600 mb-6">
+                Print this, screenshot it, whatever — bring it to every estimate. The right contractor will answer each one in a sentence.
+              </p>
+
+              <ol className="space-y-4">
+                {[
+                  {
+                    q: 'What waterproofing system do you use in showers?',
+                    a: 'Look for a named brand: Schluter KERDI, GO-BOARD, Wedi, RedGard. "Mastic" or "we just use cement board" is a wrong answer that leads to leaks within 2–3 years.',
+                  },
+                  {
+                    q: 'What\'s your day rate for a 2-person crew?',
+                    a: 'In Greater Boston, fair labor for a licensed installer is roughly $800–$1,200/day for a 2-person crew. Way below means corners are getting cut. Way above means you\'re paying for a designer middleman.',
+                  },
+                  {
+                    q: 'Are you licensed and insured? Can you send proof?',
+                    a: 'Massachusetts requires a Home Improvement Contractor (HIC) registration for jobs over $1,000. Ask for the number and a current Certificate of Insurance. Real contractors will text it to you in 5 minutes.',
+                  },
+                  {
+                    q: 'What\'s the workmanship warranty in writing?',
+                    a: 'Most tile failures show up in the first 6–18 months. A 1- to 2-year written warranty on the install (separate from manufacturer warranties on the tile itself) is the bare minimum.',
+                  },
+                  {
+                    q: 'How will I see daily progress when I\'m at work?',
+                    a: 'You should expect text or photo updates each day, not silence. If they "don\'t do that," ask yourself why.',
+                  },
+                ].map((item, i) => (
+                  <li key={i} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-7 h-7 bg-primary-600 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        {i + 1}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 mb-1">{item.q}</p>
+                        <p className="text-sm text-gray-600">{item.a}</p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+
+              <p className="text-sm text-gray-500 mt-6 italic">
+                We answer all five in 30 seconds. If you&apos;re comparing us to another shop, hold us to the same standard you hold them to.
+              </p>
+            </div>
+
+            {/* Lead magnets sidebar — 2 cols */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Free tile review */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 mb-4">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">Free tile review — before you buy</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  About to drop $1,500 on tile? Text Vince a photo or a product link first. He&apos;ll tell you in 5 minutes if it&apos;s rated for your application —
+                  shower floor, wet area, large-format on a wavy subfloor, you name it. No commitment, no upsell.
+                </p>
+                <a
+                  href="sms:+16177661259?body=Hi%20Vince%20%E2%80%94%20can%20you%20take%20a%20look%20at%20this%20tile%20I%E2%80%99m%20considering%3F"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold text-sm hover:bg-primary-700 active:scale-95 transition"
+                >
+                  <Phone className="w-4 h-4" />
+                  Text Vince a tile to review
+                </a>
+                <p className="text-xs text-gray-400 mt-2 text-center">(617) 766-1259 — text or call</p>
+              </div>
+
+              {/* In-home consult */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 mb-4">
+                  <Home className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">Free in-home consult</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Photos can&apos;t catch everything. If your project is bigger than one bathroom or the subfloor looks questionable,
+                  we&apos;ll come walk it with you — no charge, no obligation. Most visits are 20 minutes.
+                </p>
+                <a
+                  href="/contact"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-white text-primary-700 border-2 border-primary-600 rounded-lg font-semibold text-sm hover:bg-primary-50 active:scale-95 transition"
+                >
+                  Book a 20-min visit
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </div>
+
+              {/* Same-day written estimate */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 mb-4">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">Same-day written estimate</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Send 4–5 photos and we&apos;ll send back an itemized written quote — labor days, materials, scope, the works — usually within hours.
+                </p>
+                <a
+                  href="/contact"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-white text-primary-700 border-2 border-primary-600 rounded-lg font-semibold text-sm hover:bg-primary-50 active:scale-95 transition"
+                >
+                  Send photos
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -137,20 +137,9 @@ function renderCustomerGroup(
               <span className="text-gray-300">•</span>{' '}
               {item.quantity > 1 ? `${item.quantity} × ` : ''}
               {item.description}
-              {item.source_url && (
-                <>
-                  {' '}
-                  <a
-                    href={item.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={item.source_name || undefined}
-                    className="text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap"
-                  >
-                    (view)
-                  </a>
-                </>
-              )}
+              {/* No source/retail "(view)" link on the customer-facing estimate —
+                  it exposes our sourcing. The internal dashboard line-item editor
+                  keeps source_url for the team. */}
             </li>
           ))}
         </ul>

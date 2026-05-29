@@ -113,8 +113,10 @@ function SheetBody<S extends string>({
                 data-pickable={pickable ? 'true' : 'false'}
                 onClick={async () => {
                   if (!pickable) return
-                  await onPick(opt.stage)
-                  onClose()
+                  // Always close, even if the save rejects — onPick (saveStage)
+                  // surfaces its own error toast, so a failure shouldn't leave
+                  // the sheet hanging open.
+                  try { await onPick(opt.stage) } finally { onClose() }
                 }}
                 title={opt.disabled ? opt.disabledReason : undefined}
                 aria-current={isCurrent ? 'true' : undefined}

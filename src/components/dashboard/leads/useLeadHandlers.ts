@@ -152,7 +152,17 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     async (item: PipelineItem, newStage: PipelineStage) => {
       const convertRes = await fetch(`/api/leads/${item.id}/convert`, { method: 'POST' })
       const convertData = await convertRes.json()
-      if (!convertRes.ok) throw new Error(convertData.error ?? 'Conversion failed')
+      if (!convertRes.ok) {
+        // Lead was already converted (e.g. a stale card / double-tap). Don't
+        // throw — resolve the card to its real state by refetching so it stops
+        // looking stuck, and tell the user what happened.
+        if (convertRes.status === 409 && convertData.existing_job_id) {
+          toast('Already a job — refreshing', 'success')
+          await loadPipeline()
+          return
+        }
+        throw new Error(convertData.error ?? 'Conversion failed')
+      }
       const newJobId: string = convertData.job?.id
       const targetJobStatus = jobStatusForStage(newStage)
       if (newJobId && targetJobStatus && targetJobStatus !== 'lead') {
@@ -173,24 +183,34 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
   const saveStage = useCallback(
     async (item: PipelineItem, newStage: PipelineStage, opts: { skipUndo?: boolean } = {}) => {
       const prevStage = item.stage
-      if (
-        item.kind === 'quote_request' &&
-        (newStage === 'new' || newStage === 'in_person_estimate_scheduled')
-      ) {
-        const committed = await saveStageQrToQr(item, newStage)
-        if (!committed) return
-      } else if (
-        item.kind === 'job' &&
-        newStage !== 'new' &&
-        newStage !== 'in_person_estimate_scheduled'
-      ) {
-        await saveStageJobToJob(item, newStage)
-      } else if (item.kind === 'quote_request') {
-        // Cross-table promote. No undo (un-converting isn't supported).
-        await promoteQrThenSetStage(item, newStage)
+      // Single error chokepoint: every stage change (sheet pick AND undo)
+      // flows through here. The sub-helpers throw on failure (optimisticPatch
+      // already rolls back local state); we just surface the message so a
+      // failed change is never silent. Returning instead of re-throwing lets
+      // the picker close cleanly.
+      try {
+        if (
+          item.kind === 'quote_request' &&
+          (newStage === 'new' || newStage === 'in_person_estimate_scheduled')
+        ) {
+          const committed = await saveStageQrToQr(item, newStage)
+          if (!committed) return
+        } else if (
+          item.kind === 'job' &&
+          newStage !== 'new' &&
+          newStage !== 'in_person_estimate_scheduled'
+        ) {
+          await saveStageJobToJob(item, newStage)
+        } else if (item.kind === 'quote_request') {
+          // Cross-table promote. No undo (un-converting isn't supported).
+          await promoteQrThenSetStage(item, newStage)
+          return
+        } else {
+          throw new Error('Cannot move a job back to inquiry stage. Use Archive instead.')
+        }
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Could not change stage', 'error')
         return
-      } else {
-        throw new Error('Cannot move a job back to inquiry stage. Use Archive instead.')
       }
 
       // C3: undo toast on successful same-table moves

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, DollarSign, Calendar, Users } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, MessageSquare, MapPin, Briefcase, DollarSign, Calendar, Users, Plus } from 'lucide-react'
 import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
@@ -161,6 +161,15 @@ export default async function CustomerDetailPage({
             )}
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2">
+              {/* Start a new lead pre-linked to this customer (no retyping, no
+                  duplicate). Mirrors the ?customer_id= prefill jobs/new uses. */}
+              <Link
+                href={`/dashboard/leads/new?customer_id=${customer.id}&name=${encodeURIComponent(customer.name)}&phone=${encodeURIComponent(customer.phone ?? '')}&email=${encodeURIComponent(customer.email ?? '')}`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                New Lead
+              </Link>
               {customer.phone && (
                 <>
                   <a

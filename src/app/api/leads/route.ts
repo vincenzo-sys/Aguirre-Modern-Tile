@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       site_visit_at,
       site_visit_notes,
       answers = {},
+      customer_id,
     } = body
 
     if (!client_name) {
@@ -63,9 +64,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project type is required' }, { status: 400 })
     }
 
+    // An explicit customer_id (e.g. "New Lead" launched from a customer page)
+    // wins outright — no email/phone matching, so a typo can't fork off a
+    // duplicate customer. Validate it points at a real customer first, so a
+    // stale/bad id can't attach the lead to a dangling reference. (Single-
+    // tenant app: every authenticated staff user shares one customer set, so
+    // existence — not ownership — is the check that matters.) Falls back to
+    // find-or-create when absent.
     let customerId: string | null = null
+    if (customer_id) {
+      const { data: owned } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('id', customer_id)
+        .maybeSingle()
+      if (!owned) {
+        return NextResponse.json({ error: 'Invalid customer' }, { status: 400 })
+      }
+      customerId = owned.id
+    }
 
-    if (client_email) {
+    if (!customerId && client_email) {
       const { data: existing } = await supabase
         .from('customers')
         .select('id')

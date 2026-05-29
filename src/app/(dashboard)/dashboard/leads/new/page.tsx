@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from '@/components/Toast'
@@ -24,14 +24,27 @@ const sources = [
 ]
 
 export default function NewLeadPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <NewLeadForm />
+    </Suspense>
+  )
+}
+
+function NewLeadForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // When launched from a customer's page (?customer_id=...), hard-link the new
+  // lead to that customer so it can't create a duplicate. The name/phone/email
+  // params just prefill the visible fields.
+  const customerId = searchParams.get('customer_id') || ''
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    client_name: '',
-    client_phone: '',
-    client_email: '',
+    client_name: searchParams.get('name') || '',
+    client_phone: searchParams.get('phone') || '',
+    client_email: searchParams.get('email') || '',
     project_type: 'bathroom',
-    source: 'phone',
+    source: customerId ? 'repeat' : 'phone',
     notes: '',
     next_follow_up: '',
   })
@@ -52,7 +65,7 @@ export default function NewLeadPage() {
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(customerId ? { ...form, customer_id: customerId } : form),
       })
 
       if (!res.ok) {
@@ -82,6 +95,14 @@ export default function NewLeadPage() {
       </Link>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Lead</h1>
+
+      {customerId && (
+        <div className="mb-4 rounded-lg bg-primary-50 border border-primary-200 p-3">
+          <p className="text-sm text-primary-800">
+            Linked to an existing customer — this lead attaches to their record and won&apos;t create a duplicate.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
         <div>

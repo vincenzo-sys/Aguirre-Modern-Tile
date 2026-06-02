@@ -68,6 +68,7 @@ export async function PATCH(
       'estimated_cost', 'actual_cost', 'amount_invoiced', 'amount_paid',
       'estimate_accepted_at',
       'line_items', 'assigned_to', 'notes', 'crew_instructions', 'crew_log', 'customer_provides',
+      'lost_reason',
       // Per-job editable estimate text snapshotted from estimate_defaults.
       'warranty_text', 'payment_terms_text', 'payment_methods',
     ]

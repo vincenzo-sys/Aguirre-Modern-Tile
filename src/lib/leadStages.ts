@@ -124,18 +124,17 @@ export function jobStatusForStage(stage: PipelineStage): string | null {
 // can pick any stage (job-stages auto-promote via convert endpoint).
 // Job rows can only stay in job-stages.
 export function stageOptionsFor(item: { kind: 'quote_request' | 'job' }): StageOption<PipelineStage>[] {
-  return STAGE_ORDER.map((stage) => {
+  // Job rows can't go back to the inquiry-only stages (there's no inquiry to
+  // revert to), so we simply don't offer them — no greyed-out "Locked" rows.
+  // Quote-request rows still see every stage (picking a job stage promotes).
+  const stages = item.kind === 'job' ? STAGE_ORDER.filter((s) => !isQrStage(s)) : STAGE_ORDER
+  return stages.map((stage) => {
     const meta = STAGE_META[stage]
-    const disabled = item.kind === 'job' && isQrStage(stage)
     return {
       stage,
       label: meta.label,
       color: meta.chip,
       icon: meta.icon,
-      disabled,
-      disabledReason: disabled
-        ? 'Job already created — moving back to an inquiry stage isn’t supported. Use Archive to remove from the pipeline.'
-        : undefined,
     }
   })
 }

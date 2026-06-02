@@ -91,6 +91,10 @@ export interface Job {
   crew_instructions: string | null
   crew_log: string | null
   customer_provides: string | null
+  // Why a quoted deal was lost. Written by the leads page "Mark as lost"
+  // action alongside status -> 'cancelled'. Mirrors quote_requests.lost_reason
+  // so win/loss reporting works whether the deal died as an inquiry or a quote.
+  lost_reason?: string | null
   // Snapshotted from estimate_defaults at estimate-generate time. Editable
   // per-job in the dashboard so wording can be tweaked without affecting
   // already-issued estimates. Optional in TS since legacy rows + demo

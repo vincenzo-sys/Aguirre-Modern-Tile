@@ -19,6 +19,22 @@ export type Transition = {
 
 export type Role = 'owner' | 'crew'
 
+// Full status list for the owner's free-choice dropdown (any status, including
+// backward moves + cancel). Shared by StatusUpdateDropdown and the leads
+// workspace page so the two surfaces never drift. Crew stay on getTransitions.
+export const JOB_STATUS_OPTIONS: Array<{ value: JobStatus; label: string }> = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'quoted', label: 'Quoted' },
+  { value: 'estimate_revised', label: 'Estimate revised' },
+  { value: 'accepted_not_scheduled', label: 'Accepted — not scheduled' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'waiting_for_materials', label: 'Waiting for materials' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
 const ownerTransitions: Partial<Record<JobStatus, Transition[]>> = {
   lead: [
     { label: 'Mark Quoted', next: 'quoted', primary: true },

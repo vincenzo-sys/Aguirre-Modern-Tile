@@ -327,6 +327,50 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     [setItems, loadPipeline],
   )
 
+  // ── Mark as lost (job-only; soft, recoverable, captures a reason) ─
+  // The job equivalent of the QR "Archive (lost)". Customer passed on the
+  // quote → status 'cancelled' (drops out of the pipeline, same as cancelItem)
+  // but we also prompt for + store a lost_reason for win/loss tracking. Undo
+  // restores the prior stage and clears the reason.
+  const markLost = useCallback(
+    async (item: PipelineItem) => {
+      if (item.kind !== 'job') return
+      const reason = window.prompt(
+        `Mark ${item.project_name} as lost.\nWhy did we lose it? (price, timeline, scope, went with someone else…)`,
+      )
+      if (reason === null) return // prompt cancelled — do nothing
+      const prevStage = item.stage
+      setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'job')))
+      const res = await fetch(`/api/jobs/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled', lost_reason: reason.trim() || null }),
+      })
+      if (!res.ok) {
+        await loadPipeline()
+        toast('Could not mark lost — refreshed', 'error')
+        return
+      }
+      toast('Marked as lost', 'success', {
+        label: 'Undo',
+        onClick: () => {
+          const restoreStatus = jobStatusForStage(prevStage) ?? 'quoted'
+          fetch(`/api/jobs/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: restoreStatus, lost_reason: null }),
+          })
+            .then((r) => {
+              if (!r.ok) throw new Error('Undo failed')
+              return loadPipeline()
+            })
+            .catch((err) => toast(err instanceof Error ? err.message : 'Undo failed', 'error'))
+        },
+      })
+    },
+    [setItems, loadPipeline],
+  )
+
   // ── Delete forever (hard, NOT recoverable) ───────────────────────
   // Mirrors cancelItem's optimistic-removal + reload-on-error shape, but
   // hits the DELETE verb instead of a status PATCH and offers no Undo —
@@ -457,6 +501,7 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     markContactedNow,
     archiveLead,
     cancelItem,
+    markLost,
     deleteItem,
     convertLead,
     sendToJobs,

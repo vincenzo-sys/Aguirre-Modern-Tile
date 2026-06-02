@@ -43,6 +43,10 @@ type Props<S extends string> = {
   onPick: (stage: S) => void | Promise<void>
   // Optional short title — defaults to "Change stage".
   title?: string
+  // When provided, a red "Cancel this lead" button is pinned to the bottom of
+  // the sheet so Cancel is always reachable from the same place you change
+  // status. The host owns the soft-cancel + optimistic removal.
+  onCancel?: () => void
 }
 
 export default function StagePickerSheet<S extends string>(props: Props<S>) {
@@ -56,6 +60,7 @@ function SheetBody<S extends string>({
   options,
   onPick,
   title = 'Change stage',
+  onCancel,
 }: Props<S>) {
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -166,6 +171,21 @@ function SheetBody<S extends string>({
             )
           })}
         </div>
+
+        {/* Always-available Cancel — soft-cancels the deal (job → cancelled,
+            lead → archived) and drops it out of the pipeline. */}
+        {onCancel && (
+          <div className="border-t border-gray-200 p-3">
+            <button
+              type="button"
+              onClick={() => { onCancel(); onClose() }}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200 border border-red-200 rounded-lg"
+            >
+              <X className="w-4 h-4" />
+              Cancel this lead
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

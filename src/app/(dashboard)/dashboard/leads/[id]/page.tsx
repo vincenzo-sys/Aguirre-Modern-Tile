@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Phone, Mail, User, Calendar, Tag, Save, Archive,
   CheckCircle, MapPin, ImageIcon, Sparkles, Loader2, Send, Copy, Check,
-  ExternalLink, FileText, Trash2, X, MessageSquare, Star,
+  ExternalLink, FileText, Trash2, X, MessageSquare, Star, ThumbsDown,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
@@ -15,6 +15,7 @@ import JobLineItems from '@/components/dashboard/JobLineItems'
 import StructuredScopeEditor from '@/components/dashboard/StructuredScopeEditor'
 import { deriveQuoteHints } from '@/lib/quoteHints'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
+import { JOB_STATUS_OPTIONS } from '@/lib/jobStatusTransitions'
 import type { Job, QuoteRequest, QuoteRequestPhoto, QuoteRequestStatus } from '@/lib/supabase/types'
 
 const statusColors: Record<QuoteRequestStatus, string> = {
@@ -36,22 +37,6 @@ const jobStatusColors: Record<string, string> = {
   paid: 'bg-green-100 text-green-800',
   cancelled: 'bg-gray-200 text-gray-600',
 }
-
-// Status options for the dropdown — grouped logically so the user reads them
-// in pipeline order. Picking a non-lead-stage status from this page triggers
-// the same redirect as if the status had landed via "Send to Jobs".
-const JOB_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'lead', label: 'Lead' },
-  { value: 'quoted', label: 'Quoted' },
-  { value: 'estimate_revised', label: 'Estimate revised' },
-  { value: 'accepted_not_scheduled', label: 'Accepted — not scheduled' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'waiting_for_materials', label: 'Waiting for materials' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
 
 const sources = [
   { value: 'website', label: 'Website' },
@@ -1041,6 +1026,18 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
           {job && (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Estimate summary</h2>
+              {/* Lost callout — surfaces the reason captured by the leads page
+                  "Mark as lost" action (status -> cancelled + lost_reason) so a
+                  dead deal explains itself here, not just in the pipeline toast. */}
+              {job.status === 'cancelled' && job.lost_reason && (
+                <div className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                  <ThumbsDown className="w-4 h-4 text-red-700 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-red-900 leading-tight">Marked lost</p>
+                    <p className="text-xs text-red-700 leading-tight">{job.lost_reason}</p>
+                  </div>
+                </div>
+              )}
               {/* Deposit-paid callout — visible the moment a deposit lands
                   (Stripe webhook or manual entry), so Vince knows on this
                   page (not just on the operations job page) that the deal

@@ -9,7 +9,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   MoreHorizontal, CalendarPlus, FilePen, ExternalLink, Archive, Sparkles,
-  CheckCircle2, ChevronDown, Phone, MessageSquare, Check, X, Trash2,
+  CheckCircle2, ChevronDown, Phone, MessageSquare, Check, X, Trash2, ThumbsDown,
 } from 'lucide-react'
 import type { PipelineItem } from '@/app/api/pipeline/route'
 import type { PipelineStage } from '@/app/api/pipeline/route'
@@ -28,6 +28,7 @@ export type LeadCardHandlers = {
   markContactedNow: (item: PipelineItem) => Promise<void>
   archiveLead: (item: PipelineItem) => Promise<void>
   cancelItem: (item: PipelineItem) => Promise<void>
+  markLost: (item: PipelineItem) => Promise<void>
   deleteItem: (item: PipelineItem) => Promise<void>
   convertLead: (item: PipelineItem) => Promise<void>
   sendToJobs: (item: PipelineItem) => Promise<void>
@@ -335,12 +336,20 @@ function buildMoreActions({
 
   if (item.kind === 'job') {
     actions.push({
+      key: 'lost',
+      icon: ThumbsDown,
+      label: 'Mark as lost',
+      hint: 'Customer passed — records why, drops out of the pipeline, recoverable.',
+      danger: true,
+      dividerBefore: true,
+      onSelect: () => handlers.markLost(item),
+    })
+    actions.push({
       key: 'cancel',
       icon: X,
       label: 'Cancel job',
       hint: 'Soft-cancel — drops out of the pipeline, recoverable.',
       danger: true,
-      dividerBefore: true,
       onSelect: () => handlers.cancelItem(item),
     })
   }

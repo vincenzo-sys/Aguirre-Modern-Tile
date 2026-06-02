@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobStatus } from '@/lib/supabase/types'
-import { getTransitions } from '@/lib/jobStatusTransitions'
+import { getTransitions, JOB_STATUS_OPTIONS } from '@/lib/jobStatusTransitions'
 
 interface StatusUpdateDropdownProps {
   jobId: string
@@ -17,9 +17,21 @@ export default function StatusUpdateDropdown({ jobId, currentStatus, isOwner = f
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const transitions = getTransitions(isOwner ? 'owner' : 'crew', currentStatus)
 
-  if (transitions.length === 0) return null
+  // Owners get free choice of any status (backward moves + cancel included) so
+  // a job stays fully editable after it leaves the leads pipeline. Crew keep
+  // the guided forward-only transitions.
+  const menuItems: Array<{ next: JobStatus; label: string; danger: boolean }> = isOwner
+    ? JOB_STATUS_OPTIONS
+        .filter((o) => o.value !== currentStatus)
+        .map((o) => ({ next: o.value, label: o.label, danger: o.value === 'cancelled' }))
+    : getTransitions('crew', currentStatus).map((t) => ({
+        next: t.next,
+        label: t.label,
+        danger: t.tone === 'danger',
+      }))
+
+  if (menuItems.length === 0) return null
 
   async function handleUpdate(next: JobStatus) {
     setOpen(false)
@@ -60,13 +72,13 @@ export default function StatusUpdateDropdown({ jobId, currentStatus, isOwner = f
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[160px]">
-            {transitions.map((t) => (
+          <div className="absolute right-0 mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[160px] max-h-[60vh] overflow-y-auto">
+            {menuItems.map((t) => (
               <button
                 key={t.next}
                 onClick={() => handleUpdate(t.next)}
                 className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                  t.tone === 'danger' ? 'text-red-600' : 'text-gray-700'
+                  t.danger ? 'text-red-600' : 'text-gray-700'
                 }`}
               >
                 {t.label}

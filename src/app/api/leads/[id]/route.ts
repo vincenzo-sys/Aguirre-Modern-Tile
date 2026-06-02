@@ -82,3 +82,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// DELETE /api/leads/[id] — permanently remove a quote_request (lead).
+// quote_request_photos cascade-delete (migration 016, ON DELETE CASCADE) and
+// nothing else FKs to quote_requests, so the row goes cleanly. No payment/
+// estimate guards: leads carry no money. (Like the jobs DELETE, storage files
+// in the 'quote-photos' bucket are left orphaned — only DB rows are removed.)
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const unauthorized = await requireApiAuth(request)
+  if (unauthorized) return unauthorized
+
+  try {
+    const { id } = await params
+    const supabase = getSupabaseAdmin()
+
+    const { data: lead, error: fetchErr } = await supabase
+      .from('quote_requests')
+      .select('id, client_name, status')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const { error: delErr } = await supabase.from('quote_requests').delete().eq('id', id)
+    if (delErr) {
+      return NextResponse.json({ error: delErr.message }, { status: 500 })
+    }
+
+    console.log(`[Leads] Deleted quote_request ${id} "${lead.client_name}" — status=${lead.status}`)
+
+    return NextResponse.json({ deleted: true })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

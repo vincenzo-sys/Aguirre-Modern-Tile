@@ -283,6 +283,76 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     [setItems],
   )
 
+  // ── Cancel / remove from pipeline (soft, recoverable) ────────────
+  // Jobs → status 'cancelled', quote_requests → status 'archived'. Both drop
+  // out of the pipeline (see /api/pipeline filters) but the record survives,
+  // so an Undo toast can put it right back. Mirrors archiveLead but works for
+  // both kinds and is reachable from the stage picker + the "..." menu.
+  const cancelItem = useCallback(
+    async (item: PipelineItem) => {
+      const prevStage = item.stage
+      const endpoint = item.kind === 'job' ? `/api/jobs/${item.id}` : `/api/leads/${item.id}`
+      const cancelStatus = item.kind === 'job' ? 'cancelled' : 'archived'
+      // Optimistic removal
+      setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === item.kind)))
+      const res = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: cancelStatus }),
+      })
+      if (!res.ok) {
+        await loadPipeline()
+        toast('Could not cancel — refreshed', 'error')
+        return
+      }
+      toast(item.kind === 'job' ? 'Job cancelled' : 'Lead archived', 'success', {
+        label: 'Undo',
+        onClick: () => {
+          // Restore the prior status, then refetch so the row reappears.
+          const restoreStatus =
+            item.kind === 'job' ? (jobStatusForStage(prevStage) ?? 'quoted') : 'new'
+          fetch(endpoint, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: restoreStatus }),
+          })
+            .then((r) => {
+              if (!r.ok) throw new Error('Undo failed')
+              return loadPipeline()
+            })
+            .catch((err) => toast(err instanceof Error ? err.message : 'Undo failed', 'error'))
+        },
+      })
+    },
+    [setItems, loadPipeline],
+  )
+
+  // ── Delete forever (hard, NOT recoverable) ───────────────────────
+  // Mirrors cancelItem's optimistic-removal + reload-on-error shape, but
+  // hits the DELETE verb instead of a status PATCH and offers no Undo —
+  // the record is gone. Jobs send force:true so a paid / estimate-sent job
+  // still deletes in one tap (the /api/jobs guard otherwise 409s).
+  const deleteItem = useCallback(
+    async (item: PipelineItem) => {
+      if (!confirm(`Delete ${item.project_name} forever? This can't be undone.`)) return
+      const endpoint = item.kind === 'job' ? `/api/jobs/${item.id}` : `/api/leads/${item.id}`
+      // Optimistic removal
+      setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === item.kind)))
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: item.kind === 'job' ? JSON.stringify({ force: true }) : undefined,
+      })
+      if (!res.ok) {
+        await loadPipeline()
+        toast('Could not delete — refreshed', 'error')
+        return
+      }
+      toast('Deleted permanently', 'success')
+    },
+    [setItems, loadPipeline],
+  )
+
   // ── Customer accepted → Jobs (job-only) ──────────────────────────
 
   const sendToJobs = useCallback(
@@ -386,6 +456,8 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
     saveNotes,
     markContactedNow,
     archiveLead,
+    cancelItem,
+    deleteItem,
     convertLead,
     sendToJobs,
     openScheduleVisit: (item) => setSheet({ mode: 'schedule-visit', item }),

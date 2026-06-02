@@ -9,7 +9,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   MoreHorizontal, CalendarPlus, FilePen, ExternalLink, Archive, Sparkles,
-  CheckCircle2, ChevronDown, Phone, MessageSquare, Check,
+  CheckCircle2, ChevronDown, Phone, MessageSquare, Check, X, Trash2,
 } from 'lucide-react'
 import type { PipelineItem } from '@/app/api/pipeline/route'
 import type { PipelineStage } from '@/app/api/pipeline/route'
@@ -27,6 +27,8 @@ export type LeadCardHandlers = {
   saveNotes: (item: PipelineItem, value: string | null) => Promise<void>
   markContactedNow: (item: PipelineItem) => Promise<void>
   archiveLead: (item: PipelineItem) => Promise<void>
+  cancelItem: (item: PipelineItem) => Promise<void>
+  deleteItem: (item: PipelineItem) => Promise<void>
   convertLead: (item: PipelineItem) => Promise<void>
   sendToJobs: (item: PipelineItem) => Promise<void>
   openScheduleVisit: (item: PipelineItem) => void
@@ -268,6 +270,7 @@ export default function LeadCard({
         currentStage={item.stage}
         options={handlers.stageOptionsFor(item)}
         onPick={(s) => handlers.saveStage(item, s)}
+        onCancel={() => handlers.cancelItem(item)}
         title={`Change stage — ${item.client_name}`}
       />
 
@@ -330,6 +333,18 @@ function buildMoreActions({
     })
   }
 
+  if (item.kind === 'job') {
+    actions.push({
+      key: 'cancel',
+      icon: X,
+      label: 'Cancel job',
+      hint: 'Soft-cancel — drops out of the pipeline, recoverable.',
+      danger: true,
+      dividerBefore: true,
+      onSelect: () => handlers.cancelItem(item),
+    })
+  }
+
   if (item.kind === 'quote_request') {
     actions.push({
       key: 'convert',
@@ -346,6 +361,18 @@ function buildMoreActions({
       onSelect: () => handlers.archiveLead(item),
     })
   }
+
+  // Permanent delete — available for BOTH kinds, every stage. Sits below the
+  // soft Cancel/Archive so the recoverable option is the default-looking one.
+  actions.push({
+    key: 'delete',
+    icon: Trash2,
+    label: 'Delete forever',
+    hint: 'Permanently removes this record. Cannot be undone.',
+    danger: true,
+    dividerBefore: true,
+    onSelect: () => handlers.deleteItem(item),
+  })
 
   return actions
 }

@@ -427,6 +427,7 @@ export default async function JobDetailPage({
             <GenerateEstimateModal
               jobId={job.id}
               hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
+              estimateSent={!!job.estimate_sent_at}
               initialSqft={job.square_footage}
             />
           </div>

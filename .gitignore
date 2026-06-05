@@ -30,3 +30,6 @@ next-env.d.ts
 scripts/blog-engine/logs/
 scripts/blog-engine/node_modules/
 scripts/blog-engine/.env
+
+# Local pricing backups (operational data, not code)
+scripts/backups/

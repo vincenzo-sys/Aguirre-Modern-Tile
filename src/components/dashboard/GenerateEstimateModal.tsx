@@ -99,11 +99,16 @@ function fallbackLabel(scope: ScopeInput, index: number): string {
 export default function GenerateEstimateModal({
   jobId,
   hasExistingItems,
+  estimateSent = false,
   initialSqft,
   initialTemplate,
 }: {
   jobId: string
   hasExistingItems: boolean
+  // True when this job's estimate has already been sent to the customer.
+  // Regenerating then re-prices a live estimate, so we gate it behind an
+  // explicit confirm (see confirmReprice below).
+  estimateSent?: boolean
   initialSqft?: number | null
   initialTemplate?: string
 }) {
@@ -117,6 +122,10 @@ export default function GenerateEstimateModal({
     },
   ])
   const [loading, setLoading] = useState(false)
+
+  // Guard for re-pricing an already-SENT estimate. Must be ticked before
+  // Generate is enabled when hasExistingItems && estimateSent. Reset on open.
+  const [confirmReprice, setConfirmReprice] = useState(false)
 
   // Live preview state — populated by a debounced /api/estimates/preview call
   // as the user changes inputs. Null until the first measurement is filled in
@@ -148,6 +157,7 @@ export default function GenerateEstimateModal({
           sqft: initialSqft ? String(initialSqft) : '',
         },
       ])
+      setConfirmReprice(false)
     }
   }, [open, initialTemplate, initialSqft])
 
@@ -331,6 +341,9 @@ export default function GenerateEstimateModal({
   }
 
   const isMulti = scopes.length > 1
+  // Regenerating a job whose estimate is already out re-prices what the
+  // customer saw — gate Generate behind an explicit confirm.
+  const isSentReprice = hasExistingItems && estimateSent
 
   return (
     <>
@@ -393,14 +406,32 @@ export default function GenerateEstimateModal({
                 Add another scope
               </button>
 
-              {hasExistingItems && (
+              {isSentReprice ? (
+                <div className="rounded-md bg-red-50 border border-red-200 p-3 space-y-2">
+                  <p className="text-xs text-red-900">
+                    <strong>This estimate was already sent to the customer.</strong> Regenerating
+                    replaces their line items and re-prices everything at today&apos;s material
+                    costs — the customer-facing estimate will change.
+                  </p>
+                  <label className="flex items-center gap-2 text-xs font-medium text-red-900 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confirmReprice}
+                      onChange={(e) => setConfirmReprice(e.target.checked)}
+                      disabled={loading}
+                      className="rounded border-red-300 text-red-600 focus:ring-red-500"
+                    />
+                    Yes, re-price this sent estimate
+                  </label>
+                </div>
+              ) : hasExistingItems ? (
                 <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
                   <p className="text-xs text-amber-900">
                     <strong>Heads up:</strong> this job already has line items.
                     Generating will replace them. Material status (ordered/received) is reset on items that change.
                   </p>
                 </div>
-              )}
+              ) : null}
 
               {isMulti && (
                 <div className="rounded-md bg-gray-50 border border-gray-200 p-3 text-xs text-gray-600">
@@ -428,7 +459,7 @@ export default function GenerateEstimateModal({
                 </button>
                 <button
                   onClick={handleGenerate}
-                  disabled={loading}
+                  disabled={loading || (isSentReprice && !confirmReprice)}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
                   {loading ? (

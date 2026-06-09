@@ -43,6 +43,9 @@ const UPDATES = [
   { id: 'e7275dcb-f516-4d89-a550-c160f3c7a9e7', name: 'Kerdi-Board Curb 48x6', cost: 74.31 },
   { id: '08b9ffef-7c03-4061-8577-6b3c71c010c9', name: 'Bright White Polished Corner Shelf', cost: 26.39 },
   { id: 'eed1fc14-8a14-475d-a9aa-7966fd4d6164', name: 'Glass Corner Shelf', cost: 20.89 },
+  // Metal Edge - Small: matched to aluminum L-angle trim (item is named "Metal").
+  // Schluter Schiene aluminum at F&D $21.11. Flip to PVC (~$8.18) if that's what's stocked.
+  { id: '530d0bb8-8515-45bc-b141-56f8b3bbe444', name: 'Metal Edge - Small (aluminum)', cost: 21.11 },
   // --- decreases (current cost was above verified highest retail) ---
   { id: '879965eb-96ba-43d6-9a20-4dea2d204a5f', name: 'Ditra-Heat Smart Thermostat (E-RS1)', cost: 370.09 },
   { id: 'ce9dad9a-d7c0-46e2-831d-ae92fe8705ca', name: 'Ditra-Heat WiFi Thermostat', cost: 366.89 },

@@ -242,6 +242,7 @@ function MaterialsTable({ data }: { data: any[] }) {
             <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Customer Price</th>
             <th className="text-right text-xs font-semibold text-gray-500 uppercase px-4 py-3">Coverage</th>
             <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Unit</th>
+            <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Sources</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -301,11 +302,45 @@ function MaterialsTable({ data }: { data: any[] }) {
                 </td>
                 <td className="px-4 py-3 text-sm text-right text-gray-500">{row.coverage}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{row.unit}</td>
+                <td className="px-4 py-3"><SourceLinks links={row.source_links} fallback={row.retail_link} /></td>
               </tr>
             )
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// Per-retailer source links (migration 037). Renders small chips that open the
+// product page in a new tab so the team can re-check a retailer's live price.
+// Falls back to the legacy single retail_link when source_links is empty.
+function SourceLinks({
+  links,
+  fallback,
+}: {
+  links?: { floor_decor?: string; lowes?: string; home_depot?: string } | null
+  fallback?: string | null
+}) {
+  const entries: Array<[string, string]> = []
+  if (links?.floor_decor) entries.push(['F&D', links.floor_decor])
+  if (links?.lowes) entries.push(["Lowe's", links.lowes])
+  if (links?.home_depot) entries.push(['HD', links.home_depot])
+  if (entries.length === 0 && fallback) entries.push(['Link', fallback])
+  if (entries.length === 0) return <span className="text-xs text-gray-300">—</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([label, url]) => (
+        <a
+          key={label}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 whitespace-nowrap"
+        >
+          {label}
+        </a>
+      ))}
     </div>
   )
 }

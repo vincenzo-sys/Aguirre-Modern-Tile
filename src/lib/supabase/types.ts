@@ -239,6 +239,9 @@ export interface MaterialPricing {
   coverage: number
   unit: MaterialUnit
   retail_link: string | null
+  // Per-retailer product links for the same material (migration 037). Keys are
+  // omitted for retailers that don't carry the item.
+  source_links?: { floor_decor?: string; lowes?: string; home_depot?: string } | null
   notion_page_id: string | null
   created_at: string
   updated_at: string

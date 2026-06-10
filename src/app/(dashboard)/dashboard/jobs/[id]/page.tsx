@@ -13,6 +13,7 @@ import CrewLog from '@/components/dashboard/CrewLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
+import WorkOrderShareLink from '@/components/dashboard/WorkOrderShareLink'
 import EstimateTextEditor from '@/components/dashboard/EstimateTextEditor'
 import EstimateMessages from '@/components/EstimateMessages'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
@@ -394,6 +395,12 @@ export default async function JobDetailPage({
           <EstimateShareLink job={job} />
         </div>
       )}
+
+      {/* Crew work order link — public, no pricing. Shown to anyone who can
+          view the job so the crew link is always one tap away in the field. */}
+      <div className="mb-6">
+        <WorkOrderShareLink job={job} />
+      </div>
 
       {/* Customer ↔ Aguirre conversation thread tied to this job's estimate.
           Reads + writes through /api/jobs/[id]/messages; sends SMS + email

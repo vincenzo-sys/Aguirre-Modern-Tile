@@ -13,6 +13,7 @@ import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import StructuredScopeEditor from '@/components/dashboard/StructuredScopeEditor'
+import WorkOrderShareLink from '@/components/dashboard/WorkOrderShareLink'
 import { deriveQuoteHints } from '@/lib/quoteHints'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { JOB_STATUS_OPTIONS } from '@/lib/jobStatusTransitions'
@@ -779,6 +780,11 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                   </p>
                 )}
               </div>
+
+              {/* Crew work order link — a separate public link with NO pricing,
+                  for texting to the install crew. Edits to scope + materials
+                  below show up instantly on it, same as the customer estimate. */}
+              <WorkOrderShareLink job={job} />
 
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-900">Line items</h2>

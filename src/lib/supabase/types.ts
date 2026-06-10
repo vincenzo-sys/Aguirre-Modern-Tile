@@ -106,6 +106,10 @@ export interface Job {
   estimate_sent_at: string | null
   estimate_viewed_at: string | null
   estimate_accepted_at: string | null
+  // Crew-facing work order share link (migration 038). Separate token from
+  // estimate_token so the crew link can never expose pricing.
+  work_order_token?: string | null
+  work_order_shared_at?: string | null
   priority: JobPriority | null
   follow_up_count: number
   last_contact_at: string | null

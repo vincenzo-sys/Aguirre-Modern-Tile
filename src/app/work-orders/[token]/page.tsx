@@ -1,18 +1,9 @@
 import { notFound } from 'next/navigation'
 import {
-  MapPin, Phone, Calendar, Package, ClipboardList, User, ExternalLink,
-  Check, Minus, Wrench, Navigation,
+  MapPin, Phone, Calendar, ClipboardList, User, ImageIcon,
+  Check, Minus, Wrench, Navigation, MessageSquare,
 } from 'lucide-react'
-
-type Material = {
-  description: string
-  quantity: number
-  unit: string
-  status: 'needed' | 'ordered' | 'received' | 'on_site' | null
-  source_url: string | null
-  source_name: string | null
-  section: string | null
-}
+import MaterialsChecklist, { type Material } from '@/components/work-order/MaterialsChecklist'
 
 type WorkOrder = {
   title: string
@@ -29,19 +20,11 @@ type WorkOrder = {
   crew_instructions: string | null
   customer_provides: string | null
   materials: Material[]
+  photos: { url: string; caption: string | null }[]
 }
 
 const COMPANY_PHONE = '(617) 766-1259'
 const COMPANY_PHONE_TEL = '+16177661259'
-
-// Material status → label + color. Mirrors the dashboard's MaterialStatus
-// so the crew sees the same "is it here yet?" state the office tracks.
-const STATUS_META: Record<NonNullable<Material['status']>, { label: string; cls: string }> = {
-  needed: { label: 'Needed', cls: 'bg-gray-100 text-gray-600' },
-  ordered: { label: 'Ordered', cls: 'bg-blue-100 text-blue-700' },
-  received: { label: 'Received', cls: 'bg-amber-100 text-amber-700' },
-  on_site: { label: 'On site', cls: 'bg-green-100 text-green-700' },
-}
 
 function fmtDate(iso: string): string {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -71,21 +54,14 @@ export default async function WorkOrderPage({
   const wo = await fetchWorkOrder(token)
   if (!wo) notFound()
 
-  // Group materials by section so multi-room jobs read room-by-room. Items
-  // with no section fall under a single unlabeled bucket.
-  const PROJECTWIDE = 'Project-wide'
-  const sectionMap = new Map<string, Material[]>()
-  for (const m of wo.materials) {
-    const key = m.section || PROJECTWIDE
-    if (!sectionMap.has(key)) sectionMap.set(key, [])
-    sectionMap.get(key)!.push(m)
-  }
-  const sections = Array.from(sectionMap.entries())
-  const showSectionHeaders = sections.length > 1 || sections[0]?.[0] !== PROJECTWIDE
-
   const mapsHref = wo.client_address
     ? `https://maps.google.com/?q=${encodeURIComponent(wo.client_address)}`
     : null
+
+  // Pre-fill the text so Vince knows which job the crew is asking about.
+  const smsHref = `sms:${COMPANY_PHONE_TEL}?&body=${encodeURIComponent(
+    `Hi Vince — question about the ${wo.client_name} job:\n\n`
+  )}`
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -103,7 +79,7 @@ export default async function WorkOrderPage({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5 pb-12">
+      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5 pb-28">
         {/* Schedule — top of the sheet so the crew sees WHEN at a glance */}
         {wo.scheduled_start && (
           <section className="rounded-xl border border-primary-200 bg-primary-50 p-4">
@@ -180,6 +156,38 @@ export default async function WorkOrderPage({
           )}
         </section>
 
+        {/* Site photos — intake shots of the existing space + any jobsite
+            reference photos, so the crew knows what they're walking into.
+            Tapping opens the full-size image (zoomable on a phone). */}
+        {wo.photos.length > 0 && (
+          <section className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-gray-400" />
+              Site photos ({wo.photos.length})
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              {wo.photos.map((photo, i) => (
+                <a
+                  key={i}
+                  href={photo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block aspect-square overflow-hidden rounded-lg bg-gray-100 border border-gray-200"
+                  title={photo.caption ?? 'Site photo'}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt={photo.caption ?? 'Site photo'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Scope of work */}
         {(wo.scope_of_work || wo.included.length > 0 || wo.not_included.length > 0) && (
           <section className="bg-white rounded-xl border border-gray-200 p-5">
@@ -220,60 +228,9 @@ export default async function WorkOrderPage({
           </section>
         )}
 
-        {/* Materials checklist — no prices, just what's needed and where */}
-        {wo.materials.length > 0 && (
-          <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-3 bg-gray-100 border-b border-gray-200 flex items-center gap-2">
-              <Package className="w-4 h-4 text-gray-500" />
-              <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Materials ({wo.materials.length})
-              </h2>
-            </div>
-            {sections.map(([sectionKey, items]) => (
-              <div key={sectionKey}>
-                {showSectionHeaders && (
-                  <div className="px-5 py-2 bg-primary-50 border-b border-primary-100">
-                    <span className="text-xs font-semibold text-primary-900 uppercase tracking-wider">
-                      {sectionKey}
-                    </span>
-                  </div>
-                )}
-                <ul className="divide-y divide-gray-100">
-                  {items.map((m, i) => (
-                    <li key={i} className="px-5 py-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm text-gray-900">{m.description}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-gray-500">
-                            {m.quantity} {m.unit}
-                          </span>
-                          {m.source_url && (
-                            <a
-                              href={m.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-0.5 text-xs text-primary-600 hover:underline"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              {m.source_name || 'Source'}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      {m.status && (
-                        <span
-                          className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_META[m.status].cls}`}
-                        >
-                          {STATUS_META[m.status].label}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </section>
-        )}
+        {/* Materials — no prices. Tap to check off while loading the truck;
+            checks persist per-job on the crew member's phone. */}
+        <MaterialsChecklist materials={wo.materials} token={token} />
 
         {/* What the customer provides */}
         {wo.customer_provides && (
@@ -296,18 +253,52 @@ export default async function WorkOrderPage({
           </section>
         )}
 
-        {/* Office contact — escape hatch if something's off on site */}
-        <div className="text-center pt-2">
-          <p className="text-xs text-gray-500 mb-2">Questions on site? Call the office.</p>
-          <a
-            href={`tel:${COMPANY_PHONE_TEL}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
-          >
-            <Phone className="w-4 h-4" />
-            {COMPANY_PHONE}
-          </a>
+        {/* Reach Vince — escape hatch if something's off on site. The crew
+            knows Vince, not "the office"; text pre-fills with the job. */}
+        <div className="pt-2">
+          <p className="text-center text-xs text-gray-500 mb-3">
+            Questions on site? Vince picks up.
+          </p>
+          <div className="flex items-stretch gap-2">
+            <a
+              href={`tel:${COMPANY_PHONE_TEL}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 active:scale-95 transition"
+            >
+              <Phone className="w-4 h-4" />
+              Call Vince
+            </a>
+            <a
+              href={smsHref}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Text Vince
+            </a>
+          </div>
+          <p className="text-center text-[11px] text-gray-400 mt-2">{COMPANY_PHONE}</p>
         </div>
       </main>
+
+      {/* Sticky contact bar — keeps Vince one tap away while scrolling a long
+          material list. Plain links, so the page stays server-rendered. */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
+        <div className="max-w-2xl mx-auto flex items-stretch gap-2">
+          <a
+            href={`tel:${COMPANY_PHONE_TEL}`}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
+          >
+            <Phone className="w-4 h-4" />
+            Call Vince
+          </a>
+          <a
+            href={smsHref}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Text Vince
+          </a>
+        </div>
+      </div>
     </div>
   )
 }

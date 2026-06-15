@@ -45,6 +45,10 @@ function NewLeadForm() {
     client_email: searchParams.get('email') || '',
     project_type: 'bathroom',
     source: customerId ? 'repeat' : 'phone',
+    address: '',
+    city: '',
+    state: 'MA',
+    zip: '',
     notes: '',
     next_follow_up: '',
   })
@@ -170,6 +174,50 @@ function NewLeadForm() {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+          <input
+            type="text"
+            value={form.address}
+            onChange={(e) => updateField('address', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Job site / street address"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <input
+              type="text"
+              value={form.city}
+              onChange={(e) => updateField('city', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="Boston"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <input
+              type="text"
+              value={form.state}
+              onChange={(e) => updateField('state', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="MA"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+            <input
+              type="text"
+              value={form.zip}
+              onChange={(e) => updateField('zip', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="02108"
+            />
           </div>
         </div>
 

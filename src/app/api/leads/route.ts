@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
       site_visit_notes,
       answers = {},
       customer_id,
+      address,
+      city,
+      state,
+      zip,
     } = body
 
     if (!client_name) {
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
       if (existing) customerId = existing.id
     }
 
+    let createdNewCustomer = false
     if (!customerId) {
       const { data: newCustomer } = await supabase
         .from('customers')
@@ -111,11 +116,39 @@ export async function POST(request: NextRequest) {
           name: client_name,
           email: client_email || null,
           phone: client_phone || null,
+          address: address || null,
+          city: city || null,
+          state: state || null,
+          zip: zip || null,
           source: 'manual',
         })
         .select('id')
         .single()
-      if (newCustomer) customerId = newCustomer.id
+      if (newCustomer) {
+        customerId = newCustomer.id
+        createdNewCustomer = true
+      }
+    }
+
+    // For an existing customer, fill in any address field they're missing
+    // rather than overwriting one that's already on file.
+    if (customerId && !createdNewCustomer && (address || city || state || zip)) {
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('address, city, state, zip')
+        .eq('id', customerId)
+        .maybeSingle()
+
+      if (existingCustomer) {
+        const patch: Record<string, string> = {}
+        if (address && !existingCustomer.address) patch.address = address
+        if (city && !existingCustomer.city) patch.city = city
+        if (state && !existingCustomer.state) patch.state = state
+        if (zip && !existingCustomer.zip) patch.zip = zip
+        if (Object.keys(patch).length > 0) {
+          await supabase.from('customers').update(patch).eq('id', customerId)
+        }
+      }
     }
 
     const { data: lead, error } = await supabase

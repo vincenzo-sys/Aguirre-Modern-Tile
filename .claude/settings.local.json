@@ -164,7 +164,11 @@
       "Read(//c/Users/vince/.claude/**)",
       "WebFetch(domain:www.flooranddecor.com)",
       "Bash(cd *)",
-      "PowerShell(Test-Path *)"
+      "PowerShell(Test-Path *)",
+      "Bash(npx eslint *)",
+      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 30)",
+      "PowerShell(npx eslint \"src/app/\\(dashboard\\)/dashboard/invoices/[id]/page.tsx\" \"src/app/api/invoices/[id]/route.ts\" 2>&1 | Select-Object -First 40)",
+      "PowerShell(npx next lint --file \"src/app/\\(dashboard\\)/dashboard/invoices/[id]/page.tsx\" --file \"src/app/api/invoices/[id]/route.ts\" 2>&1 | Select-Object -First 40)"
     ]
   }
 }

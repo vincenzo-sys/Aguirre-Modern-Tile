@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, ExternalLink, CreditCard, FileText, RefreshCw, XCircle } from 'lucide-react'
+import { ArrowLeft, Send, ExternalLink, CreditCard, FileText, RefreshCw, XCircle, Pencil, Plus, Trash2 } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { toast } from '@/components/Toast'
 import { getDemoInvoice } from '@/lib/demo'
@@ -12,6 +12,8 @@ import type { InvoiceWithJob, InvoiceLineItem } from '@/lib/supabase/types'
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
+const emptyLine: InvoiceLineItem = { description: '', quantity: 1, unit_price: 0, amount: 0, type: 'service', unit: '' }
 
 export default function InvoiceDetailPage() {
   const params = useParams()
@@ -23,6 +25,9 @@ export default function InvoiceDetailPage() {
   const [creatingDraft, setCreatingDraft] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [editingItems, setEditingItems] = useState(false)
+  const [draftItems, setDraftItems] = useState<InvoiceLineItem[]>([])
+  const [savingItems, setSavingItems] = useState(false)
   const [stripeInfo, setStripeInfo] = useState<{
     hosted_invoice_url?: string | null
     invoice_pdf?: string | null
@@ -285,6 +290,91 @@ export default function InvoiceDetailPage() {
     setVoiding(false)
   }
 
+  function startEditItems() {
+    // Seed a working copy so existing items are never mutated until Save.
+    setDraftItems((invoice?.line_items ?? []).map((l) => ({ ...l })))
+    setEditingItems(true)
+  }
+
+  function cancelEditItems() {
+    setEditingItems(false)
+    setDraftItems([])
+  }
+
+  function updateDraftLine(index: number, field: keyof InvoiceLineItem, value: string | number) {
+    setDraftItems((prev) => {
+      const next = [...prev]
+      const line = { ...next[index] }
+      if (field === 'description') {
+        line.description = value as string
+      } else if (field === 'type') {
+        line.type = value as 'product' | 'service'
+      } else if (field === 'unit') {
+        line.unit = value as string
+      } else {
+        const num = typeof value === 'string' ? parseFloat(value) || 0 : value
+        if (field === 'quantity') line.quantity = num
+        if (field === 'unit_price') line.unit_price = num
+      }
+      line.amount = line.quantity * line.unit_price
+      next[index] = line
+      return next
+    })
+  }
+
+  function addDraftLine() {
+    setDraftItems((prev) => [...prev, { ...emptyLine }])
+  }
+
+  function removeDraftLine(index: number) {
+    setDraftItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function handleSaveItems() {
+    // Drop blank rows, then make sure something real remains.
+    const cleaned = draftItems.filter((l) => l.description.trim() !== '')
+    if (cleaned.length === 0) {
+      toast('Add at least one line item with a description', 'error')
+      return
+    }
+    const total = cleaned.reduce((sum, l) => sum + l.amount, 0)
+    if (total <= 0) {
+      toast('Invoice total must be greater than $0', 'error')
+      return
+    }
+
+    if (isDemoMode) {
+      toast('Demo mode: line items would be saved. Connect Supabase to update real data.')
+      return
+    }
+
+    setSavingItems(true)
+
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_items: cleaned }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save line items')
+      }
+
+      setInvoice((prev) => prev ? { ...prev, line_items: data.line_items, amount: data.amount } : prev)
+      setEditingItems(false)
+      setDraftItems([])
+      toast('Line items updated')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save line items'
+      toast(message, 'error')
+    }
+
+    setSavingItems(false)
+  }
+
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading invoice...</div>
   }
@@ -302,6 +392,12 @@ export default function InvoiceDetailPage() {
 
   const hasStripe = !!invoice.stripe_invoice_id
   const anyLoading = updating || sendingStripe || creatingDraft || syncing || voiding
+  // Line items can only be edited while the invoice is still a local draft with
+  // no Stripe copy — once pushed to Stripe or sent, editing here would desync it.
+  const canEditItems = invoice.status === 'draft' && !hasStripe
+  const draftTotal = draftItems.reduce((sum, l) => sum + l.amount, 0)
+  const inputClass =
+    'block w-full rounded-md border border-gray-300 px-2 py-1.5 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm'
 
   return (
     <div className="max-w-3xl">
@@ -500,7 +596,130 @@ export default function InvoiceDetailPage() {
         )}
       </div>
 
-      {/* Line Items */}
+      {/* Line Items header + edit toggle */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Line Items</h2>
+        {canEditItems && !editingItems && (
+          <button
+            onClick={startEditItems}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit / Add Scope
+          </button>
+        )}
+      </div>
+
+      {/* Line Items — editable */}
+      {editingItems ? (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="space-y-3">
+            {draftItems.map((line, i) => (
+              <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-4">
+                  {i === 0 && <label className="text-xs text-gray-500">Description</label>}
+                  <input
+                    type="text"
+                    value={line.description}
+                    onChange={(e) => updateDraftLine(i, 'description', e.target.value)}
+                    className={inputClass}
+                    placeholder="Description"
+                  />
+                </div>
+                <div className="col-span-2">
+                  {i === 0 && <label className="text-xs text-gray-500">Type</label>}
+                  <select
+                    value={line.type || 'service'}
+                    onChange={(e) => updateDraftLine(i, 'type', e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="service">Labor</option>
+                    <option value="product">Material</option>
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  {i === 0 && <label className="text-xs text-gray-500">Qty</label>}
+                  <input
+                    type="number"
+                    min="1"
+                    value={line.quantity}
+                    onChange={(e) => updateDraftLine(i, 'quantity', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="col-span-1">
+                  {i === 0 && <label className="text-xs text-gray-500">Unit</label>}
+                  <input
+                    type="text"
+                    value={line.unit || ''}
+                    onChange={(e) => updateDraftLine(i, 'unit', e.target.value)}
+                    className={inputClass}
+                    placeholder="hrs"
+                  />
+                </div>
+                <div className="col-span-2">
+                  {i === 0 && <label className="text-xs text-gray-500">Unit Price</label>}
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={line.unit_price || ''}
+                    onChange={(e) => updateDraftLine(i, 'unit_price', e.target.value)}
+                    className={inputClass}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="col-span-1">
+                  {i === 0 && <label className="text-xs text-gray-500">Amount</label>}
+                  <p className="px-1 py-1.5 text-sm font-medium text-gray-900 truncate">{fmt.format(line.amount)}</p>
+                </div>
+                <div className="col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => removeDraftLine(i)}
+                    className="p-2 text-gray-400 hover:text-red-500"
+                    title="Remove line"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={addDraftLine}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
+          >
+            <Plus className="w-4 h-4" />
+            Add Line Item
+          </button>
+
+          <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveItems}
+                disabled={savingItems}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50"
+              >
+                {savingItems ? 'Saving...' : 'Save Line Items'}
+              </button>
+              <button
+                onClick={cancelEditItems}
+                disabled={savingItems}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-500">New Total</p>
+              <p className="text-xl font-bold text-gray-900">{fmt.format(draftTotal)}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -548,6 +767,7 @@ export default function InvoiceDetailPage() {
           </tfoot>
         </table>
       </div>
+      )}
 
       {/* Meta */}
       <div className="mt-6 text-xs text-gray-400 space-y-1">

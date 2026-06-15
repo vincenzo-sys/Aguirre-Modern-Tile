@@ -31,24 +31,50 @@ export async function PATCH(
     const { id } = await params
     const supabase = await getSupabase()
     const body = await req.json()
-    const { status } = body
+    const { status, line_items } = body
 
-    const validStatuses = ['draft', 'sent', 'paid', 'overdue', 'void']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    const updates: Record<string, unknown> = {}
+
+    if (status !== undefined) {
+      const validStatuses = ['draft', 'sent', 'paid', 'overdue', 'void']
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+      }
+      updates.status = status
+    }
+
+    // Allow appending/editing line items. Recompute the amount server-side so
+    // the stored total always matches the items (never trust a client total).
+    if (line_items !== undefined) {
+      if (!Array.isArray(line_items) || line_items.length === 0) {
+        return NextResponse.json(
+          { error: 'line_items must be a non-empty array' },
+          { status: 400 }
+        )
+      }
+      updates.line_items = line_items
+      updates.amount = line_items.reduce(
+        (sum: number, item: { amount: number }) => sum + Number(item.amount || 0),
+        0
+      )
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
 
     const { data: invoice, error } = await supabase
       .from('invoices')
-      .update({ status })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
 
     if (error) throw error
 
-    // If marking as paid or void, recalculate job financial totals
-    if ((status === 'paid' || status === 'void') && invoice) {
+    // Recalculate the job's financial totals whenever the invoiced amount could
+    // have changed: a status flip to paid/void, or an edit to the line items.
+    if (invoice && (line_items !== undefined || status === 'paid' || status === 'void')) {
       const { data: jobInvoices } = await supabase
         .from('invoices')
         .select('amount, status')
@@ -69,7 +95,7 @@ export async function PATCH(
         .from('jobs')
         .update({
           amount_paid: totalPaid,
-          ...(status === 'void' ? { amount_invoiced: totalInvoiced } : {}),
+          amount_invoiced: totalInvoiced,
         })
         .eq('id', invoice.job_id)
     }

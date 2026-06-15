@@ -8,7 +8,7 @@ export interface QueueItem {
   serviceType: ServiceType
   slug: string
   articleType: 'hub' | 'pillar' | 'spoke'
-  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to'
+  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | 'case-study'
   parentSlug?: string
   hubSlug?: string
   searchVolume?: number

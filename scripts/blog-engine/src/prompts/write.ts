@@ -59,7 +59,7 @@ function getArticleTypeInstructions(item: QueueItem): string {
   }
 }
 
-type ArticleStyle = 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to'
+type ArticleStyle = 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | 'case-study'
 
 function getStyleInstructions(style: ArticleStyle, item: QueueItem): string {
   switch (style) {
@@ -103,6 +103,17 @@ function getStyleInstructions(style: ArticleStyle, item: QueueItem): string {
 - Each step should have clear, actionable instructions with specific measurements, times, and techniques.
 - Include warnings about common mistakes using <strong> emphasis.
 - End with a "When to Call a Professional" section — be honest about DIY limits.`
+
+    case 'case-study':
+      return `**Article Style: CASE STUDY (project showcase)**
+- This is a real completed-project showcase. Write it as a first-person account from Aguirre Modern Tile ("we", "our crew") documenting one actual job start to finish.
+- Open with a 1-2 sentence summary of the project (location, room, headline result) so it's extractable on its own — do NOT include a "Key Takeaways" section.
+- Follow the scope -> problem -> process -> result -> cost arc. Use statement headings ("What the Homeowner Wanted", "The Problems We Found", "The Build, Day by Day", "The Result", "What It Cost and How Long It Took").
+- Be concrete and specific: real materials and brands (Schluter KERDI, DITRA-HEAT, Mapei, Calacatta-look porcelain), the actual layout, the real timeline in days, and an honest "what went wrong and how we solved it" moment. Specificity is the E-E-A-T signal.
+- Include one cost-and-timeline section with a clear total range and day count (based on current Greater Boston rates).
+- Reference before/after photos in prose where they belong (the engine resolves <img> placement markers to real images). Place an <img> marker at the "Before" and "Result" sections.
+- Use lists sparingly — only for genuinely distinct items (materials used, scope of work). Prefer flowing prose, like a contractor telling the story of the job.
+- Close with a CTA inviting homeowners with a similar project to get an estimate.`
 
     case 'standard':
     default:
@@ -228,10 +239,10 @@ GOOD: "Subway tile is the most affordable backsplash option at $3-6 per square f
 
 **AI Search & Featured Snippet Optimization (CRITICAL — follow these closely):**
 16. OPENING ANSWER: The very first paragraph must be a concise, direct answer to the main query implied by the title. It should be extractable on its own — if someone only read this one paragraph, they'd get the core answer. AI search engines pull this as the primary citation.
-17. KEY TAKEAWAYS: For standard, data-heavy, and comparison styles, immediately after the opening answer include a "Key Takeaways" section using a <ul> with 4-6 bullet points summarizing the most important facts. Bold the lead phrase of each bullet with <strong>. Skip this for narrative style (weave facts into prose instead), listicle style (the numbered format serves this purpose), and how-to style (the steps serve this purpose).
+17. KEY TAKEAWAYS: For standard, data-heavy, and comparison styles, immediately after the opening answer include a "Key Takeaways" section using a <ul> with 4-6 bullet points summarizing the most important facts. Bold the lead phrase of each bullet with <strong>. Skip this for narrative style (weave facts into prose instead), listicle style (the numbered format serves this purpose), how-to style (the steps serve this purpose), and case-study style (tell the project story in prose instead).
 18. USE LISTS NATURALLY: Include <ul> or <ol> lists in most sections where they fit — options, steps, tips, comparisons, pros/cons. Don't force a list into a section that reads better as narrative, but when you're presenting multiple items, always use a list rather than burying them in paragraph form.
 19. ANSWER-FIRST SECTIONS: Begin each H2 section with a concise 1-2 sentence direct answer before elaborating. AI systems extract the first clear statement after a heading.
-20. QUESTION HEADINGS: For standard and data-heavy styles, frame H2s as questions where natural (e.g., "How Much Does Bathroom Tile Cost?" not "Bathroom Tile Costs"). For listicle and how-to styles, keep numbered/step headings as statements. For narrative style, prefer statement headings. This rule is OVERRIDDEN by the style instructions above when they conflict.
+20. QUESTION HEADINGS: For standard and data-heavy styles, frame H2s as questions where natural (e.g., "How Much Does Bathroom Tile Cost?" not "Bathroom Tile Costs"). For listicle and how-to styles, keep numbered/step headings as statements. For narrative and case-study styles, prefer statement headings. This rule is OVERRIDDEN by the style instructions above when they conflict.
 21. DEFINITION PATTERN: When genuinely introducing a new concept the reader may not know, use the "What is X? X is..." pattern as an H3. Don't overuse this — it's for terms that actually need defining (e.g., "thin-set mortar", "backer board", "waterproofing membrane"), not for obvious concepts.
 22. COMPARISONS: Include at least one comparison section using a structured list (e.g., "<h3>Porcelain vs Ceramic Tile</h3>" with a <ul> comparing key differences side by side).
 23. SOURCE ATTRIBUTION: When citing facts you're confident about, attribute them to real sources (e.g., "according to TCNA guidelines", "per HomeAdvisor data", "based on current material prices"). NEVER fabricate a source or attribution — if you're not sure who published a fact, use softer language like "homeowners typically spend" or "based on current Boston-area rates" instead.

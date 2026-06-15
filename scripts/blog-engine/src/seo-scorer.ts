@@ -33,7 +33,7 @@ interface ScorerInput {
   excerpt: string
   faqItems: { question: string; answer: string }[]
   articleType: 'hub' | 'pillar' | 'spoke'
-  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to'
+  articleStyle?: 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | 'case-study'
   targetWords: number
   hasImage: boolean
   imageAlt: string | null
@@ -881,6 +881,29 @@ function scoreStyleAdherence(input: ScorerInput, root: HTMLElement, fullText: st
         points: hasProTip ? 2 : 0,
         maxPoints: 2,
         detail: hasProTip ? 'Contains Pro Tip callout(s)' : 'Missing Pro Tip callouts',
+      })
+      break
+    }
+    case 'case-study': {
+      // Before/after proof — either an <img> marker or explicit before/after language.
+      const hasBeforeAfter = /<img/i.test(input.html) || /\bbefore\b/i.test(fullText) && /\bafter\b/i.test(fullText)
+      checks.push({
+        name: 'Case-study: before/after proof',
+        passed: hasBeforeAfter,
+        points: hasBeforeAfter ? 2 : 0,
+        maxPoints: 2,
+        detail: hasBeforeAfter ? 'Contains before/after photo marker or framing' : 'Missing before/after proof (img marker or before/after framing)',
+      })
+      // Concrete cost + timeline — the conversion-critical specifics.
+      const hasCost = /\$\d/.test(fullText)
+      const hasTimeline = /\b\d+\s*(day|days|week|weeks)\b/i.test(fullText)
+      const costTimelinePass = hasCost && hasTimeline
+      checks.push({
+        name: 'Case-study: cost & timeline',
+        passed: costTimelinePass,
+        points: costTimelinePass ? 3 : (hasCost || hasTimeline ? 1 : 0),
+        maxPoints: 3,
+        detail: `cost=${hasCost ? 'yes' : 'no'}, timeline=${hasTimeline ? 'yes' : 'no'} (target: both)`,
       })
       break
     }

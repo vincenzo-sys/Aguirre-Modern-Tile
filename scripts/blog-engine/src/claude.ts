@@ -511,7 +511,7 @@ export async function editArticle(
 ): Promise<EditResult> {
   console.log(failedChecks ? '  Step 3b/3: Re-editing with failed checks...' : '  Step 3/3: Editing & QA...')
   setCurrentStep(failedChecks ? 'revision' : 'edit')
-  const prompt = buildEditPrompt(html, keyword, articleType, articleStyle as 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | undefined, publishedPosts, failedChecks, analysis)
+  const prompt = buildEditPrompt(html, keyword, articleType, articleStyle as 'standard' | 'narrative' | 'listicle' | 'data-heavy' | 'comparison' | 'how-to' | 'case-study' | undefined, publishedPosts, failedChecks, analysis)
   const systemBlocks: Anthropic.MessageCreateParams['system'] = [
     {
       type: 'text' as const,

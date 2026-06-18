@@ -15,6 +15,7 @@ import {
   MapPin,
   Settings,
   ImageIcon,
+  HardHat,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -59,6 +60,7 @@ export const ownerSections: NavSection[] = [
       { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays, pinnedToTabBar: true },
       { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList, pinnedToTabBar: true },
       { label: 'Materials', href: '/dashboard/materials', icon: Package },
+      { label: 'Crew', href: '/dashboard/settings/crew', icon: HardHat },
       { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
     ],
   },

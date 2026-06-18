@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import PhotoUpload from '@/components/dashboard/PhotoUpload'
 import { toast } from '@/components/Toast'
+import { logError } from '@/lib/logger'
 import { demoTeamMembers } from '@/lib/demo'
 import type { Profile, JobTemplate } from '@/lib/supabase/types'
 
@@ -227,7 +228,7 @@ function NewJobForm() {
             .upload(storagePath, file)
 
           if (uploadError) {
-            console.error('Photo upload failed:', uploadError)
+            logError('Photo upload failed:', uploadError)
             continue
           }
 

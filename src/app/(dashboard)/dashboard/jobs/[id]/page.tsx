@@ -10,6 +10,7 @@ import JobLineItems from '@/components/dashboard/JobLineItems'
 import EstimateInvoiceCards from '@/components/dashboard/EstimateInvoiceCards'
 import JobEditForm from '@/components/dashboard/JobEditForm'
 import CrewLog from '@/components/dashboard/CrewLog'
+import LaborLog from '@/components/dashboard/LaborLog'
 import UploadJobPhotos from '@/components/dashboard/UploadJobPhotos'
 import DepositReceivedAction from '@/components/dashboard/DepositReceivedAction'
 import EstimateShareLink from '@/components/dashboard/EstimateShareLink'
@@ -22,7 +23,7 @@ import DeleteJobButton from '@/components/dashboard/DeleteJobButton'
 import FinalPaymentButton from '@/components/dashboard/FinalPaymentButton'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
-import type { Job, JobPhoto, Profile, Invoice, Customer } from '@/lib/supabase/types'
+import type { Job, JobPhoto, Profile, Invoice, Customer, CrewMember, LaborEntryWithMember } from '@/lib/supabase/types'
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -56,6 +57,8 @@ export default async function JobDetailPage({
   let profile: Profile = demoProfile
   let invoices: Invoice[] = []
   let team: Profile[] = []
+  let crewMembers: CrewMember[] = []
+  let laborEntries: LaborEntryWithMember[] = []
 
   const useDemo = await shouldUseDemoData()
 
@@ -134,6 +137,20 @@ export default async function JobDetailPage({
         .eq('is_active', true)
         .order('full_name')
       team = (teamData ?? []) as Profile[]
+
+      const { data: crewData } = await supabase
+        .from('crew_members')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name')
+      crewMembers = (crewData ?? []) as CrewMember[]
+
+      const { data: laborData } = await supabase
+        .from('labor_entries')
+        .select('*, crew_member:crew_members(*)')
+        .eq('job_id', id)
+        .order('work_date', { ascending: true })
+      laborEntries = (laborData ?? []) as LaborEntryWithMember[]
 
       const { data: photos } = await supabase
         .from('job_photos')
@@ -464,6 +481,19 @@ export default async function JobDetailPage({
           authorName={profile.full_name?.split(' ')[0] || 'Crew'}
         />
       </div>
+
+      {/* Labor hours — Vince/Christian log crew time here; crew can also log
+          via the work-order link. Cost totals are owner-only. */}
+      {!useDemo && (
+        <div className="mb-6">
+          <LaborLog
+            jobId={job.id}
+            crewMembers={crewMembers}
+            initialEntries={laborEntries}
+            isOwner={isOwner}
+          />
+        </div>
+      )}
 
       {/* Photos — Before */}
       <PhotoSection

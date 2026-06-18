@@ -80,6 +80,12 @@ export interface Job {
   estimated_cost: number | null
   margin_percent?: number | null
   actual_cost: number | null
+  // Job-cost actuals split (migration 039). actual_labor_cost is maintained by
+  // the labor API from logged hours; actual_materials_cost holds everything
+  // non-labor; actual_cost is rewritten as the sum of the two. Optional in TS
+  // since legacy rows pre-date the migration.
+  actual_labor_cost?: number | null
+  actual_materials_cost?: number | null
   amount_invoiced: number | null
   amount_paid: number | null
   line_items: JobLineItem[]
@@ -151,6 +157,53 @@ export interface CalendarEvent {
   created_by: string | null
   created_at: string
   updated_at: string
+}
+
+// Crew & labor (migration 039)
+export interface CrewMember {
+  id: string
+  full_name: string
+  nickname: string | null
+  phone: string | null
+  role: string
+  day_rate: number
+  hour_rate: number | null
+  is_active: boolean
+  profile_id: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CrewAssignment {
+  id: string
+  job_id: string
+  crew_member_id: string
+  work_date: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface CrewAssignmentWithMember extends CrewAssignment {
+  crew_member?: CrewMember | null
+}
+
+export interface LaborEntry {
+  id: string
+  job_id: string
+  crew_member_id: string
+  work_date: string
+  hours: number
+  rate_applied: number
+  labor_cost: number
+  note: string | null
+  logged_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LaborEntryWithMember extends LaborEntry {
+  crew_member?: CrewMember | null
 }
 
 export interface JobPhoto {
@@ -348,6 +401,21 @@ export interface Database {
         Row: CalendarEvent
         Insert: Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>>
+      }
+      crew_members: {
+        Row: CrewMember
+        Insert: Omit<CrewMember, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<CrewMember, 'id' | 'created_at' | 'updated_at'>>
+      }
+      crew_assignments: {
+        Row: CrewAssignment
+        Insert: Omit<CrewAssignment, 'id' | 'created_at'>
+        Update: Partial<Omit<CrewAssignment, 'id' | 'created_at'>>
+      }
+      labor_entries: {
+        Row: LaborEntry
+        Insert: Omit<LaborEntry, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<LaborEntry, 'id' | 'created_at' | 'updated_at'>>
       }
     }
   }

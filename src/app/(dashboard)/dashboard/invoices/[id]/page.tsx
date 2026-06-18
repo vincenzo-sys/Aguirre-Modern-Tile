@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, Send, ExternalLink, CreditCard, FileText, RefreshCw, XCircle, Pencil, Plus, Trash2 } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { getDemoInvoice } from '@/lib/demo'
 import type { InvoiceWithJob, InvoiceLineItem } from '@/lib/supabase/types'
 
@@ -264,6 +265,13 @@ export default function InvoiceDetailPage() {
       toast('Demo mode: Connect Supabase and configure Stripe to void invoices.', 'error')
       return
     }
+
+    if (!(await confirmDialog({
+      title: 'Void this invoice?',
+      message: 'Voiding cancels the invoice in Stripe and the customer can no longer pay it. This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Void invoice',
+    }))) return
 
     setVoiding(true)
 

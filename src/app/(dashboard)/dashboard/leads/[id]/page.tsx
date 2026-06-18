@@ -9,6 +9,8 @@ import {
   ExternalLink, FileText, Trash2, X, MessageSquare, Star, ThumbsDown,
 } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { logError } from '@/lib/logger'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
@@ -357,7 +359,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
       const noun = data.uploaded === 1 ? 'photo' : 'photos'
       toast(`Uploaded ${data.uploaded} ${noun}${data.failed ? ` (${data.failed} failed)` : ''}`, 'success')
     } catch (err) {
-      console.error('Photo upload failed:', err)
+      logError('Photo upload failed:', err)
       toast(err instanceof Error ? err.message : 'Upload failed', 'error')
     } finally {
       setUploadingPhotos(false)
@@ -367,7 +369,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   async function deletePhoto(photoId: string) {
     const base = photoApiBase()
     if (!base) return
-    if (!confirm('Delete this photo?')) return
+    if (!(await confirmDialog({ title: 'Delete this photo?', tone: 'danger', confirmLabel: 'Delete' }))) return
     setDeletingPhotoId(photoId)
     const prev = photos
     setPhotos((p) => p.filter((x) => x.id !== photoId))
@@ -387,7 +389,11 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
 
   async function sendToJobs() {
     if (!job) return
-    if (!confirm('Send to Jobs? This locks in the estimate as a job and moves it to the operations workflow. You can revert from the Jobs page if needed.')) {
+    if (!(await confirmDialog({
+      title: 'Send to Jobs?',
+      message: 'This locks in the estimate as a job and moves it to the operations workflow. You can revert from the Jobs page if needed.',
+      confirmLabel: 'Send to Jobs',
+    }))) {
       return
     }
     setAdvancing(true)
@@ -633,12 +639,18 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
               dropdown, but a one-click button when a deal is dead. */}
           {job && job.status !== 'cancelled' && (
             <button
-              onClick={() => {
-                if (confirm('Cancel this lead? You can revert from the status dropdown.')) {
+              onClick={async () => {
+                if (await confirmDialog({
+                  title: 'Cancel this lead?',
+                  message: 'You can revert from the status dropdown.',
+                  tone: 'danger',
+                  confirmLabel: 'Cancel lead',
+                  cancelLabel: 'Keep',
+                })) {
                   changeJobStatus('cancelled')
                 }
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 border border-red-200"
+              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 rounded-md hover:bg-red-100 border border-red-200"
             >
               <X className="w-4 h-4" />
               Cancel

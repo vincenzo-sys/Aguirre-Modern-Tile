@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { demoJobs, demoProfile, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
-import type { Job, Profile, JobWithAssignee, JobStatus } from '@/lib/supabase/types'
+import type { Job, Profile, JobWithAssignee, JobStatus, CrewMember, CrewAssignment } from '@/lib/supabase/types'
 import ViewSwitcher from '@/components/dashboard/ViewSwitcher'
 import JobsFilterBar from '@/components/dashboard/JobsFilterBar'
 import { filterJobs } from '@/lib/filterJobs'
@@ -36,6 +36,8 @@ export default async function JobsPage({
   let profile: Profile = demoProfile
   let jobList: JobWithAssignee[] = []
   let team: Profile[] = []
+  let crewMembers: CrewMember[] = []
+  let crewAssignments: CrewAssignment[] = []
 
   const useDemo = await shouldUseDemoData()
 
@@ -105,6 +107,21 @@ export default async function JobsPage({
       .eq('is_active', true)
       .order('full_name')
     team = (teamData ?? []) as Profile[]
+
+    // Crew roster + assignments power the crew week grid. Assignments are
+    // small (job_id, crew_member_id, work_date); the grid filters by week
+    // client-side as you navigate.
+    const { data: crewData } = await supabase
+      .from('crew_members')
+      .select('*')
+      .eq('is_active', true)
+      .order('full_name')
+    crewMembers = (crewData ?? []) as CrewMember[]
+
+    const { data: assignData } = await supabase
+      .from('crew_assignments')
+      .select('*')
+    crewAssignments = (assignData ?? []) as CrewAssignment[]
     }
   }
 
@@ -159,7 +176,14 @@ export default async function JobsPage({
       {view === 'timeline' && <TimelineView jobs={filtered} team={team} />}
       {view === 'kanban' && <KanbanBoard initialJobs={filtered} isOwner={isOwner} profile={profile} />}
       {view === 'list' && <JobListView jobs={filtered} isOwner={isOwner} profile={profile} />}
-      {view === 'crew' && <CrewWeekView jobs={filtered} team={team} />}
+      {view === 'crew' && (
+        <CrewWeekView
+          jobs={filtered}
+          team={team}
+          crewMembers={crewMembers}
+          assignments={crewAssignments}
+        />
+      )}
       {!['calendar', 'timeline', 'kanban', 'list', 'crew'].includes(view) && (
         <TodayUpcomingJobs jobs={filtered} />
       )}

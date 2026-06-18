@@ -5,10 +5,16 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
+import { SkeletonCards } from '@/components/ui/Skeleton'
+import { logError } from '@/lib/logger'
 import { getAllDemoInvoices } from '@/lib/demo'
 import type { InvoiceStatus, InvoiceWithJob } from '@/lib/supabase/types'
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+
+function fmtDate(d: string): string {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 const tabs: { label: string; value: InvoiceStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Draft', value: 'draft' },
@@ -41,7 +47,7 @@ export default function InvoicesPage() {
           setAllInvoices(data)
         }
       } catch (err) {
-        console.error('Failed to load invoices:', err)
+        logError('Failed to load invoices:', err)
       }
       setLoading(false)
     }
@@ -52,7 +58,11 @@ export default function InvoicesPage() {
   const filtered = activeTab === 'all' ? allInvoices : allInvoices.filter((inv) => inv.status === activeTab)
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading invoices...</div>
+    return (
+      <div className="pt-6">
+        <SkeletonCards count={6} />
+      </div>
+    )
   }
 
   return (
@@ -79,12 +89,12 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1 w-full sm:w-fit overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            className={`min-h-[44px] px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
               activeTab === tab.value
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
@@ -95,7 +105,35 @@ export default function InvoicesPage() {
         ))}
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Mobile: stacked cards (a desktop table is unreadable on a phone). */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <p className="text-center text-sm text-gray-500 py-8">No invoices found.</p>
+        ) : (
+          filtered.map((inv) => (
+            <Link
+              key={inv.id}
+              href={`/dashboard/invoices/${inv.id}`}
+              className="block bg-white rounded-xl border border-gray-200 shadow-sm p-4 active:bg-gray-50"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-mono text-primary-600">{inv.invoice_number}</span>
+                <InvoiceStatusBadge status={inv.status} />
+              </div>
+              <p className="text-sm text-gray-900 mt-1 truncate">
+                {inv.job ? `#${inv.job.job_number} ${inv.job.title}` : '—'}
+              </p>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-base font-semibold text-gray-900">{fmt.format(inv.amount)}</span>
+                <span className="text-xs text-gray-500">Due {fmtDate(inv.due_date)}</span>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: full table. */}
+      <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>

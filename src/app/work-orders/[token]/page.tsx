@@ -4,6 +4,7 @@ import {
   Check, Minus, Wrench, Navigation, MessageSquare,
 } from 'lucide-react'
 import MaterialsChecklist, { type Material } from '@/components/work-order/MaterialsChecklist'
+import LogHours from '@/components/work-order/LogHours'
 
 type WorkOrder = {
   title: string
@@ -231,6 +232,10 @@ export default async function WorkOrderPage({
         {/* Materials — no prices. Tap to check off while loading the truck;
             checks persist per-job on the crew member's phone. */}
         <MaterialsChecklist materials={wo.materials} token={token} />
+
+        {/* Crew self-logs hours here — no login, no money shown. Writes to
+            labor_entries via the token-gated public route. */}
+        <LogHours token={token} />
 
         {/* What the customer provides */}
         {wo.customer_provides && (

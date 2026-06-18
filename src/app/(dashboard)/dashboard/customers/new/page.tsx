@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { logError } from '@/lib/logger'
 import ReferrerPicker from '@/components/dashboard/ReferrerPicker'
 
 export default function NewCustomerPage() {
@@ -51,7 +52,7 @@ export default function NewCustomerPage() {
       toast('Customer created', 'success')
       router.push(`/dashboard/customers/${customer.id}`)
     } catch (err) {
-      console.error(err)
+      logError('Create customer failed', err)
       toast(err instanceof Error ? err.message : 'Failed to create customer', 'error')
     } finally {
       setSaving(false)

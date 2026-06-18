@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import ToastContainer from '@/components/Toast'
+import ConfirmDialogHost from '@/components/ui/ConfirmDialog'
 import './globals.css'
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
@@ -51,6 +52,7 @@ export default function RootLayout({
       <body className={inter.className}>
         {children}
         <ToastContainer />
+        <ConfirmDialogHost />
         {GA_MEASUREMENT_ID && (
           <>
             <Script

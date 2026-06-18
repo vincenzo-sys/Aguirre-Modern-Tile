@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireApiAuth } from '@/lib/apiAuth'
+import { requireApiOwner } from '@/lib/apiAuth'
 
 // PATCH /api/crew/[id] — edit a crew member's rate/role/contact or deactivate.
 
@@ -29,7 +29,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const unauthorized = await requireApiAuth(request)
+  const unauthorized = await requireApiOwner(request)
   if (unauthorized) return unauthorized
 
   const { id } = await params

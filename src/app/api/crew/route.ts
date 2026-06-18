@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireApiAuth } from '@/lib/apiAuth'
+import { requireApiAuth, requireApiOwner } from '@/lib/apiAuth'
 
 // Crew roster (migration 039). GET lists crew; POST adds one.
 // Crew members are NOT dashboard logins — see migration 039 for why.
@@ -19,7 +19,14 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)
-  const includeInactive = searchParams.get('all') === '1'
+  // Active crew are team-readable (the LaborLog / crew week view need them).
+  // The `all=1` expansion also returns INACTIVE crew + phone/notes, so it's
+  // gated to owners — non-owners silently get the active-only list.
+  let includeInactive = false
+  if (searchParams.get('all') === '1') {
+    const notOwner = await requireApiOwner(request)
+    includeInactive = notOwner === null
+  }
 
   const supabaseAdmin = getSupabaseAdmin()
   let query = supabaseAdmin
@@ -39,7 +46,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const unauthorized = await requireApiAuth(request)
+  const unauthorized = await requireApiOwner(request)
   if (unauthorized) return unauthorized
 
   const supabaseAdmin = getSupabaseAdmin()

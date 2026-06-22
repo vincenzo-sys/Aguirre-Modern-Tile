@@ -29,6 +29,7 @@ export default function PhotoUploadForm() {
   }, [])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -120,6 +121,7 @@ export default function PhotoUploadForm() {
           const quoteData = await quoteRes.clone().json()
           const quoteId = quoteData?.id as string | undefined
           if (quoteId) {
+            setUploadingPhotos(true)
             const results = await uploadQuotePhotos(quoteId, files)
             const failed = results.filter((r) => !r.ok)
             if (failed.length > 0) {
@@ -133,9 +135,11 @@ export default function PhotoUploadForm() {
         }
       }
 
+      setUploadingPhotos(false)
       setIsSubmitting(false)
       setIsSubmitted(true)
     } catch {
+      setUploadingPhotos(false)
       setIsSubmitting(false)
       setSubmitError('Something went wrong. Please call us at (617) 766-1259.')
     }
@@ -307,7 +311,7 @@ export default function PhotoUploadForm() {
         {isSubmitting ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            Sending...
+            {uploadingPhotos ? 'Uploading photos...' : 'Sending...'}
           </>
         ) : (
           <>

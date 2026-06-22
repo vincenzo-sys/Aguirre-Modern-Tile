@@ -753,7 +753,7 @@ export default async function EstimatePage({
 
       {/* Sticky mobile CTA */}
       {!depositSuccess && (
-        <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
+        <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
           <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto">
             <div className="flex-shrink-0">
               <div className="text-[11px] text-gray-500 leading-tight">10% deposit</div>

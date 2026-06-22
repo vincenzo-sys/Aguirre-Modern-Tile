@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation'
 import {
-  MapPin, Phone, Calendar, ClipboardList, User, ImageIcon,
+  MapPin, Phone, Calendar, ClipboardList, User,
   Check, Minus, Wrench, Navigation, MessageSquare,
 } from 'lucide-react'
 import MaterialsChecklist, { type Material } from '@/components/work-order/MaterialsChecklist'
 import LogHours from '@/components/work-order/LogHours'
+import PhotoGallery from '@/components/work-order/PhotoGallery'
+import WorkOrderJumpNav from '@/components/work-order/WorkOrderJumpNav'
 
 type WorkOrder = {
   title: string
@@ -59,6 +61,8 @@ export default async function WorkOrderPage({
     ? `https://maps.google.com/?q=${encodeURIComponent(wo.client_address)}`
     : null
 
+  const hasScope = !!(wo.scope_of_work || wo.included.length > 0 || wo.not_included.length > 0)
+
   // Pre-fill the text so Vince knows which job the crew is asking about.
   const smsHref = `sms:${COMPANY_PHONE_TEL}?&body=${encodeURIComponent(
     `Hi Vince — question about the ${wo.client_name} job:\n\n`
@@ -80,10 +84,17 @@ export default async function WorkOrderPage({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5 pb-28">
+      {/* Sticky jump bar — skip a long materials list to reach Hours / Scope */}
+      <WorkOrderJumpNav
+        hasSchedule={!!wo.scheduled_start}
+        hasPhotos={wo.photos.length > 0}
+        hasScope={hasScope}
+      />
+
+      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5 pb-24">
         {/* Schedule — top of the sheet so the crew sees WHEN at a glance */}
         {wo.scheduled_start && (
-          <section className="rounded-xl border border-primary-200 bg-primary-50 p-4">
+          <section id="schedule" className="rounded-xl border border-primary-200 bg-primary-50 p-4 scroll-mt-16">
             <div className="flex items-center gap-3">
               <Calendar className="w-5 h-5 text-primary-700 flex-shrink-0" />
               <div>
@@ -102,9 +113,9 @@ export default async function WorkOrderPage({
         )}
 
         {/* Customer & site — tap-to-call + tap-to-navigate for the field */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <User className="w-4 h-4 text-gray-400" />
+        <section id="site" className="bg-white rounded-xl border border-gray-200 p-5 scroll-mt-16">
+          <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <User className="w-4 h-4 text-gray-500" />
             Customer &amp; site
           </h2>
           <p className="text-lg font-semibold text-gray-900">{wo.client_name}</p>
@@ -130,7 +141,7 @@ export default async function WorkOrderPage({
                   href={mapsHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700"
+                  className="mt-2 inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700"
                 >
                   <Navigation className="w-4 h-4" />
                   Open in Maps
@@ -157,43 +168,15 @@ export default async function WorkOrderPage({
           )}
         </section>
 
-        {/* Site photos — intake shots of the existing space + any jobsite
-            reference photos, so the crew knows what they're walking into.
-            Tapping opens the full-size image (zoomable on a phone). */}
-        {wo.photos.length > 0 && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-gray-400" />
-              Site photos ({wo.photos.length})
-            </h2>
-            <div className="grid grid-cols-3 gap-2">
-              {wo.photos.map((photo, i) => (
-                <a
-                  key={i}
-                  href={photo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block aspect-square overflow-hidden rounded-lg bg-gray-100 border border-gray-200"
-                  title={photo.caption ?? 'Site photo'}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photo.url}
-                    alt={photo.caption ?? 'Site photo'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Site photos — intake shots + jobsite reference photos. Tapping opens
+            an in-page, swipeable, zoomable lightbox (no new tab). */}
+        <PhotoGallery photos={wo.photos} />
 
         {/* Scope of work */}
-        {(wo.scope_of_work || wo.included.length > 0 || wo.not_included.length > 0) && (
-          <section className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-gray-400" />
+        {hasScope && (
+          <section id="scope" className="bg-white rounded-xl border border-gray-200 p-5 scroll-mt-16">
+            <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-gray-500" />
               Scope of work
             </h2>
             {wo.scope_of_work && (
@@ -235,7 +218,9 @@ export default async function WorkOrderPage({
 
         {/* Crew self-logs hours here — no login, no money shown. Writes to
             labor_entries via the token-gated public route. */}
-        <LogHours token={token} />
+        <div id="hours" className="scroll-mt-16">
+          <LogHours token={token} />
+        </div>
 
         {/* What the customer provides */}
         {wo.customer_provides && (
@@ -258,46 +243,28 @@ export default async function WorkOrderPage({
           </section>
         )}
 
-        {/* Reach Vince — escape hatch if something's off on site. The crew
-            knows Vince, not "the office"; text pre-fills with the job. */}
-        <div className="pt-2">
-          <p className="text-center text-xs text-gray-500 mb-3">
-            Questions on site? Vince picks up.
-          </p>
-          <div className="flex items-stretch gap-2">
-            <a
-              href={`tel:${COMPANY_PHONE_TEL}`}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 active:scale-95 transition"
-            >
-              <Phone className="w-4 h-4" />
-              Call Vince
-            </a>
-            <a
-              href={smsHref}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Text Vince
-            </a>
-          </div>
-          <p className="text-center text-[11px] text-gray-400 mt-2">{COMPANY_PHONE}</p>
-        </div>
+        {/* Questions on site? The crew knows Vince, not "the office". The
+            actual Call/Text buttons live in the sticky bar below, always one
+            tap away. */}
+        <p className="text-center text-xs text-gray-500 pt-2">
+          Questions on site? Vince picks up — {COMPANY_PHONE}
+        </p>
       </main>
 
       {/* Sticky contact bar — keeps Vince one tap away while scrolling a long
           material list. Plain links, so the page stays server-rendered. */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
         <div className="max-w-2xl mx-auto flex items-stretch gap-2">
           <a
             href={`tel:${COMPANY_PHONE_TEL}`}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
+            className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
           >
             <Phone className="w-4 h-4" />
             Call Vince
           </a>
           <a
             href={smsHref}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
+            className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-semibold active:scale-95 transition"
           >
             <MessageSquare className="w-4 h-4" />
             Text Vince

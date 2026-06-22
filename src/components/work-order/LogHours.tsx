@@ -32,6 +32,7 @@ export default function LogHours({ token }: { token: string }) {
   const [date, setDate] = useState(todayLocal())
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function load() {
     try {
@@ -53,20 +54,27 @@ export default function LogHours({ token }: { token: string }) {
 
   async function submit() {
     const h = Number(hours)
-    if (!crewId || !Number.isFinite(h) || h <= 0 || h > 24) return
+    if (!crewId) { setError('Pick who you are first.'); return }
+    if (!Number.isFinite(h) || h <= 0 || h > 24) { setError('Enter hours between 0 and 24.'); return }
     setSaving(true)
     setJustSaved(false)
+    setError(null)
     try {
       const res = await fetch(`/api/public/work-orders/${token}/labor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ crew_member_id: crewId, hours: h, work_date: date }),
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Save failed')
+      }
       setJustSaved(true)
       await load()
-    } catch {
-      // keep the form state so the crew can retry
+    } catch (err) {
+      // Surface it — the crew may be offline and need to know it didn't save.
+      // Form values are kept so they can retry.
+      setError(err instanceof Error ? err.message : "Couldn't save — check your signal and try again.")
     } finally {
       setSaving(false)
     }
@@ -84,7 +92,7 @@ export default function LogHours({ token }: { token: string }) {
       <div className="space-y-2">
         <select
           value={crewId}
-          onChange={(e) => { setCrewId(e.target.value); setJustSaved(false) }}
+          onChange={(e) => { setCrewId(e.target.value); setJustSaved(false); setError(null) }}
           disabled={saving}
           aria-label="Who are you?"
           className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -101,7 +109,7 @@ export default function LogHours({ token }: { token: string }) {
             max={24}
             step={0.5}
             value={hours}
-            onChange={(e) => { setHours(e.target.value); setJustSaved(false) }}
+            onChange={(e) => { setHours(e.target.value); setJustSaved(false); setError(null) }}
             disabled={saving}
             aria-label="Hours worked"
             className="w-24 min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -109,7 +117,7 @@ export default function LogHours({ token }: { token: string }) {
           <input
             type="date"
             value={date}
-            onChange={(e) => { setDate(e.target.value); setJustSaved(false) }}
+            onChange={(e) => { setDate(e.target.value); setJustSaved(false); setError(null) }}
             disabled={saving}
             aria-label="Work date"
             className="flex-1 min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -124,6 +132,11 @@ export default function LogHours({ token }: { token: string }) {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : justSaved ? <Check className="w-4 h-4" /> : null}
           {saving ? 'Saving…' : justSaved ? 'Saved' : 'Save my hours'}
         </button>
+        {error && (
+          <p className="text-sm text-red-600 font-medium text-center" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
       {entries.length > 0 && (

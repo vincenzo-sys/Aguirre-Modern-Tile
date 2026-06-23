@@ -177,6 +177,9 @@ export async function POST(req: NextRequest) {
       .update({
         stripe_invoice_id: finalizedInvoice.id,
         status: 'sent' as const,
+        // Cache the hosted pay URL so the customer-facing /invoices/[token]
+        // page can deep-link "Pay now" without a live Stripe call.
+        stripe_hosted_url: finalizedInvoice.hosted_invoice_url ?? null,
       })
       .eq('id', invoice_id)
 

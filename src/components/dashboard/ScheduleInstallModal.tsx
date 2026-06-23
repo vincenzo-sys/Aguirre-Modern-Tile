@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import type { JobWithAssignee } from '@/lib/supabase/types'
 
 type ExistingInstall = {
@@ -125,7 +126,12 @@ export default function ScheduleInstallModal({
   // Doesn't archive or change status — Vince can re-schedule via this same flow.
   async function handleClear() {
     if (!install) return
-    if (!confirm('Remove this install from the calendar?\n\nThe job stays in its current status — only the scheduled dates are cleared.')) return
+    if (!(await confirmDialog({
+      title: 'Remove this install from the calendar?',
+      message: 'The job stays in its current status — only the scheduled dates are cleared.',
+      tone: 'danger',
+      confirmLabel: 'Remove',
+    }))) return
     setClearing(true)
     try {
       const res = await fetch(`/api/jobs/${install.id}`, {

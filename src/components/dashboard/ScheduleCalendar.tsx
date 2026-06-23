@@ -253,6 +253,13 @@ export default function ScheduleCalendar({
     setModalOpen(true)
   }
 
+  // Tapping an empty day cell opens the Add Event modal pre-dated to that day.
+  function openAddEventOn(dayYmd: string) {
+    setEditingEvent(null)
+    setModalDefaultDate(dayYmd)
+    setModalOpen(true)
+  }
+
   // Drag-resize an install's right edge across day cells. We attach
   // document-level pointer listeners so the drag survives the pointer
   // leaving the original chip element (which shrinks/grows under it).
@@ -430,9 +437,9 @@ export default function ScheduleCalendar({
       ) : view === 'agenda' ? (
         <AgendaView events={events} onOpen={openEvent} />
       ) : view === 'week' ? (
-        <WeekGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onResizeRight={startResizeInstall} resizing={resizing} />
+        <WeekGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={openAddEventOn} onResizeRight={startResizeInstall} resizing={resizing} />
       ) : (
-        <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onResizeRight={startResizeInstall} resizing={resizing} />
+        <MonthGrid cursor={cursor} eventsByDay={eventsByDay} onOpen={openEvent} onCreate={openAddEventOn} onResizeRight={startResizeInstall} resizing={resizing} />
       )}
 
       <AddEventModal
@@ -461,12 +468,14 @@ function MonthGrid({
   cursor,
   eventsByDay,
   onOpen,
+  onCreate,
   onResizeRight,
   resizing,
 }: {
   cursor: Date
   eventsByDay: Map<string, ScheduleEvent[]>
   onOpen: (ev: ScheduleEvent) => void
+  onCreate: (dayYmd: string) => void
   onResizeRight: (installId: string, e: React.PointerEvent<HTMLElement>) => void
   resizing: { id: string; previewEndYmd: string } | null
 }) {
@@ -506,7 +515,13 @@ function MonthGrid({
             <div
               key={key}
               data-day={key}
-              className={`min-h-[110px] border-b border-r border-gray-100 p-1.5 flex flex-col gap-1 ${
+              onClick={(e) => {
+                // Only treat clicks on empty cell space as "create" — clicks on
+                // event chips / links have their own handlers.
+                if ((e.target as HTMLElement).closest('button, a')) return
+                onCreate(key)
+              }}
+              className={`min-h-[110px] border-b border-r border-gray-100 p-1.5 flex flex-col gap-1 cursor-pointer hover:bg-gray-50/60 ${
                 isToday ? 'bg-primary-50/40' : ''
               }`}
             >
@@ -546,12 +561,14 @@ function WeekGrid({
   cursor,
   eventsByDay,
   onOpen,
+  onCreate,
   onResizeRight,
   resizing,
 }: {
   cursor: Date
   eventsByDay: Map<string, ScheduleEvent[]>
   onOpen: (ev: ScheduleEvent) => void
+  onCreate: (dayYmd: string) => void
   onResizeRight: (installId: string, e: React.PointerEvent<HTMLElement>) => void
   resizing: { id: string; previewEndYmd: string } | null
 }) {
@@ -569,7 +586,11 @@ function WeekGrid({
           <div
             key={key}
             data-day={key}
-            className={`flex gap-3 px-4 py-3 ${isToday ? 'bg-primary-50/40' : ''}`}
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button, a')) return
+              onCreate(key)
+            }}
+            className={`flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50/60 ${isToday ? 'bg-primary-50/40' : ''}`}
           >
             <div className="w-16 shrink-0 text-center">
               <div className="text-[11px] font-semibold text-gray-500 uppercase">

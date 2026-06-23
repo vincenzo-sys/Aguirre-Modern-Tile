@@ -195,14 +195,14 @@ export default function LeadCard({
           {telHref ? (
             <a
               href={telHref}
-              className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 min-h-[40px]"
+              className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 min-h-[44px]"
               aria-label={`Call ${item.client_name}`}
             >
               <Phone className="w-3.5 h-3.5" />
               Call
             </a>
           ) : (
-            <span className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-300 bg-gray-50 border border-gray-100 rounded-md min-h-[40px]" aria-disabled="true">
+            <span className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-300 bg-gray-50 border border-gray-100 rounded-md min-h-[44px]" aria-disabled="true">
               <Phone className="w-3.5 h-3.5" />
               Call
             </span>
@@ -210,14 +210,14 @@ export default function LeadCard({
           {smsHref ? (
             <a
               href={smsHref}
-              className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 min-h-[40px]"
+              className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 min-h-[44px]"
               aria-label={`Text ${item.client_name}`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
               Text
             </a>
           ) : (
-            <span className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-300 bg-gray-50 border border-gray-100 rounded-md min-h-[40px]" aria-disabled="true">
+            <span className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-gray-300 bg-gray-50 border border-gray-100 rounded-md min-h-[44px]" aria-disabled="true">
               <MessageSquare className="w-3.5 h-3.5" />
               Text
             </span>
@@ -225,7 +225,7 @@ export default function LeadCard({
           <button
             type="button"
             onClick={() => handlers.markContactedNow(item)}
-            className={`inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md min-h-[40px] border transition ${
+            className={`inline-flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-md min-h-[44px] border transition ${
               contactedToday
                 ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
                 : 'text-gray-700 bg-white border-gray-200 hover:bg-gray-50'

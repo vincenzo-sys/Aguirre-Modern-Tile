@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Tile Reglazing in ${locationName}, MA | Aguirre Modern Tile`,
     description: `Professional tile reglazing and refinishing in ${locationName}, Massachusetts. Restore your bathtub, shower, and tile surfaces. Free estimates. Call (617) 766-1259.`,
+    alternates: { canonical: `/tilereglazing/${slug}` },
     openGraph: {
       title: `Tile Reglazing in ${locationName}, MA | Aguirre Modern Tile`,
       description: `Professional tile reglazing and refinishing in ${locationName}, Massachusetts. Restore your bathtub, shower, and tile surfaces.`,
@@ -51,6 +52,7 @@ export default async function TileReglazingLocationPage({ params }: Props) {
       state={location.state}
       serviceType="tilereglazing"
       serviceTitle="Tile Reglazing"
+      slug={slug}
     />
   )
 }

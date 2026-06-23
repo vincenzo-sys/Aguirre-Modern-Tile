@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, ExternalLink } from 'lucide-react'
+import { Package, ShoppingCart, Truck, CheckCircle2, Trash2, Plus, Pencil, X, ExternalLink, Wand2, AlertTriangle } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import type { JobLineItem, MaterialStatus, MaterialPricing } from '@/lib/supabase/types'
 
@@ -27,6 +27,12 @@ const MATERIAL_UNITS: JobLineItem['unit'][] = ['sheet', 'bag', 'tube', 'kit', 'r
 const LABOR_UNITS: JobLineItem['unit'][] = ['day', 'hr', 'ea', 'sq ft']
 
 const PROJECTWIDE_LABEL = 'Project-wide'
+
+// Aguirre target margin band (see feedback_pricing_conventions): aim for
+// 39–45%. Below 39% the footer flags the job; the "Set margin → 40%" quick
+// adjuster snaps it back into the band.
+const TARGET_MARGIN_MIN = 39
+const TARGET_MARGIN_MAX = 45
 
 function calcAmount(qty: number, price: number): number {
   return Number((qty * price).toFixed(2))
@@ -228,6 +234,79 @@ export default function JobLineItems({
     await persist(updated)
   }
 
+  // ── Quick price adjusters ──────────────────────────────────────────────
+  // Reshape the whole job's customer prices in one tap. Cost is never touched
+  // (catalog your_cost / day rate stay fixed) — only the customer-facing
+  // amounts move, so margin recomputes live from the same costStats.
+
+  // Scale the priced lines (materials w/ catalog match + day-unit labor) so the
+  // job hits the target margin. Pass-through lines (trash/transport/ea) hold —
+  // they're 0-margin by design and shouldn't absorb markup. Needs cost data.
+  async function applyTargetMargin(target: number) {
+    if (!costStats || dayCostNumber == null) {
+      toast('Pricing data still loading — try again in a moment', 'error')
+      return
+    }
+    const cost = costStats.cost
+    if (cost <= 0) {
+      toast('No cost basis on these line items', 'error')
+      return
+    }
+    const targetRevenue = cost / (1 - target)
+    const priced = liveItems
+      .map((it) => ({ it, c: lineCost(it, materialsCatalog, dayCostNumber) }))
+      .filter((x) => x.c != null)
+    const pricedRevenue = priced.reduce((s, x) => s + (x.it.amount ?? 0), 0)
+    const passThroughRevenue = grandTotal - pricedRevenue
+    const newPricedRevenue = targetRevenue - passThroughRevenue
+    if (pricedRevenue <= 0 || newPricedRevenue <= 0) {
+      toast('Can’t reach that margin by scaling the priced lines', 'error')
+      return
+    }
+    const factor = newPricedRevenue / pricedRevenue
+    const next = liveItems.map((it) => {
+      if (lineCost(it, materialsCatalog, dayCostNumber) == null) return it
+      const newUnitPrice = it.quantity
+        ? Number(((it.amount * factor) / it.quantity).toFixed(2))
+        : Number((it.amount * factor).toFixed(2))
+      return { ...it, unit_price: newUnitPrice, amount: calcAmount(it.quantity, newUnitPrice) }
+    })
+    await persist(next)
+    toast(`Margin set to ~${Math.round(target * 100)}%`)
+  }
+
+  // Nudge the grand total to a round number by adjusting the single largest
+  // line — keeps every other line untouched so the change is legible.
+  async function roundTotalTo(step: number) {
+    if (liveItems.length === 0) return
+    const rounded = Math.round(grandTotal / step) * step
+    const delta = rounded - grandTotal
+    if (Math.abs(delta) < 0.005) {
+      toast(`Total is already a round $${step}`)
+      return
+    }
+    let maxIdx = 0
+    liveItems.forEach((it, i) => {
+      if ((it.amount ?? 0) > (liveItems[maxIdx].amount ?? 0)) maxIdx = i
+    })
+    const target = liveItems[maxIdx]
+    const newAmount = Number(((target.amount ?? 0) + delta).toFixed(2))
+    if (newAmount <= 0) {
+      toast('Rounding would zero out the largest line', 'error')
+      return
+    }
+    const newUnitPrice = target.quantity
+      ? Number((newAmount / target.quantity).toFixed(2))
+      : newAmount
+    const next = liveItems.map((it, i) =>
+      i === maxIdx
+        ? { ...it, unit_price: newUnitPrice, amount: calcAmount(target.quantity, newUnitPrice) }
+        : it
+    )
+    await persist(next)
+    toast(`Total rounded to ${formatCurrency(rounded)}`)
+  }
+
   async function addRow(category: 'materials' | 'labor') {
     const defaults: JobLineItem = {
       category,
@@ -322,25 +401,60 @@ export default function JobLineItems({
           ))}
 
           {editing && (
-            <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 bg-gray-50">
-              <button
-                type="button"
-                onClick={() => addRow('materials')}
-                disabled={updating}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
-              >
-                <Plus className="w-4 h-4" /> Add material
-              </button>
-              <button
-                type="button"
-                onClick={() => addRow('labor')}
-                disabled={updating}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
-              >
-                <Plus className="w-4 h-4" /> Add labor
-              </button>
-              <span className="text-xs text-gray-400 ml-auto">New rows land in Project-wide</span>
-            </div>
+            <>
+              <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-3 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => addRow('materials')}
+                  disabled={updating}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" /> Add material
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addRow('labor')}
+                  disabled={updating}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" /> Add labor
+                </button>
+                <span className="text-xs text-gray-400 ml-auto">New rows land in Project-wide</span>
+              </div>
+
+              {/* Quick price adjusters — reshape customer prices in one tap.
+                  Cost stays fixed; margin recomputes live. */}
+              <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap items-center gap-2 bg-gray-50">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 mr-1">
+                  <Wand2 className="w-3.5 h-3.5" /> Quick adjust
+                </span>
+                <button
+                  type="button"
+                  onClick={() => applyTargetMargin(0.4)}
+                  disabled={updating || !costStats}
+                  title={costStats ? 'Scale priced lines to a 40% margin' : 'Loading cost data…'}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-40"
+                >
+                  Set margin → 40%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => roundTotalTo(100)}
+                  disabled={updating}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-40"
+                >
+                  Round total → $100
+                </button>
+                <button
+                  type="button"
+                  onClick={() => roundTotalTo(250)}
+                  disabled={updating}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 text-gray-700 bg-white hover:bg-gray-100 disabled:opacity-40"
+                >
+                  Round total → $250
+                </button>
+              </div>
+            </>
           )}
 
           {/* Grand total */}
@@ -375,7 +489,7 @@ export default function JobLineItems({
                       <span className="text-xs text-gray-500 uppercase tracking-wider">Margin</span>
                       <p
                         className={`text-xl font-bold ${
-                          displayMargin >= 40
+                          displayMargin >= TARGET_MARGIN_MIN
                             ? 'text-emerald-700'
                             : displayMargin >= 30
                               ? 'text-amber-600'
@@ -384,6 +498,9 @@ export default function JobLineItems({
                       >
                         {Number(displayMargin).toFixed(1)}%
                       </p>
+                      <span className="text-[10px] text-gray-400">
+                        Target {TARGET_MARGIN_MIN}–{TARGET_MARGIN_MAX}%
+                      </span>
                     </div>
                   )}
                   <div className="text-right">
@@ -392,6 +509,18 @@ export default function JobLineItems({
                   </div>
                 </div>
               </div>
+
+              {/* Below-target flag — only when we have real cost data to judge
+                  against. Nudges the owner to the "Set margin → 40%" adjuster. */}
+              {costStats && displayMargin != null && displayMargin < TARGET_MARGIN_MIN && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>
+                    Margin is below the {TARGET_MARGIN_MIN}% target.
+                    {canEdit && !editing && ' Tap “Edit / add items” to use the quick adjusters.'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </>

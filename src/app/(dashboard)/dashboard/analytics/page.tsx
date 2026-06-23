@@ -119,7 +119,28 @@ export default async function AnalyticsPage() {
           {budgetJobs.length === 0 ? (
             <p className="text-sm text-gray-500">No completed jobs with cost data.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {budgetJobs.map((j) => {
+                const variance = (j.estimated_cost ?? 0) - (j.actual_cost ?? 0)
+                const pct = j.estimated_cost ? Math.round((variance / j.estimated_cost) * 100) : 0
+                return (
+                  <div key={j.id} className="border border-gray-100 rounded-lg p-3">
+                    <p className="text-sm font-medium text-gray-900 truncate">#{j.job_number} {j.title}</p>
+                    <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                      <div><span className="text-gray-400 block">Est.</span>{fmt.format(j.estimated_cost!)}</div>
+                      <div><span className="text-gray-400 block">Actual</span>{fmt.format(j.actual_cost!)}</div>
+                      <div className={variance >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        <span className="text-gray-400 block">Variance</span>
+                        {variance >= 0 ? '+' : ''}{fmt.format(variance)} ({pct > 0 ? '+' : ''}{pct}%)
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -147,6 +168,7 @@ export default async function AnalyticsPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 
@@ -156,7 +178,27 @@ export default async function AnalyticsPage() {
           {daysJobs.length === 0 ? (
             <p className="text-sm text-gray-500">No completed jobs with days data.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {daysJobs.map((j) => {
+                const diff = (j.actual_days ?? 0) - (j.estimated_days ?? 0)
+                return (
+                  <div key={j.id} className="border border-gray-100 rounded-lg p-3">
+                    <p className="text-sm font-medium text-gray-900 truncate">#{j.job_number} {j.title}</p>
+                    <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                      <div><span className="text-gray-400 block">Est.</span>{j.estimated_days} days</div>
+                      <div><span className="text-gray-400 block">Actual</span>{j.actual_days} days</div>
+                      <div className={diff <= 0 ? 'text-green-600' : 'text-red-600'}>
+                        <span className="text-gray-400 block">Diff</span>
+                        {diff <= 0 ? diff : `+${diff}`} day{Math.abs(diff) !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -183,6 +225,7 @@ export default async function AnalyticsPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>
@@ -193,7 +236,20 @@ export default async function AnalyticsPage() {
           <Users className="w-5 h-5" />
           Team Workload
         </h2>
-        <div className="overflow-x-auto">
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {teamWorkload.map((w) => (
+            <div key={w.name} className="border border-gray-100 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-900">{w.name}</p>
+              <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                <div><span className="text-gray-400 block">Assigned</span>{w.assigned}</div>
+                <div><span className="text-gray-400 block">Active</span>{w.active}</div>
+                <div><span className="text-gray-400 block">Completed</span>{w.completed}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">

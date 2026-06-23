@@ -20,6 +20,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import type { PipelineItem, PipelineStage } from '@/app/api/pipeline/route'
 import type { LeadCardHandlers } from '@/components/dashboard/LeadCard'
 import { stageOptionsFor, jobStatusForStage, STAGE_META } from '@/lib/leadStages'
@@ -270,7 +271,11 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
   const archiveLead = useCallback(
     async (item: PipelineItem) => {
       if (item.kind !== 'quote_request') return
-      if (!confirm(`Archive ${item.client_name}'s inquiry? They'll move out of the active pipeline.`)) return
+      if (!(await confirmDialog({
+        title: `Archive ${item.client_name}'s inquiry?`,
+        message: "They'll move out of the active pipeline.",
+        confirmLabel: 'Archive',
+      }))) return
       setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'quote_request')))
       const res = await fetch(`/api/leads/${item.id}`, {
         method: 'PATCH',
@@ -378,7 +383,12 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
   // still deletes in one tap (the /api/jobs guard otherwise 409s).
   const deleteItem = useCallback(
     async (item: PipelineItem) => {
-      if (!confirm(`Delete ${item.project_name} forever? This can't be undone.`)) return
+      if (!(await confirmDialog({
+        title: `Delete ${item.project_name} forever?`,
+        message: "This can't be undone.",
+        tone: 'danger',
+        confirmLabel: 'Delete forever',
+      }))) return
       const endpoint = item.kind === 'job' ? `/api/jobs/${item.id}` : `/api/leads/${item.id}`
       // Optimistic removal
       setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === item.kind)))
@@ -402,7 +412,11 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
   const sendToJobs = useCallback(
     async (item: PipelineItem) => {
       if (item.kind !== 'job') return
-      if (!confirm(`Mark ${item.project_name} as accepted? This moves it to the operations workflow.`)) return
+      if (!(await confirmDialog({
+        title: `Mark ${item.project_name} as accepted?`,
+        message: 'This moves it to the operations workflow.',
+        confirmLabel: 'Accept',
+      }))) return
       setItems((prev) => prev.filter((i) => !(i.id === item.id && i.kind === 'job')))
       const res = await fetch(`/api/jobs/${item.id}`, {
         method: 'PATCH',

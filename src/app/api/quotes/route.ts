@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
     const phone = sanitize(body.phone || '')
     const projectType = sanitize(body.projectType || '')
 
-    // Server-side validation
-    const errors = validateContact({ name, email, phone })
+    // Server-side validation — email optional for the quote intake (name +
+    // phone is enough; SMS is the primary follow-up channel).
+    const errors = validateContact({ name, email, phone }, { requireEmail: false })
     if (Object.keys(errors).length > 0) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 })
     }

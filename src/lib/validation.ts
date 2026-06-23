@@ -23,10 +23,22 @@ export function formatPhone(value: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
-export function validateContact(fields: { name: string; email: string; phone: string }) {
+// requireEmail defaults to true so existing callers are unchanged. The lead/
+// quote intake passes requireEmail:false so a name + phone is enough to submit
+// (phone is the channel that actually matters for the estimate flow); a
+// non-empty email is still format-checked so typos are caught.
+export function validateContact(
+  fields: { name: string; email: string; phone: string },
+  opts: { requireEmail?: boolean } = {}
+) {
+  const { requireEmail = true } = opts
   const errors: Record<string, string> = {}
   if (!isValidName(fields.name)) errors.name = 'Name must be at least 2 characters'
-  if (!isValidEmail(fields.email)) errors.email = 'Enter a valid email address'
+  if (requireEmail) {
+    if (!isValidEmail(fields.email)) errors.email = 'Enter a valid email address'
+  } else if (fields.email.trim() && !isValidEmail(fields.email)) {
+    errors.email = 'Enter a valid email address'
+  }
   if (!isValidPhone(fields.phone)) errors.phone = 'Enter a valid phone number, e.g. (617) 555-1234'
   return errors
 }

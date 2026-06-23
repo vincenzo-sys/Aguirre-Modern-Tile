@@ -59,6 +59,16 @@ export async function POST(req: NextRequest) {
     const stripeInvoice = await stripe.invoices.retrieve(invoice.stripe_invoice_id)
     const localStatus = mapStripeStatus(stripeInvoice.status ?? 'draft')
 
+    // Backfill the cached hosted pay URL whenever we learn it — keeps the
+    // customer-facing /invoices/[token] "Pay now" button working for older
+    // invoices sent before stripe_hosted_url existed.
+    if (stripeInvoice.hosted_invoice_url && stripeInvoice.hosted_invoice_url !== invoice.stripe_hosted_url) {
+      await supabase
+        .from('invoices')
+        .update({ stripe_hosted_url: stripeInvoice.hosted_invoice_url })
+        .eq('id', invoice_id)
+    }
+
     // Update local DB if status changed
     if (localStatus !== invoice.status) {
       await supabase

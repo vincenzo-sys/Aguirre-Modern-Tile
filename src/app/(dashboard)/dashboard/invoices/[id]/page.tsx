@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, ExternalLink, CreditCard, FileText, RefreshCw, XCircle, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Send, ExternalLink, CreditCard, FileText, RefreshCw, XCircle, Pencil, Plus, Trash2, Link2, Copy, Check } from 'lucide-react'
 import InvoiceStatusBadge from '@/components/dashboard/InvoiceStatusBadge'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { getDemoInvoice } from '@/lib/demo'
 import type { InvoiceWithJob, InvoiceLineItem } from '@/lib/supabase/types'
 
@@ -28,6 +29,8 @@ export default function InvoiceDetailPage() {
   const [editingItems, setEditingItems] = useState(false)
   const [draftItems, setDraftItems] = useState<InvoiceLineItem[]>([])
   const [savingItems, setSavingItems] = useState(false)
+  const [sendingLink, setSendingLink] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [stripeInfo, setStripeInfo] = useState<{
     hosted_invoice_url?: string | null
     invoice_pdf?: string | null
@@ -265,6 +268,13 @@ export default function InvoiceDetailPage() {
       return
     }
 
+    if (!(await confirmDialog({
+      title: 'Void this invoice?',
+      message: 'Voiding cancels the invoice in Stripe and the customer can no longer pay it. This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Void invoice',
+    }))) return
+
     setVoiding(true)
 
     try {
@@ -375,6 +385,57 @@ export default function InvoiceDetailPage() {
     setSavingItems(false)
   }
 
+  const publicUrl = invoice?.public_token
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invoices/${invoice.public_token}`
+    : null
+
+  async function handleCopyLink() {
+    if (!publicUrl) return
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      toast('Could not copy link', 'error')
+    }
+  }
+
+  async function handleSendLink() {
+    if (isDemoMode) {
+      toast('Demo mode: Connect Supabase + OpenPhone/Resend to send the customer link.', 'error')
+      return
+    }
+    setSendingLink(true)
+    try {
+      const res = await fetch(`/api/invoices/${id}/send-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send link')
+
+      // A public_token may have just been generated server-side — reflect it.
+      if (data.invoice_url) {
+        const token = data.invoice_url.split('/invoices/')[1]
+        if (token) setInvoice((prev) => (prev ? { ...prev, public_token: token } : prev))
+      }
+
+      const smsOk = data.sms?.success
+      const emailOk = data.email?.success
+      if (smsOk || emailOk) {
+        const channels = [smsOk && 'text', emailOk && 'email'].filter(Boolean).join(' + ')
+        toast(`Invoice link sent to customer (${channels})`)
+      } else {
+        const reason = data.sms?.error || data.email?.error || 'No contact channels available'
+        toast(`Couldn't send: ${reason}`, 'error')
+      }
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Failed to send link', 'error')
+    }
+    setSendingLink(false)
+  }
+
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading invoice...</div>
   }
@@ -392,9 +453,11 @@ export default function InvoiceDetailPage() {
 
   const hasStripe = !!invoice.stripe_invoice_id
   const anyLoading = updating || sendingStripe || creatingDraft || syncing || voiding
-  // Line items can only be edited while the invoice is still a local draft with
-  // no Stripe copy — once pushed to Stripe or sent, editing here would desync it.
-  const canEditItems = invoice.status === 'draft' && !hasStripe
+  // Line items stay editable as long as there's no Stripe copy to desync — a
+  // local draft OR a manually-"sent" non-Stripe invoice can still be cleaned up
+  // (fix a typo, adjust a qty). Once pushed to Stripe, paid, or voided, editing
+  // here is locked to keep our record and Stripe's in sync.
+  const canEditItems = !hasStripe && (invoice.status === 'draft' || invoice.status === 'sent')
   const draftTotal = draftItems.reduce((sum, l) => sum + l.amount, 0)
   const inputClass =
     'block w-full rounded-md border border-gray-300 px-2 py-1.5 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm'
@@ -594,6 +657,48 @@ export default function InvoiceDetailPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Customer invoice link — branded, payable, printable page the customer
+          opens. Separate public_token from anything internal; no cost/margin. */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Link2 className="w-4 h-4 text-gray-500" />
+          <h2 className="text-sm font-semibold text-gray-700">Customer invoice link</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          A clean page where the customer can view, download a PDF, and pay online.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={handleSendLink}
+            disabled={sendingLink || anyLoading}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+          >
+            <Send className="w-3.5 h-3.5" />
+            {sendingLink ? 'Sending...' : 'Text + email link to customer'}
+          </button>
+          {publicUrl && (
+            <>
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                {linkCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {linkCopied ? 'Copied' : 'Copy link'}
+              </button>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Preview
+              </a>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Line Items header + edit toggle */}

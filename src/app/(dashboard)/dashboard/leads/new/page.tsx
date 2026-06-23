@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { logError } from '@/lib/logger'
 
 const projectTypes = [
   { value: 'bathroom', label: 'Bathroom' },
@@ -81,7 +82,7 @@ function NewLeadForm() {
       toast('Lead created', 'success')
       router.push(`/dashboard/leads/${lead.id}`)
     } catch (err) {
-      console.error(err)
+      logError('Create lead failed', err)
       toast(err instanceof Error ? err.message : 'Failed to create lead', 'error')
     } finally {
       setSaving(false)

@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Backsplash Tile Installation in ${locationName}, MA | Aguirre Modern Tile`,
     description: `Expert kitchen backsplash tile installation in ${locationName}, Massachusetts. Subway tile, mosaic, and custom backsplash designs. Free estimates. Call (617) 766-1259.`,
+    alternates: { canonical: `/backsplashtileinstallation/${slug}` },
     openGraph: {
       title: `Backsplash Tile Installation in ${locationName}, MA | Aguirre Modern Tile`,
       description: `Expert kitchen backsplash tile installation in ${locationName}, Massachusetts. Subway tile, mosaic, and custom backsplash designs.`,
@@ -51,6 +52,7 @@ export default async function BacksplashTileLocationPage({ params }: Props) {
       state={location.state}
       serviceType="backsplashtileinstallation"
       serviceTitle="Backsplash Tile Installation"
+      slug={slug}
     />
   )
 }

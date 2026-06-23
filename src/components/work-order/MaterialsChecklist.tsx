@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Package, ExternalLink, Check } from 'lucide-react'
+import { Package, ExternalLink, Check, ChevronDown } from 'lucide-react'
 
 export type Material = {
   description: string
@@ -43,7 +43,9 @@ export default function MaterialsChecklist({
   token: string
 }) {
   const storageKey = `wo-checked-${token}`
+  const collapseKey = `wo-materials-collapsed-${token}`
   const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [collapsed, setCollapsed] = useState(false)
   // Avoid a hydration flash: only reflect stored checks after mount.
   const [hydrated, setHydrated] = useState(false)
 
@@ -51,11 +53,24 @@ export default function MaterialsChecklist({
     try {
       const raw = localStorage.getItem(storageKey)
       if (raw) setChecked(JSON.parse(raw) as Record<string, boolean>)
+      setCollapsed(localStorage.getItem(collapseKey) === '1')
     } catch {
       // corrupt/unavailable storage — start fresh, no-op
     }
     setHydrated(true)
-  }, [storageKey])
+  }, [storageKey, collapseKey])
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(collapseKey, next ? '1' : '0')
+      } catch {
+        // ignore storage failures
+      }
+      return next
+    })
+  }
 
   function toggle(key: string) {
     setChecked((prev) => {
@@ -87,17 +102,23 @@ export default function MaterialsChecklist({
     : 0
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-5 py-3 bg-gray-100 border-b border-gray-200 flex items-center gap-2">
-        <Package className="w-4 h-4 text-gray-500" />
+    <section id="materials" className="bg-white rounded-xl border border-gray-200 overflow-hidden scroll-mt-16">
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-expanded={!collapsed}
+        className="w-full px-5 py-3 bg-gray-100 border-b border-gray-200 flex items-center gap-2 text-left"
+      >
+        <Package className="w-4 h-4 text-gray-600" />
         <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
           Materials ({materials.length})
         </h2>
-        <span className="ml-auto text-xs text-gray-500 tabular-nums">
+        <span className="ml-auto text-xs font-medium text-gray-600 tabular-nums">
           {doneCount}/{materials.length} loaded
         </span>
-      </div>
-      {sections.map(([sectionKey, items]) => (
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+      </button>
+      {!collapsed && sections.map(([sectionKey, items]) => (
         <div key={sectionKey}>
           {showSectionHeaders && (
             <div className="px-5 py-2 bg-primary-50 border-b border-primary-100">
@@ -112,7 +133,7 @@ export default function MaterialsChecklist({
               const isChecked = hydrated && !!checked[key]
               return (
                 <li key={i}>
-                  <div className="w-full px-5 py-3 flex items-start gap-3 text-left">
+                  <div className="w-full px-5 py-3 min-h-[44px] flex items-start gap-3 text-left">
                     {/* The checkbox is the tap target; the source link stays a
                         separate tap so it isn't swallowed by the toggle. */}
                     <button
@@ -120,28 +141,28 @@ export default function MaterialsChecklist({
                       onClick={() => toggle(key)}
                       aria-pressed={isChecked}
                       aria-label={`Mark ${m.description} as loaded`}
-                      className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-md border flex items-center justify-center transition-colors ${
+                      className={`mt-0.5 flex-shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center transition-colors ${
                         isChecked
                           ? 'bg-green-600 border-green-600 text-white'
-                          : 'bg-white border-gray-300 text-transparent'
+                          : 'bg-white border-gray-400 text-transparent'
                       }`}
                     >
-                      <Check className="w-4 h-4" />
+                      <Check className="w-5 h-5" />
                     </button>
                     <button
                       type="button"
                       onClick={() => toggle(key)}
-                      className="min-w-0 flex-1 text-left"
+                      className="min-w-0 flex-1 text-left min-h-[44px]"
                     >
                       <p
-                        className={`text-sm ${
+                        className={`text-[15px] ${
                           isChecked ? 'text-gray-400 line-through' : 'text-gray-900'
                         }`}
                       >
                         {m.description}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-600">
                           {m.quantity} {m.unit}
                         </span>
                       </div>

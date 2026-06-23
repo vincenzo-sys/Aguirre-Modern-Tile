@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Tile Contractor in ${locationName}, MA | Aguirre Modern Tile`,
     description: `Expert tile contractor serving ${locationName}, Massachusetts. Professional bathroom tile, shower tile, floor tile, and backsplash installation. Free estimates. Call (617) 766-1259.`,
+    alternates: { canonical: `/tilecontractor/${slug}` },
     openGraph: {
       title: `Tile Contractor in ${locationName}, MA | Aguirre Modern Tile`,
       description: `Expert tile contractor serving ${locationName}, Massachusetts. Professional bathroom tile, shower tile, floor tile, and backsplash installation.`,
@@ -51,6 +52,7 @@ export default async function TileContractorLocationPage({ params }: Props) {
       state={location.state}
       serviceType="tilecontractor"
       serviceTitle="Tile Contractor"
+      slug={slug}
     />
   )
 }

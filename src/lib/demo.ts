@@ -731,6 +731,9 @@ export const demoInvoices: Invoice[] = [
     status: 'paid',
     due_date: '2026-02-15',
     stripe_invoice_id: null,
+    public_token: 'demo-inv-brooks-1',
+    stripe_hosted_url: null,
+    public_link_sent_at: null,
     line_items: [
       { description: 'Strata Mat (prorated) + Thinset + Sealer', quantity: 1, unit_price: 237.50, amount: 237.50, type: 'product', unit: 'lot' },
       { description: 'Hexagon tile installation + sealer (55 sq ft)', quantity: 1, unit_price: 1385.50, amount: 1385.50, type: 'service', unit: 'job' },
@@ -747,6 +750,9 @@ export const demoInvoices: Invoice[] = [
     status: 'sent',
     due_date: '2026-04-10',
     stripe_invoice_id: null,
+    public_token: 'demo-inv-wickersty-demo',
+    stripe_hosted_url: null,
+    public_link_sent_at: null,
     line_items: [
       { description: 'Partial tile demo', quantity: 1, unit_price: 250, amount: 250, type: 'service', unit: 'job' },
       { description: 'Trash disposal', quantity: 1, unit_price: 150, amount: 150, type: 'service', unit: 'job' },
@@ -763,6 +769,9 @@ export const demoInvoices: Invoice[] = [
     status: 'sent',
     due_date: '2026-04-15',
     stripe_invoice_id: null,
+    public_token: 'demo-inv-wickersty-install',
+    stripe_hosted_url: null,
+    public_link_sent_at: null,
     line_items: [
       { description: 'Floor tile installation (280 sq ft @ $12.50/sq ft)', quantity: 280, unit_price: 12.50, amount: 3500, type: 'service', unit: 'sq ft' },
     ],

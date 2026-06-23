@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Package, ShoppingCart, Truck, CheckCircle2 } from 'lucide-react'
+import { Package, ShoppingCart, CheckCircle2 } from 'lucide-react'
+import MaterialsRows from '@/components/dashboard/MaterialsRows'
 import type { Job, JobLineItem, MaterialStatus } from '@/lib/supabase/types'
 
 type WindowKey = '7' | '14' | '30'
@@ -8,13 +9,6 @@ const windowLabels: Record<WindowKey, string> = {
   '7': 'Next 7 days',
   '14': 'Next 14 days',
   '30': 'Next 30 days',
-}
-
-const statusMeta: Record<MaterialStatus, { label: string; icon: typeof Package; className: string }> = {
-  needed: { label: 'Needed', icon: Package, className: 'bg-gray-100 text-gray-700' },
-  ordered: { label: 'Ordered', icon: ShoppingCart, className: 'bg-blue-100 text-blue-700' },
-  received: { label: 'Received', icon: Truck, className: 'bg-yellow-100 text-yellow-700' },
-  on_site: { label: 'On site', icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
 }
 
 type MaterialRow = {
@@ -59,6 +53,13 @@ export default async function MaterialsPage({
     Job,
     'id' | 'title' | 'status' | 'scheduled_start' | 'scheduled_end' | 'line_items' | 'amount_paid'
   >[]
+
+  // Per-job line items, passed to the client island so it can re-match and
+  // PATCH a material's status back to the right job(s) without an extra fetch.
+  const lineItemsByJob: Record<string, JobLineItem[]> = {}
+  for (const job of jobs) {
+    lineItemsByJob[job.id] = (job.line_items ?? []) as JobLineItem[]
+  }
 
   const rollup: Record<string, MaterialRow> = {}
   for (const job of jobs) {
@@ -114,12 +115,12 @@ export default async function MaterialsPage({
           </p>
         </div>
 
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
           {(['7', '14', '30'] as WindowKey[]).map((k) => (
             <Link
               key={k}
               href={`/dashboard/materials?window=${k}`}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              className={`min-h-[44px] flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                 windowKey === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -163,66 +164,16 @@ export default async function MaterialsPage({
           <p className="text-xs text-gray-400 mt-1">Add material line items on a job to see them aggregated here.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-left">
-                <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Material
-                </th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">
-                  Total qty
-                </th>
-                <th className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Jobs
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row.key} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-gray-900">{row.description}</p>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {(Object.keys(row.statusCounts) as MaterialStatus[]).map((s) => {
-                        if (row.statusCounts[s] === 0) return null
-                        const meta = statusMeta[s]
-                        const Icon = meta.icon
-                        return (
-                          <span
-                            key={s}
-                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${meta.className}`}
-                          >
-                            <Icon className="w-2.5 h-2.5" />
-                            {row.statusCounts[s]} {meta.label.toLowerCase()}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {row.totalQty} {row.unit}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="space-y-0.5">
-                      {row.jobs.map((j, i) => (
-                        <Link
-                          key={`${j.id}-${i}`}
-                          href={`/dashboard/jobs/${j.id}`}
-                          className="text-xs text-primary-600 hover:underline block truncate max-w-xs"
-                        >
-                          {j.title} ({j.quantity} {row.unit})
-                        </Link>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MaterialsRows
+          rows={rows.map((r) => ({
+            key: r.key,
+            description: r.description,
+            unit: r.unit,
+            totalQty: r.totalQty,
+            jobs: r.jobs,
+          }))}
+          lineItemsByJob={lineItemsByJob}
+        />
       )}
     </div>
   )

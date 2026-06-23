@@ -91,6 +91,17 @@ export default function LeadsPage() {
     'cards',
     (v): v is ViewMode => v === 'cards' || v === 'kanban',
   )
+  // The view toggle is desktop-only (hidden < md). Guard against a stale
+  // localStorage 'kanban' trapping a phone user in the 7-column scroll: below
+  // md we always fall back to cards.
+  const [isDesktop, setIsDesktop] = useState(true)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   const [smartView, setSmartView] = useLocalStorageState<SmartView>(
     SMART_VIEW_KEY,
     'all',
@@ -182,7 +193,7 @@ export default function LeadsPage() {
   if (loading) return <LeadsPageSkeleton />
   if (error) return <PipelineErrorState message={error} onRetry={() => { setLoading(true); loadPipeline().finally(() => setLoading(false)) }} />
 
-  const effectiveViewMode: ViewMode = viewMode === 'kanban' ? 'kanban' : 'cards'
+  const effectiveViewMode: ViewMode = viewMode === 'kanban' && isDesktop ? 'kanban' : 'cards'
 
   return (
     <div className={effectiveViewMode === 'kanban' ? 'max-w-none' : 'max-w-2xl mx-auto'}>

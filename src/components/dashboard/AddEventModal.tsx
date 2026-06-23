@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
 
 // Inputs are kept as separate `date` + `time` strings while the modal is open
@@ -141,7 +142,7 @@ export default function AddEventModal({
 
   async function handleDelete() {
     if (!event) return
-    if (!confirm('Delete this event?')) return
+    if (!(await confirmDialog({ title: 'Delete this event?', tone: 'danger', confirmLabel: 'Delete' }))) return
     setDeleting(true)
     try {
       const res = await fetch(`/api/calendar-events/${event.id}`, { method: 'DELETE' })

@@ -15,10 +15,30 @@ import {
   ArrowRight,
   MapPin,
 } from 'lucide-react'
+import type { Metadata } from 'next'
 import LeadCaptureForm from '@/components/LeadCaptureForm'
 import QuoteCalculator from '@/components/QuoteCalculator'
 import JsonLd, { localBusinessJsonLd } from '@/components/JsonLd'
 import { getCmsGlobal, getCmsCollection } from '@/lib/cms'
+
+// Explicit homepage metadata (overrides the root-layout default) so the title,
+// description, canonical, and social card are tuned for the brand's primary
+// landing page rather than inheriting a generic fallback.
+export const metadata: Metadata = {
+  title: 'Aguirre Modern Tile | Expert Tile Installation in Greater Boston',
+  description:
+    'Greater Boston tile installation experts. Bathroom, shower, floor & backsplash tile. 150+ five-star reviews, licensed & insured, free same-day estimates. Call (617) 766-1259.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'Aguirre Modern Tile | Expert Tile Installation in Greater Boston',
+    description:
+      'Bathroom, shower, floor & backsplash tile installation across Greater Boston. 150+ five-star reviews, licensed & insured, free same-day estimates.',
+    url: 'https://www.aguirremoderntile.com',
+    siteName: 'Aguirre Modern Tile',
+    type: 'website',
+    locale: 'en_US',
+  },
+}
 
 const iconMap: Record<string, React.ReactNode> = {
   Home: <Home className="w-8 h-8" />,

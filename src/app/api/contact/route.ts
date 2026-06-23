@@ -31,8 +31,10 @@ export async function POST(req: NextRequest) {
     const projectType = sanitize(body.projectType || '')
     const source = body.source || 'contact'
 
-    // Server-side validation
-    const errors = validateContact({ name, email, phone })
+    // Server-side validation. The quote intake (source='quote') allows a
+    // missing email since /api/quotes saved the lead and SMS carries the
+    // follow-up; the standalone contact form still requires it.
+    const errors = validateContact({ name, email, phone }, { requireEmail: source !== 'quote' })
     if (Object.keys(errors).length > 0) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 })
     }
@@ -180,7 +182,9 @@ export async function POST(req: NextRequest) {
     const sendResult = await resend.emails.send({
       from: FROM_EMAIL,
       to: TO_EMAIL,
-      replyTo: email,
+      // Only set replyTo when we actually have a customer email (quote leads
+      // may not) — an empty replyTo is rejected by Resend.
+      replyTo: email || undefined,
       subject,
       html,
     })

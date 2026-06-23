@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Tile Repair in ${locationName}, MA | Aguirre Modern Tile`,
     description: `Professional tile repair services in ${locationName}, Massachusetts. Fix cracked, chipped, or loose tiles. Grout repair and regrouting. Free estimates. Call (617) 766-1259.`,
+    alternates: { canonical: `/tilerepair/${slug}` },
     openGraph: {
       title: `Tile Repair in ${locationName}, MA | Aguirre Modern Tile`,
       description: `Professional tile repair services in ${locationName}, Massachusetts. Fix cracked, chipped, or loose tiles. Grout repair and regrouting.`,
@@ -51,6 +52,7 @@ export default async function TileRepairLocationPage({ params }: Props) {
       state={location.state}
       serviceType="tilerepair"
       serviceTitle="Tile Repair"
+      slug={slug}
     />
   )
 }

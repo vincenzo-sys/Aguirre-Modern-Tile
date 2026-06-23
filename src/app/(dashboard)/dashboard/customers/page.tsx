@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Search, Plus, Phone, Mail, Users } from 'lucide-react'
 import { toast } from '@/components/Toast'
+import { SkeletonCards } from '@/components/ui/Skeleton'
+import { logError } from '@/lib/logger'
 import type { CustomerWithStats, CustomerSource } from '@/lib/supabase/types'
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -59,7 +61,7 @@ export default function CustomersPage() {
       const data = await res.json()
       setCustomers(data)
     } catch (err) {
-      console.error(err)
+      logError('Failed to load customers', err)
       toast('Failed to load customers', 'error')
     } finally {
       setLoading(false)
@@ -112,12 +114,12 @@ export default function CustomersPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
           {sourceTabs.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setSourceFilter(tab.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`min-h-[44px] px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                 sourceFilter === tab.value
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -131,7 +133,7 @@ export default function CustomersPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading customers...</div>
+        <SkeletonCards count={6} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -141,7 +143,32 @@ export default function CustomersPage() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <>
+        {/* Mobile: stacked cards. */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((customer) => (
+            <Link
+              key={customer.id}
+              href={`/dashboard/customers/${customer.id}`}
+              className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4 active:bg-gray-50"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold shrink-0">
+                {getInitials(customer.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-gray-900 text-sm truncate">{customer.name}</p>
+                <p className="text-xs text-gray-400 truncate">{customer.email ?? customer.phone ?? '—'}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(customer.total_revenue)}</p>
+                <p className="text-xs text-gray-400">{customer.job_count} job{customer.job_count !== 1 ? 's' : ''}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Desktop: table. */}
+        <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -222,6 +249,7 @@ export default function CustomersPage() {
             </table>
           </div>
         </div>
+        </>
       )}
     </div>
   )

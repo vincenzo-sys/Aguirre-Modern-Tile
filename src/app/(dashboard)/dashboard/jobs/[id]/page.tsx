@@ -20,6 +20,7 @@ import EstimateMessages from '@/components/EstimateMessages'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import DeleteJobButton from '@/components/dashboard/DeleteJobButton'
+import { templateForJobType } from '@/lib/quoteHints'
 import FinalPaymentButton from '@/components/dashboard/FinalPaymentButton'
 import { getDemoJob, getDemoCustomer, demoProfile, getDemoInvoicesForJob, demoTeamMembers } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
@@ -453,6 +454,7 @@ export default async function JobDetailPage({
               hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
               estimateSent={!!job.estimate_sent_at}
               initialSqft={job.square_footage}
+              initialTemplate={templateForJobType(job.job_type) ?? undefined}
             />
           </div>
         )}

@@ -1,6 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Phone, Star, CheckCircle, MapPin, Clock, Shield, Award, Wrench } from 'lucide-react'
+import JsonLd, { localBusinessLocationJsonLd } from '@/components/JsonLd'
+import { locationSlugs, parseLocationSlug } from '@/data/locations'
 
 interface LocationPageProps {
   city: string
@@ -8,6 +10,28 @@ interface LocationPageProps {
   state?: string
   serviceType?: string
   serviceTitle?: string
+  // The page's own slug — enables self-referential LocalBusiness schema and
+  // "nearby areas" internal links. Optional so legacy callers still compile.
+  slug?: string
+}
+
+const SITE_URL = 'https://www.aguirremoderntile.com'
+
+// Other location slugs in the same city, for internal linking. Crawl-depth +
+// local relevance: each location page links to a handful of sibling pages under
+// the same service so Google can discover and cluster the location corpus.
+function nearbyLinks(slug: string | undefined, city: string, serviceType: string) {
+  if (!slug) return []
+  return locationSlugs
+    .filter((s) => s !== slug && parseLocationSlug(s).city === city)
+    .slice(0, 6)
+    .map((s) => {
+      const loc = parseLocationSlug(s)
+      return {
+        href: `/${serviceType}/${s}`,
+        name: loc.neighborhood ? `${loc.neighborhood}, ${loc.city}` : loc.city,
+      }
+    })
 }
 
 // Service-specific content configurations
@@ -142,12 +166,21 @@ const allServices = [
   { name: 'Tile Reglazing', link: '/services/tile-reglazing' },
 ]
 
-export default function LocationPage({ city, neighborhood, state = 'MA', serviceType = 'tilecontractor', serviceTitle = 'Tile Contractor' }: LocationPageProps) {
+export default function LocationPage({ city, neighborhood, state = 'MA', serviceType = 'tilecontractor', serviceTitle = 'Tile Contractor', slug }: LocationPageProps) {
   const locationName = neighborhood ? `${neighborhood}, ${city}` : city
   const content = serviceContent[serviceType] || serviceContent.tilecontractor
+  const nearby = nearbyLinks(slug, city, serviceType)
+  const canonicalUrl = slug ? `${SITE_URL}/${serviceType}/${slug}` : SITE_URL
 
   return (
     <>
+      <JsonLd
+        data={localBusinessLocationJsonLd({
+          locationName,
+          url: canonicalUrl,
+          serviceTitle,
+        })}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-br from-gray-900 to-primary-900 text-white section-padding">
         <div className="container-custom">
@@ -336,6 +369,30 @@ export default function LocationPage({ city, neighborhood, state = 'MA', service
           </div>
         </div>
       </section>
+
+      {/* Nearby areas — internal links to sibling location pages in the same
+          city under the same service, for crawl depth + local relevance. */}
+      {nearby.length > 0 && (
+        <section className="section-padding bg-white">
+          <div className="container-custom max-w-4xl">
+            <h2 className="heading-secondary text-center mb-8">
+              Nearby Areas We Serve
+            </h2>
+            <div className="flex flex-wrap justify-center gap-3">
+              {nearby.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700 transition-colors"
+                >
+                  <MapPin className="w-4 h-4 text-primary-500" />
+                  {serviceTitle} in {link.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA */}
       <section className="section-padding bg-primary-600 text-white">

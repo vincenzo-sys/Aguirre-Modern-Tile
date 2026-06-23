@@ -74,6 +74,44 @@ export function localBusinessJsonLd() {
   }
 }
 
+// Location-specific LocalBusiness schema for the 3,400+ programmatic location
+// pages. Same business identity as localBusinessJsonLd(), but areaServed is
+// narrowed to the page's town/neighborhood and the URL/name are made unique so
+// each location page carries its own self-referential structured data (helps
+// Google associate the page with that locality for local search).
+export function localBusinessLocationJsonLd(params: {
+  locationName: string
+  url: string
+  serviceTitle: string
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HomeAndConstructionBusiness',
+    name: `Aguirre Modern Tile — ${params.serviceTitle} in ${params.locationName}`,
+    description: `Professional ${params.serviceTitle.toLowerCase()} serving ${params.locationName}, Massachusetts and the Greater Boston area. Licensed, insured, 150+ five-star reviews.`,
+    url: params.url,
+    telephone: '+1-617-766-1259',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Revere',
+      addressRegion: 'MA',
+      addressCountry: 'US',
+    },
+    areaServed: {
+      '@type': 'City',
+      name: params.locationName,
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.9',
+      reviewCount: '150',
+      bestRating: '5',
+    },
+    priceRange: '$$',
+    image: 'https://aguirremoderntile.com/images/bathroom-service1.jpg',
+  }
+}
+
 // Service schema for individual service pages
 export function serviceJsonLd(service: {
   name: string

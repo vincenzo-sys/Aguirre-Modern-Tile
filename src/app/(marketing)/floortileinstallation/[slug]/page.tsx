@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Floor Tile Installation in ${locationName}, MA | Aguirre Modern Tile`,
     description: `Professional floor tile installation in ${locationName}, Massachusetts. Ceramic, porcelain, natural stone, and large format tile floors. Free estimates. Call (617) 766-1259.`,
+    alternates: { canonical: `/floortileinstallation/${slug}` },
     openGraph: {
       title: `Floor Tile Installation in ${locationName}, MA | Aguirre Modern Tile`,
       description: `Professional floor tile installation in ${locationName}, Massachusetts. Ceramic, porcelain, natural stone, and large format tile floors.`,
@@ -51,6 +52,7 @@ export default async function FloorTileLocationPage({ params }: Props) {
       state={location.state}
       serviceType="floortileinstallation"
       serviceTitle="Floor Tile Installation"
+      slug={slug}
     />
   )
 }

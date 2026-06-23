@@ -235,6 +235,11 @@ export interface Invoice {
   status: InvoiceStatus
   due_date: string
   stripe_invoice_id: string | null
+  // Customer-facing share link (migration 040). public_token addresses the
+  // read-only /invoices/[token] page; stripe_hosted_url caches Stripe's pay URL.
+  public_token: string | null
+  stripe_hosted_url: string | null
+  public_link_sent_at: string | null
   line_items: InvoiceLineItem[]
   created_at: string
   updated_at: string

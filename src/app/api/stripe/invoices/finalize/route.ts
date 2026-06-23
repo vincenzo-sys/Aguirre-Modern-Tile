@@ -46,10 +46,14 @@ export async function POST(req: NextRequest) {
     const finalized = await stripe.invoices.finalizeInvoice(invoice.stripe_invoice_id)
     await stripe.invoices.sendInvoice(finalized.id)
 
-    // Update local status to sent
+    // Update local status to sent + cache the hosted pay URL for the
+    // customer-facing /invoices/[token] "Pay now" button.
     await supabase
       .from('invoices')
-      .update({ status: 'sent' })
+      .update({
+        status: 'sent',
+        stripe_hosted_url: finalized.hosted_invoice_url ?? null,
+      })
       .eq('id', invoice_id)
 
     return NextResponse.json({

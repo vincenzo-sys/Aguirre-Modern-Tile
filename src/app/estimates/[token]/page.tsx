@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
 import ShareEstimateButton from './ShareEstimateButton'
+import PrintButton from '@/components/PrintButton'
 import EstimateMessages from '@/components/EstimateMessages'
 import { Star, ShieldCheck, BadgeCheck, Phone, Check, Minus, Calendar } from 'lucide-react'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
@@ -288,7 +289,7 @@ export default async function EstimatePage({
   return (
     <div className="min-h-screen bg-gray-50 pb-28 md:pb-0">
       {/* Header */}
-      <header className="bg-gray-900 text-white">
+      <header className="bg-gray-900 text-white doc-print-header">
         <div className="max-w-3xl mx-auto px-6 py-7">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -301,7 +302,7 @@ export default async function EstimatePage({
             </div>
             <a
               href={`tel:${COMPANY_PHONE_TEL}`}
-              className="hidden sm:inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+              className="hidden sm:inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors no-print"
             >
               <Phone className="w-4 h-4" />
               {COMPANY_PHONE}
@@ -570,6 +571,9 @@ export default async function EstimatePage({
               Estimate valid through {parsed.validThrough}
             </p>
           )}
+          <div className="mt-4 no-print">
+            <PrintButton label="Download PDF" />
+          </div>
         </section>
 
         {/* Payment terms — sourced from job.payment_terms_text (snapshotted
@@ -688,7 +692,7 @@ export default async function EstimatePage({
 
         {/* Accept / pay — desktop */}
         {!depositSuccess && (
-          <section className="hidden md:block bg-primary-50 rounded-xl border border-primary-200 p-6 text-center">
+          <section className="hidden md:block bg-primary-50 rounded-xl border border-primary-200 p-6 text-center no-print">
             <h3 className="text-lg font-semibold text-primary-900 mb-1">
               Ready to move forward?
             </h3>
@@ -707,7 +711,7 @@ export default async function EstimatePage({
             notifications fire both ways. Sits above the tap-to-text/call
             row so the persistent thread reads as the primary path and the
             phone/text buttons are the escape hatch. */}
-        <div className="mt-8">
+        <div className="mt-8 no-print">
           <EstimateMessages
             mode="customer"
             endpoint={`/api/public/estimates/${token}/messages`}
@@ -718,7 +722,7 @@ export default async function EstimatePage({
             most common stall points: a question (Text Vince), a phone
             preference (Call), and a spousal-decision check (Share). The
             sms: pre-fill threads back with context already in the body. */}
-        <div className="mt-8 mb-4">
+        <div className="mt-8 mb-4 no-print">
           <p className="text-center text-sm font-medium text-gray-700 mb-3">
             Have a question, or want to share with your spouse?
           </p>
@@ -753,7 +757,7 @@ export default async function EstimatePage({
 
       {/* Sticky mobile CTA */}
       {!depositSuccess && (
-        <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20">
+        <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20 no-print">
           <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto">
             <div className="flex-shrink-0">
               <div className="text-[11px] text-gray-500 leading-tight">10% deposit</div>

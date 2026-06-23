@@ -84,7 +84,7 @@ export default function LeadCaptureForm() {
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const errors = validateContact(contactInfo)
+    const errors = validateContact(contactInfo, { requireEmail: false })
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       return
@@ -98,7 +98,8 @@ export default function LeadCaptureForm() {
     router.push(`/quote/${selectedProject}`)
   }
 
-  const isContactValid = contactInfo.name && contactInfo.email && contactInfo.phone
+  // Email is optional — name + phone is enough to continue.
+  const isContactValid = contactInfo.name && contactInfo.phone
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
@@ -226,7 +227,7 @@ export default function LeadCaptureForm() {
 
           <div>
             <label htmlFor="lead-email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              Email Address <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
@@ -234,7 +235,6 @@ export default function LeadCaptureForm() {
                 id="lead-email"
                 type="email"
                 name="email"
-                required
                 inputMode="email"
                 autoComplete="email"
                 autoCapitalize="none"

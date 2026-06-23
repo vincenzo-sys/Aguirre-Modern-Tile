@@ -95,3 +95,18 @@ export function deriveQuoteHints(
 
   return { initialTemplate, initialSqft }
 }
+
+// Map a job's free-text job_type (e.g. "Bathroom Tile", "Shower Tile",
+// "Backsplash") to the closest default estimator template, so the
+// GenerateEstimateModal on the JOB page opens pre-selected instead of always
+// defaulting to the first alphabetical template. Tolerant substring match;
+// returns null when there's no clean analog (Vince picks in the modal).
+export function templateForJobType(jobType: string | null): string | null {
+  const t = (jobType ?? '').toLowerCase()
+  if (!t) return null
+  if (t.includes('backsplash')) return 'Backsplash (Standard)'
+  if (t.includes('shower')) return 'Walk-in Shower (Small)'
+  if (t.includes('floor')) return 'Bathroom Floor (Medium)'
+  if (t.includes('bathroom')) return 'Tub Surround + Bathroom Floor'
+  return null
+}

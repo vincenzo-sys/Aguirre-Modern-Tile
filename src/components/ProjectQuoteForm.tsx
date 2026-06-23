@@ -72,7 +72,7 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
     e.preventDefault()
     setSubmitError('')
 
-    const errors = validateContact(contactInfo)
+    const errors = validateContact(contactInfo, { requireEmail: false })
     if (Object.keys(errors).length > 0) {
       toast('Please check your contact info on the previous step.', 'warning')
       return
@@ -162,7 +162,8 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
         </div>
 
         <p className="text-sm text-gray-500 mb-4">
-          We&apos;ll reach you at {contactInfo.phone} or {contactInfo.email}.
+          We&apos;ll reach you at {contactInfo.phone}
+          {contactInfo.email ? ` or ${contactInfo.email}` : ''}.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
@@ -197,7 +198,10 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
       <div className="bg-gray-50 rounded-xl p-4 mb-6">
         <p className="text-sm text-gray-500 mb-1">Sending estimate to:</p>
         <p className="font-semibold text-gray-900">{contactInfo.name}</p>
-        <p className="text-sm text-gray-600">{contactInfo.email} &bull; {contactInfo.phone}</p>
+        <p className="text-sm text-gray-600">
+          {contactInfo.email ? `${contactInfo.email} • ` : ''}
+          {contactInfo.phone}
+        </p>
       </div>
 
       {/* Project-Specific Questions */}

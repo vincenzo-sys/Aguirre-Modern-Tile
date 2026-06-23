@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { randomBytes } from 'node:crypto'
+
+// Public share-link secret for the customer-facing /invoices/[token] page.
+// Same generator as estimate_token / work_order_token (~144 bits).
+function generatePublicToken(): string {
+  return randomBytes(18).toString('base64url')
+}
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -108,6 +115,7 @@ export async function POST(req: NextRequest) {
         status: 'draft',
         due_date,
         line_items,
+        public_token: generatePublicToken(),
       })
       .select()
       .single()

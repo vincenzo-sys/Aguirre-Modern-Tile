@@ -136,6 +136,66 @@
   animation: fadeInUp 0.6s ease-out forwards;
 }
 
+/* ─── Print / "Save as PDF" ──────────────────────────────────────────────
+   Customer-facing estimate (/estimates/[token]) and invoice (/invoices/[token])
+   pages double as printable documents. Anything tagged .no-print (nav, sticky
+   CTAs, message threads, action buttons) is hidden; the page renders flat on
+   white so the browser's "Save as PDF" yields a clean, branded one-pager.
+   No server-side PDF dependency required. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  /* Flatten the app-chrome backgrounds/shadows so cards read as document
+     sections, not floating UI. */
+  .bg-gray-50,
+  .bg-gray-100 {
+    background: #fff !important;
+  }
+
+  .shadow-sm,
+  .shadow,
+  .shadow-md,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+
+  /* The customer document header is dark (bg-gray-900 / white text) on screen.
+     Chrome's "Save as PDF" defaults to NOT printing backgrounds, which would
+     leave white text on white. Flip it to dark-on-white with a rule so the
+     brand + invoice number stay legible regardless of the background-graphics
+     setting. */
+  .doc-print-header {
+    background: #fff !important;
+    color: #111 !important;
+    border-bottom: 2px solid #111 !important;
+  }
+  .doc-print-header * {
+    color: #111 !important;
+  }
+
+  /* Don't split a line item, section, or summary card across pages. */
+  .break-inside-avoid,
+  section,
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Remove the bottom padding that reserves space for the mobile sticky bar. */
+  .pb-28 {
+    padding-bottom: 0 !important;
+  }
+
+  @page {
+    margin: 0.5in;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

@@ -167,6 +167,9 @@ export const AUTO_MESSAGES = {
   invoice_sent: (amount: string, invoiceNumber: string) =>
     `Invoice ${invoiceNumber} for ${amount} has been sent to your email. Thank you! - Aguirre Modern Tile`,
 
+  invoice_link: (firstName: string, amount: string, invoiceUrl: string) =>
+    `Hi ${firstName || 'there'} — your invoice from Aguirre Modern Tile (${amount}) is ready. View it, download a PDF, or pay online here: ${invoiceUrl}. Thank you! - Vince`,
+
   estimate_ready: (firstName: string, estimateUrl: string) =>
     `Hi ${firstName || 'there'} — your tile estimate from Aguirre Modern Tile is ready. View it and reserve your install date here: ${estimateUrl}. Any questions, just reply. - Vince`,
 

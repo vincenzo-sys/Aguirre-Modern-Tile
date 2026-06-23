@@ -608,9 +608,11 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* What happens next — pre-payment version */}
+        {/* What happens next — pre-payment version. no-print so the saved PDF
+            reads as a formal document (header → project → pricing → terms)
+            rather than a sales page. */}
         {!depositSuccess && (
-          <section className="mb-6">
+          <section className="mb-6 no-print">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">
               What happens next
             </h3>
@@ -639,9 +641,10 @@ export default async function EstimatePage({
             block. After paying, the customer needs a clear "here's what
             happens next" so they don't refresh the page wondering if more
             action is required. The Accept-and-Pay CTAs below are already
-            hidden by their own !depositSuccess guards. */}
+            hidden by their own !depositSuccess guards. no-print keeps it out
+            of the formal PDF. */}
         {depositSuccess && (
-          <section className="mb-6">
+          <section className="mb-6 no-print">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">
               What happens next
             </h3>

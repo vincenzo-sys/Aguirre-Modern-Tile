@@ -1,11 +1,23 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { logError } from '@/lib/logger'
+
+type CustomerSearchResult = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  job_count?: number
+}
 
 const projectTypes = [
   { value: 'bathroom', label: 'Bathroom' },
@@ -38,7 +50,11 @@ function NewLeadForm() {
   // When launched from a customer's page (?customer_id=...), hard-link the new
   // lead to that customer so it can't create a duplicate. The name/phone/email
   // params just prefill the visible fields.
-  const customerId = searchParams.get('customer_id') || ''
+  const [customerId, setCustomerId] = useState(searchParams.get('customer_id') || '')
+  const [linkedCustomerName, setLinkedCustomerName] = useState(searchParams.get('name') || '')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([])
+  const [searchingCustomers, setSearchingCustomers] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     client_name: searchParams.get('name') || '',
@@ -56,6 +72,58 @@ function NewLeadForm() {
 
   function updateField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Debounced search of existing customers (reuses /api/customers?q=).
+  useEffect(() => {
+    const q = customerSearch.trim()
+    if (q.length < 2) {
+      setCustomerResults([])
+      return
+    }
+    let active = true
+    setSearchingCustomers(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`)
+        if (!res.ok) throw new Error('Customer search failed')
+        const data = await res.json()
+        if (active) setCustomerResults(Array.isArray(data) ? data.slice(0, 8) : [])
+      } catch (err) {
+        logError('Customer search failed', err)
+        if (active) setCustomerResults([])
+      } finally {
+        if (active) setSearchingCustomers(false)
+      }
+    }, 300)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [customerSearch])
+
+  function selectCustomer(c: CustomerSearchResult) {
+    setCustomerId(c.id)
+    setLinkedCustomerName(c.name)
+    setForm((prev) => ({
+      ...prev,
+      client_name: c.name || prev.client_name,
+      client_phone: c.phone || prev.client_phone,
+      client_email: c.email || prev.client_email,
+      address: c.address || prev.address,
+      city: c.city || prev.city,
+      state: c.state || prev.state,
+      zip: c.zip || prev.zip,
+      source: 'repeat',
+    }))
+    setCustomerSearch('')
+    setCustomerResults([])
+    toast(`Linked to ${c.name}`)
+  }
+
+  function clearLinkedCustomer() {
+    setCustomerId('')
+    setLinkedCustomerName('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -101,11 +169,63 @@ function NewLeadForm() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">New Lead</h1>
 
-      {customerId && (
-        <div className="mb-4 rounded-lg bg-primary-50 border border-primary-200 p-3">
+      {customerId ? (
+        <div className="mb-4 rounded-lg bg-primary-50 border border-primary-200 p-3 flex items-center justify-between gap-3">
           <p className="text-sm text-primary-800">
-            Linked to an existing customer — this lead attaches to their record and won&apos;t create a duplicate.
+            Linked to existing customer:{' '}
+            <span className="font-semibold">{linkedCustomerName || 'Selected customer'}</span>
+            {' '}— this lead attaches to their record and won&apos;t create a duplicate.
           </p>
+          <button
+            type="button"
+            onClick={clearLinkedCustomer}
+            className="shrink-0 text-sm font-medium text-primary-700 hover:text-primary-900"
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <div className="mb-4 rounded-lg bg-gray-50 border border-gray-200 p-3 relative">
+          <label htmlFor="customer_search" className="block text-sm font-medium text-gray-700 mb-1">
+            Previous customer? <span className="font-normal text-gray-500">(optional — pull up an existing record to price)</span>
+          </label>
+          <input
+            id="customer_search"
+            type="text"
+            autoComplete="off"
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Search by name, phone, or email…"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Leave blank to enter a brand-new lead below.
+          </p>
+          {(searchingCustomers || customerResults.length > 0) && customerSearch.trim().length >= 2 && (
+            <ul className="absolute z-10 left-3 right-3 mt-1 max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+              {searchingCustomers && customerResults.length === 0 && (
+                <li className="px-3 py-2 text-sm text-gray-500">Searching…</li>
+              )}
+              {!searchingCustomers && customerResults.length === 0 && (
+                <li className="px-3 py-2 text-sm text-gray-500">No matching customers.</li>
+              )}
+              {customerResults.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectCustomer(c)}
+                    className="w-full text-left px-3 py-2 hover:bg-primary-50 focus:bg-primary-50 focus:outline-none"
+                  >
+                    <span className="block text-sm font-medium text-gray-900">{c.name}</span>
+                    <span className="block text-xs text-gray-500">
+                      {[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact info'}
+                      {c.job_count ? ` · ${c.job_count} prior job${c.job_count === 1 ? '' : 's'}` : ''}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

@@ -37,6 +37,7 @@ const FALLBACK_TEMPLATE_NAMES = [
   'Backsplash (Large/Complex)',
   'Bathroom Floor (Small)',
   'Bathroom Floor (Medium)',
+  'Half Bathroom (Floor + Short Walls)',
   'Fireplace Surround',
   'Shower Floor Only',
   'Standard Tub Surround',

@@ -22,6 +22,15 @@ const JOB_TYPES = [
 
 const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
+type CustomerSearchResult = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  job_count?: number
+}
+
 function mapProjectTypeToJobType(projectType: string): string {
   const map: Record<string, string> = {
     bathroom: 'Bathroom Tile',
@@ -52,6 +61,15 @@ function NewJobForm() {
   const [photos, setPhotos] = useState<File[]>([])
   const fromLeadId = searchParams.get('from_lead') || ''
   const customerIdParam = searchParams.get('customer_id') || ''
+
+  // Existing-customer link. Seeded from the query param when the form is
+  // launched from a customer page / lead, but also editable via the search
+  // picker below so a prior customer can be attached from Jobs → New Job.
+  const [customerId, setCustomerId] = useState(customerIdParam)
+  const [linkedCustomerName, setLinkedCustomerName] = useState(searchParams.get('name') || '')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([])
+  const [searchingCustomers, setSearchingCustomers] = useState(false)
 
   // Pre-fill from lead conversion query params
   const [form, setForm] = useState({
@@ -118,6 +136,55 @@ function NewJobForm() {
     checkOwnerAndLoadTeam()
   }, [router])
 
+  // Debounced customer search against the existing /api/customers?q= endpoint.
+  useEffect(() => {
+    if (isDemoMode) return
+    const q = customerSearch.trim()
+    if (q.length < 2) {
+      setCustomerResults([])
+      return
+    }
+    let active = true
+    setSearchingCustomers(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`)
+        if (!res.ok) throw new Error('Customer search failed')
+        const data = await res.json()
+        if (active) setCustomerResults(Array.isArray(data) ? data.slice(0, 8) : [])
+      } catch (err) {
+        logError('Customer search failed:', err)
+        if (active) setCustomerResults([])
+      } finally {
+        if (active) setSearchingCustomers(false)
+      }
+    }, 300)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [customerSearch])
+
+  function selectCustomer(c: CustomerSearchResult) {
+    setCustomerId(c.id)
+    setLinkedCustomerName(c.name)
+    setForm((prev) => ({
+      ...prev,
+      client_name: c.name || prev.client_name,
+      client_phone: c.phone || prev.client_phone,
+      client_email: c.email || prev.client_email,
+      client_address: c.address || prev.client_address,
+    }))
+    setCustomerSearch('')
+    setCustomerResults([])
+    toast(`Linked to ${c.name}`)
+  }
+
+  function clearLinkedCustomer() {
+    setCustomerId('')
+    setLinkedCustomerName('')
+  }
+
   function applyTemplate(templateId: string) {
     setSelectedTemplateId(templateId)
     if (!templateId) return
@@ -182,7 +249,7 @@ function NewJobForm() {
         .from('jobs')
         .insert({
           title: form.title,
-          customer_id: customerIdParam || null,
+          customer_id: customerId || null,
           client_name: form.client_name,
           client_phone: form.client_phone || null,
           client_email: form.client_email || null,
@@ -376,6 +443,71 @@ function NewJobForm() {
         <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Client</h2>
           <div className="space-y-4">
+            {/* Existing-customer picker */}
+            {!isDemoMode && (
+              <div className="rounded-md bg-gray-50 border border-gray-200 p-3">
+                {customerId ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-gray-700">
+                      Linked to existing customer:{' '}
+                      <span className="font-semibold text-gray-900">
+                        {linkedCustomerName || 'Selected customer'}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearLinkedCustomer}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <label htmlFor="customer_search" className="block text-sm font-medium text-gray-700 mb-1">
+                      Link an existing customer <span className="font-normal text-gray-500">(optional)</span>
+                    </label>
+                    <input
+                      id="customer_search"
+                      type="text"
+                      autoComplete="off"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className={inputClass}
+                      placeholder="Search by name, phone, or email…"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Leave blank to create a brand-new customer from the fields below.
+                    </p>
+                    {(searchingCustomers || customerResults.length > 0) && customerSearch.trim().length >= 2 && (
+                      <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                        {searchingCustomers && customerResults.length === 0 && (
+                          <li className="px-3 py-2 text-sm text-gray-500">Searching…</li>
+                        )}
+                        {!searchingCustomers && customerResults.length === 0 && (
+                          <li className="px-3 py-2 text-sm text-gray-500">No matching customers.</li>
+                        )}
+                        {customerResults.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => selectCustomer(c)}
+                              className="w-full text-left px-3 py-2 hover:bg-primary-50 focus:bg-primary-50 focus:outline-none"
+                            >
+                              <span className="block text-sm font-medium text-gray-900">{c.name}</span>
+                              <span className="block text-xs text-gray-500">
+                                {[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact info'}
+                                {c.job_count ? ` · ${c.job_count} prior job${c.job_count === 1 ? '' : 's'}` : ''}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label htmlFor="client_name" className={labelClass}>
                 Client Name *

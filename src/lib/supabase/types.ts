@@ -1,3 +1,5 @@
+import type { JobScope } from '@/lib/estimator/scopes'
+
 export type UserRole = 'owner' | 'lead'
 export type JobStatus = 'lead' | 'quoted' | 'estimate_revised' | 'accepted_not_scheduled' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
 
@@ -89,6 +91,10 @@ export interface Job {
   amount_invoiced: number | null
   amount_paid: number | null
   line_items: JobLineItem[]
+  // Per-scope inputs snapshotted by the estimate generator (template_name,
+  // sqft/sub_sqft, addons, customer_provides). Lets a regenerate reload the
+  // exact scopes instead of starting blank. JSONB; shape mirrors JobScope.
+  scopes?: JobScope[] | null
   stripe_customer_id: string | null
   notion_page_id: string | null
   notion_last_synced_at: string | null

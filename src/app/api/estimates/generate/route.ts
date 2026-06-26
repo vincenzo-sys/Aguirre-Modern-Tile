@@ -214,6 +214,29 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Preserve material order-status across a re-generate. A line the crew
+  // already marked ordered / received / on_site shouldn't silently reset to
+  // 'needed' just because the estimate was re-priced (the regenerate would
+  // otherwise wipe two weeks of purchasing progress). Match on section +
+  // description; only carry forward a non-default status.
+  if (hasExistingItems && Array.isArray(job.line_items)) {
+    const prevStatus = new Map<string, string>()
+    for (const li of job.line_items as Array<Record<string, unknown>>) {
+      const status = li?.status as string | undefined
+      if (li?.category === 'materials' && status && status !== 'needed') {
+        prevStatus.set(`${(li.section as string) ?? ''}::${li.description as string}`, status)
+      }
+    }
+    if (prevStatus.size > 0) {
+      for (const li of result.line_items) {
+        if (li.category === 'materials') {
+          const carried = prevStatus.get(`${li.section ?? ''}::${li.description}`)
+          if (carried) li.status = carried as typeof li.status
+        }
+      }
+    }
+  }
+
   const defaults = defaultsRes?.data
   // Build customer_provides text. Priority order:
   //   1. Explicit per-scope customer_provides arrays (caller passed them)

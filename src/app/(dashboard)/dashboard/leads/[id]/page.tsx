@@ -811,6 +811,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                   initialSqft={job.square_footage ?? quoteHints.initialSqft}
                   initialTemplate={quoteHints.initialTemplate ?? undefined}
                   initialAddons={quoteHints.initialAddons}
+                  initialScopes={Array.isArray(job.scopes) ? job.scopes : null}
                 />
               </div>
 

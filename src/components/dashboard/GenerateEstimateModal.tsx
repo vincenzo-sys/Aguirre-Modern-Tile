@@ -91,6 +91,36 @@ function defaultScope(template: string = FALLBACK_TEMPLATE_NAMES[0]): ScopeInput
   }
 }
 
+// Shape persisted on job.scopes by the generate route (JSONB). Mapped back
+// into editable ScopeInput so a regenerate opens with the prior scopes
+// instead of a single blank one.
+type StoredScope = {
+  label?: string
+  template_name?: string
+  sqft?: number | null
+  sub_sqft?: Record<string, number> | null
+  addons?: Record<string, boolean | number> | null
+  customer_provides?: string[] | null
+}
+
+function mapStoredScope(s: StoredScope): ScopeInput {
+  const sub_sqft: Record<string, string> = {}
+  if (s.sub_sqft) for (const [k, v] of Object.entries(s.sub_sqft)) sub_sqft[k] = String(v)
+  const addons: Record<string, boolean> = {}
+  if (s.addons) for (const [k, v] of Object.entries(s.addons)) addons[k] = Boolean(v)
+  return {
+    uid: newUid(),
+    label: s.label ?? '',
+    template_name: s.template_name || FALLBACK_TEMPLATE_NAMES[0],
+    sqft: s.sqft != null ? String(s.sqft) : '',
+    sub_sqft,
+    addons,
+    customer_provides_tile: Array.isArray(s.customer_provides)
+      ? s.customer_provides.includes('tile')
+      : true,
+  }
+}
+
 // Auto-generated label when the user hasn't typed one. Mirrors what the
 // server does, so the preview here matches what shows up on the estimate.
 function fallbackLabel(scope: ScopeInput, index: number): string {
@@ -104,6 +134,7 @@ export default function GenerateEstimateModal({
   initialSqft,
   initialTemplate,
   initialAddons,
+  initialScopes,
 }: {
   jobId: string
   hasExistingItems: boolean
@@ -116,17 +147,30 @@ export default function GenerateEstimateModal({
   // Addon flags implied by the originating quote answers (e.g. large_format).
   // Seeds the matching checkboxes; the addon-default effect won't clobber them.
   initialAddons?: Record<string, boolean>
+  // The job's previously-generated scopes (job.scopes). When present, a
+  // regenerate opens pre-loaded with these instead of one blank scope, so a
+  // multi-scope estimate doesn't have to be rebuilt from scratch.
+  initialScopes?: StoredScope[] | null
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
-  const [scopes, setScopes] = useState<ScopeInput[]>(() => [
-    {
-      ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
-      sqft: initialSqft ? String(initialSqft) : '',
-      addons: { ...(initialAddons ?? {}) },
-    },
-  ])
+  // Initial scope set: the job's saved scopes when regenerating (so a
+  // multi-scope estimate isn't rebuilt by hand), otherwise a single scope
+  // seeded from the quote hints.
+  function buildInitialScopes(): ScopeInput[] {
+    if (initialScopes && initialScopes.length > 0) {
+      return initialScopes.map(mapStoredScope)
+    }
+    return [
+      {
+        ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
+        sqft: initialSqft ? String(initialSqft) : '',
+        addons: { ...(initialAddons ?? {}) },
+      },
+    ]
+  }
+  const [scopes, setScopes] = useState<ScopeInput[]>(buildInitialScopes)
   const [loading, setLoading] = useState(false)
 
   // Guard for re-pricing an already-SENT estimate. Must be ticked before
@@ -157,16 +201,11 @@ export default function GenerateEstimateModal({
   // stale entries from the previous interaction.
   useEffect(() => {
     if (open) {
-      setScopes([
-        {
-          ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
-          sqft: initialSqft ? String(initialSqft) : '',
-          addons: { ...(initialAddons ?? {}) },
-        },
-      ])
+      setScopes(buildInitialScopes())
       setConfirmReprice(false)
     }
-  }, [open, initialTemplate, initialSqft, JSON.stringify(initialAddons)])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialTemplate, initialSqft, JSON.stringify(initialAddons), JSON.stringify(initialScopes)])
 
   // Initialize addon defaults whenever the templates list lands or the user
   // switches a scope to a different template. Only fills in keys the user
@@ -380,6 +419,19 @@ export default function GenerateEstimateModal({
   // customer saw — gate Generate behind an explicit confirm.
   const isSentReprice = hasExistingItems && estimateSent
 
+  // Every scope needs a positive measurement before Generate is meaningful —
+  // otherwise the engine quietly falls back to the template's typical sqft and
+  // produces a number that looks real but wasn't measured. Block instead.
+  const scopesValid = scopes.every((s) => {
+    const hasSqft = Number(s.sqft) > 0
+    const hasAnySub = Object.values(s.sub_sqft).some((v) => Number(v) > 0)
+    if (templates.length === 0) return hasSqft || hasAnySub
+    const tmpl = templates.find((t) => t.template_name === s.template_name)
+    const subAreas = tmpl?.sub_areas ?? []
+    if (subAreas.length > 0) return subAreas.some((a) => Number(s.sub_sqft[a.key]) > 0) || hasSqft
+    return hasSqft
+  })
+
   return (
     <>
       <button
@@ -482,7 +534,13 @@ export default function GenerateEstimateModal({
 
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between sticky bottom-0 bg-white">
               <div className="text-xs text-gray-500">
-                {scopes.length} scope{scopes.length === 1 ? '' : 's'}
+                {!scopesValid ? (
+                  <span className="text-amber-600">Enter a square footage to generate</span>
+                ) : (
+                  <>
+                    {scopes.length} scope{scopes.length === 1 ? '' : 's'}
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -494,7 +552,8 @@ export default function GenerateEstimateModal({
                 </button>
                 <button
                   onClick={handleGenerate}
-                  disabled={loading || (isSentReprice && !confirmReprice)}
+                  disabled={loading || !scopesValid || (isSentReprice && !confirmReprice)}
+                  title={!scopesValid ? 'Enter a square footage for every scope first' : undefined}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
                   {loading ? (

@@ -455,6 +455,7 @@ export default async function JobDetailPage({
               estimateSent={!!job.estimate_sent_at}
               initialSqft={job.square_footage}
               initialTemplate={templateForJobType(job.job_type) ?? undefined}
+              initialScopes={Array.isArray(job.scopes) ? job.scopes : null}
             />
           </div>
         )}

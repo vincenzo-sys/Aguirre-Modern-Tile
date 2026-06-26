@@ -258,15 +258,19 @@ function buildScope(
 
   for (const entry of formulas) {
     if (!appliesWhen(entry.applies_when, scope.addons ?? {})) continue
+    // Match the catalog first so the material's coverage can feed the formula
+    // (coverage-as-source-of-truth). No row = catalog gap; skip — the owner
+    // adds the line manually after. We skip before computing to avoid a
+    // coverage-based formula dividing by 0 on a material we can't price anyway.
+    const row = matchCatalog(entry.item, catalog)
+    if (!row) continue
     const qty = computeMaterialQty({
       formula: entry.formula,
-      vars: formulaVars,
+      vars: { ...formulaVars, coverage: Number(row.coverage) || 0 },
       min: entry.min,
       max: entry.max,
     })
     if (qty <= 0) continue
-    const row = matchCatalog(entry.item, catalog)
-    if (!row) continue // catalog gap — owner can add the line manually after
     const unitPrice = Number(row.price_to_customer)
     const amount = Math.round(unitPrice * qty * 100) / 100
     lineItems.push({

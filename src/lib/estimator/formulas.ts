@@ -28,6 +28,13 @@ export interface FormulaVars {
   // outside_floor }; for tub combos: { walls, floor }; for simple templates:
   // empty/absent. Formulas reference values via `sub_sqft.<key>`.
   sub_sqft?: Record<string, number>
+  // The matched catalog material's coverage (sq ft per unit). Bound per line
+  // item by scopes.ts so a formula can be "one source of truth": write
+  // `ceil(sqft * 1.15 / coverage)` and the bag count tracks whatever coverage
+  // is set in Settings → Materials. 0 when no catalog row matched — a formula
+  // that divides by it then yields Infinity and fails loud (the intended
+  // signal that the material is missing from the catalog).
+  coverage?: number
 }
 
 // Locked-down parser. Disable assignment, comparisons, conditionals, and any
@@ -90,6 +97,10 @@ function buildScope(vars: FormulaVars): Record<string, unknown> {
     sqft: Number(vars.sqft ?? 0),
     linear_ft: Number(vars.linear_ft ?? 0),
     height_ft: Number(vars.height_ft ?? 0),
+    // Coverage of the catalog material this formula prices (sq ft per unit).
+    // Lets formulas derive bag/sheet counts from the catalog instead of a
+    // hardcoded divisor. 0 when unmatched — dividing by it fails loud.
+    coverage: Number(vars.coverage ?? 0),
   }
   // Addons land as a nested object so formulas can write `addons.niche`.
   // Booleans coerce to 1/0 so they multiply cleanly: e.g. `2 + 1*addons.niche`.

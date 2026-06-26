@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireApiAuth } from '@/lib/apiAuth'
 import type { JobLineItem } from '@/lib/supabase/types'
+import { deriveQuoteHints } from '@/lib/quoteHints'
+
+// Compact, AI-readable reference of every template's input shape so the
+// assistant builds a correct generate_estimate payload (right sub_sqft keys,
+// right addon keys) instead of guessing. One DB read, formatted to a few lines.
+async function buildTemplateReference(
+  supabase: ReturnType<typeof getSupabase>,
+): Promise<string> {
+  const { data } = await supabase
+    .from('job_templates')
+    .select('template_name, sub_areas, addons')
+    .order('template_name')
+  if (!data || data.length === 0) return '_(template list unavailable — use `list_templates`)_'
+  const lines = data.map((t) => {
+    const subKeys = (Array.isArray(t.sub_areas) ? t.sub_areas : []).map((s: { key: string }) => s.key)
+    const addonKeys = (Array.isArray(t.addons) ? t.addons : []).map((a: { key: string }) => a.key)
+    const shape = subKeys.length > 0 ? `sub_sqft: {${subKeys.join(', ')}}` : 'single sqft'
+    const addons = addonKeys.length > 0 ? `; addons: {${addonKeys.join(', ')}}` : ''
+    return `- **${t.template_name}** — ${shape}${addons}`
+  })
+  return lines.join('\n')
+}
 
 // Builds a clipboard-ready text block for pasting into Claude Desktop.
 // The block is pure markdown, deliberately information-dense — every
@@ -74,12 +96,30 @@ async function buildLeadContext(supabase: ReturnType<typeof getSupabase>, leadId
     priorRevenue = (jobs ?? []).reduce((s, j) => s + Number(j.amount_paid ?? 0), 0)
   }
 
-  // Photos from quote form
+  // Photos from quote form — sign them so the assistant can actually open and
+  // read the images (1h URLs), not just be told they exist.
   const { data: photos } = await supabase
     .from('quote_request_photos')
     .select('storage_path, file_name')
     .eq('quote_request_id', leadId)
   const photoCount = photos?.length ?? 0
+  let signedPhotos: Array<{ name: string; url: string }> = []
+  if (photoCount > 0 && photos) {
+    const { data: signed } = await supabase.storage
+      .from('quote-photos')
+      .createSignedUrls(photos.map((p) => p.storage_path), 3600)
+    signedPhotos = (signed ?? [])
+      .map((s, i) => ({ name: photos[i]?.file_name ?? `photo ${i + 1}`, url: s.signedUrl ?? '' }))
+      .filter((p) => p.url)
+  }
+
+  // Phase-1 quote hints + template reference so the assistant can draft an
+  // estimate, not just review it.
+  const hints = deriveQuoteHints(
+    lead.project_type ?? null,
+    (lead.answers ?? null) as Record<string, string> | null,
+  )
+  const templateReference = await buildTemplateReference(supabase)
 
   const lines: string[] = []
   // Top-of-document instruction — lands first so Claude reads the prompt
@@ -137,14 +177,36 @@ async function buildLeadContext(supabase: ReturnType<typeof getSupabase>, leadId
     lines.push('')
   }
   lines.push(`## Photos uploaded`)
-  lines.push(
-    photoCount === 0
-      ? '_(none)_'
-      : `${photoCount} photo${photoCount === 1 ? '' : 's'} attached to the lead (view them at \`/dashboard/leads/${lead.id}\`)`
-  )
+  if (photoCount === 0) {
+    lines.push('_(none)_')
+  } else {
+    lines.push(`${photoCount} photo${photoCount === 1 ? '' : 's'} — open these and read them for scope/condition (demo complexity, existing tile, niches, drain type, square-footage cues). Links expire in 1 hour:`)
+    for (const p of signedPhotos) lines.push(`- [${p.name}](${p.url})`)
+  }
+  lines.push('')
+  lines.push('## Suggested starting point (auto-derived from the answers)')
+  lines.push(`- **Template**: ${hints.initialTemplate ?? '_(none inferred — pick from the list below)_'}`)
+  lines.push(`- **Approx sqft**: ${hints.initialSqft ?? '_(unknown — estimate from photos/answers)_'}`)
+  const hintAddons = Object.keys(hints.initialAddons)
+  if (hintAddons.length > 0) lines.push(`- **Implied addons**: ${hintAddons.join(', ')}`)
+  lines.push('_(These are rough defaults the dashboard would pre-fill — confirm or override.)_')
+  lines.push('')
+  lines.push('## Available templates & their input shape')
+  lines.push(templateReference)
+  lines.push('')
+  lines.push('## To draft the estimate')
+  if (lead.converted_job_id) {
+    lines.push(`This lead is already job \`${lead.converted_job_id}\`. Call \`generate_estimate\` with that job_id once you've settled the scope:`)
+  } else {
+    lines.push('Convert the lead to a job first (`create_job`, or the dashboard "Convert"), then call `generate_estimate` with the job_id:')
+  }
+  lines.push('```')
+  lines.push('generate_estimate({ job_id, scopes: [{ template_name, sub_sqft: { <keys above> }  // or sqft for single-sqft templates, addons: { <keys above>: true } }] })')
+  lines.push('```')
+  lines.push('Use the exact sub_sqft / addon keys listed per template above. Preview the totals, sanity-check margin against 39-45%, then tell me what you set.')
   lines.push('')
   lines.push('---')
-  lines.push('_Pasted from the Aguirre Modern Tile dashboard via "Copy for Claude". Reply with your scope read, suggested template, sub-area estimates, and a clarifying-questions punch list._')
+  lines.push('_Pasted from the Aguirre Modern Tile dashboard via "Copy for Claude". Reply with your scope read, the template + sub-area sqft you\'d use, and a clarifying-questions punch list._')
 
   return lines.join('\n')
 }
@@ -252,7 +314,14 @@ async function buildJobContext(supabase: ReturnType<typeof getSupabase>, jobId: 
   }
   lines.push('## Line items')
   if (lineItems.length === 0) {
-    lines.push('_No line items yet._ Use Generate Estimate (template), Claude Desktop (MCP), or build manually.')
+    lines.push('_No line items yet._ Draft them via `generate_estimate` (MCP) using the template shapes below, or build manually.')
+    lines.push('')
+    lines.push('### Available templates & their input shape')
+    lines.push(await buildTemplateReference(supabase))
+    lines.push('')
+    lines.push('```')
+    lines.push(`generate_estimate({ job_id: "${job.id}", scopes: [{ template_name, sub_sqft: { <keys above> } /* or sqft */, addons: { <keys above>: true } }] })`)
+    lines.push('```')
   } else {
     lines.push(`**Total**: ${formatMoney(total)} · ${labor.length} labor · ${materials.length} materials`)
     lines.push('')

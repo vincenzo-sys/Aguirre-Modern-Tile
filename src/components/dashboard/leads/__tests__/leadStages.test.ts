@@ -72,22 +72,24 @@ describe('stageOptionsFor', () => {
     expect(opts.every((o) => !o.disabled)).toBe(true)
   })
 
-  it('job rows: QR-only stage options are disabled', () => {
+  it('job rows: QR-only stages are not offered at all', () => {
+    // Job rows have no inquiry to revert to, so the two QR-only stages are
+    // omitted entirely rather than shown greyed-out (see stageOptionsFor).
     const opts = stageOptionsFor({ kind: 'job' })
-    const byStage = Object.fromEntries(opts.map((o) => [o.stage, o]))
-    expect(byStage.new.disabled).toBe(true)
-    expect(byStage.in_person_estimate_scheduled.disabled).toBe(true)
-    expect(byStage.quoted.disabled).toBe(false)
-    expect(byStage.edits_needed.disabled).toBe(false)
-    expect(byStage.awaiting_response.disabled).toBe(false)
-    expect(byStage.accepted_not_scheduled.disabled).toBe(false)
-    expect(byStage.scheduled.disabled).toBe(false)
+    const stages = opts.map((o) => o.stage)
+    expect(stages).not.toContain('new')
+    expect(stages).not.toContain('in_person_estimate_scheduled')
+    expect(stages).toEqual([
+      'quoted',
+      'edits_needed',
+      'awaiting_response',
+      'accepted_not_scheduled',
+      'scheduled',
+    ])
   })
 
-  it('job rows: disabled options carry a disabledReason', () => {
+  it('job rows: every offered option is selectable (none disabled)', () => {
     const opts = stageOptionsFor({ kind: 'job' })
-    for (const o of opts.filter((o) => o.disabled)) {
-      expect(o.disabledReason).toBeTruthy()
-    }
+    expect(opts.every((o) => !o.disabled)).toBe(true)
   })
 })

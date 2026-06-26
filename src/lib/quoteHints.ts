@@ -111,6 +111,18 @@ export function deriveQuoteHints(
     initialTemplate = 'Bathroom Floor (Medium)'
   }
 
+  // Exact measurement beats the size band. When the customer typed a real
+  // number (new optional intake fields), use it instead of the band midpoint
+  // so the estimate opens on the measured value, not a guess. Backsplash is
+  // sized by linear feet (×1.5 for an 18" run), the rest by square feet.
+  const exactSqft = Number(a.exactSqft)
+  const exactLinearFeet = Number(a.exactLinearFeet)
+  if (type === 'backsplash' && exactLinearFeet > 0) {
+    initialSqft = Math.round(exactLinearFeet * 1.5)
+  } else if (exactSqft > 0) {
+    initialSqft = exactSqft
+  }
+
   return { initialTemplate, initialSqft, initialAddons }
 }
 

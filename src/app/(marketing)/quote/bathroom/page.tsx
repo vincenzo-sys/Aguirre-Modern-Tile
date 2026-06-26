@@ -41,6 +41,12 @@ const questions = [
     ],
   },
   {
+    id: 'exactSqft',
+    label: 'Know the exact square footage? (optional)',
+    type: 'number' as const,
+    placeholder: 'e.g. 85 — leave blank if unsure',
+  },
+  {
     id: 'existingTile',
     label: 'Is there existing tile to remove?',
     type: 'radio' as const,

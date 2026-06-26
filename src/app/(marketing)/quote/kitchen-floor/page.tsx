@@ -53,6 +53,12 @@ const questions = [
     ],
   },
   {
+    id: 'exactSqft',
+    label: 'Know the exact square footage? (optional)',
+    type: 'number' as const,
+    placeholder: 'e.g. 220 — leave blank if unsure',
+  },
+  {
     id: 'tileSize',
     label: 'Tile size preference (optional)',
     type: 'select' as const,

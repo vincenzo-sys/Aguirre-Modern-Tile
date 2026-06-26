@@ -34,6 +34,23 @@ describe('deriveQuoteHints', () => {
     const h = deriveQuoteHints('shower', { showerType: 'walkin', size: 'large' })
     expect(h.initialTemplate).toBe('Walk-in Shower (Large)')
   })
+
+  it('lets an exact sqft answer override the size band', () => {
+    const band = deriveQuoteHints('bathroom', { size: 'small', projectScope: 'floor-only' })
+    expect(band.initialSqft).toBe(40) // band midpoint
+    const exact = deriveQuoteHints('bathroom', { size: 'small', projectScope: 'floor-only', exactSqft: '52' })
+    expect(exact.initialSqft).toBe(52)
+  })
+
+  it('converts an exact backsplash linear-feet answer to sqft (×1.5)', () => {
+    const h = deriveQuoteHints('backsplash', { linearFeet: 'small', exactLinearFeet: '14' })
+    expect(h.initialSqft).toBe(21)
+  })
+
+  it('ignores blank/zero exact measurements (keeps the band)', () => {
+    const h = deriveQuoteHints('kitchen-floor', { size: 'medium', exactSqft: '' })
+    expect(h.initialSqft).toBe(150)
+  })
 })
 
 describe('templateForJobType', () => {

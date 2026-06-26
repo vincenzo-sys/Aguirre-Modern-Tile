@@ -41,6 +41,12 @@ const questions = [
     ],
   },
   {
+    id: 'exactSqft',
+    label: 'Know the tiled square footage? (optional)',
+    type: 'number' as const,
+    placeholder: 'e.g. 90 — walls + floor, leave blank if unsure',
+  },
+  {
     id: 'features',
     label: 'Any special features?',
     type: 'radio' as const,

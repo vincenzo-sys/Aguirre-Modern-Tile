@@ -42,6 +42,12 @@ const questions = [
     ],
   },
   {
+    id: 'exactLinearFeet',
+    label: 'Know the exact length in feet? (optional)',
+    type: 'number' as const,
+    placeholder: 'e.g. 14 — leave blank if unsure',
+  },
+  {
     id: 'existingBacksplash',
     label: 'Is there existing backsplash tile?',
     type: 'radio' as const,

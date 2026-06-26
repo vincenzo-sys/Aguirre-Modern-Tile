@@ -10,7 +10,7 @@ import { uploadQuotePhotos } from '@/lib/uploadQuotePhotos'
 interface Question {
   id: string
   label: string
-  type: 'select' | 'radio' | 'text' | 'textarea'
+  type: 'select' | 'radio' | 'text' | 'textarea' | 'number'
   options?: { value: string; label: string }[]
   placeholder?: string
 }
@@ -245,6 +245,19 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
           {question.type === 'text' && (
             <input
               type="text"
+              value={answers[question.id] || ''}
+              onChange={e => handleAnswerChange(question.id, e.target.value)}
+              placeholder={question.placeholder}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+          )}
+
+          {question.type === 'number' && (
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
               value={answers[question.id] || ''}
               onChange={e => handleAnswerChange(question.id, e.target.value)}
               placeholder={question.placeholder}

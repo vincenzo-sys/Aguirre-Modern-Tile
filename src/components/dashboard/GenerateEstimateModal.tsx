@@ -103,6 +103,7 @@ export default function GenerateEstimateModal({
   estimateSent = false,
   initialSqft,
   initialTemplate,
+  initialAddons,
 }: {
   jobId: string
   hasExistingItems: boolean
@@ -112,6 +113,9 @@ export default function GenerateEstimateModal({
   estimateSent?: boolean
   initialSqft?: number | null
   initialTemplate?: string
+  // Addon flags implied by the originating quote answers (e.g. large_format).
+  // Seeds the matching checkboxes; the addon-default effect won't clobber them.
+  initialAddons?: Record<string, boolean>
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -120,6 +124,7 @@ export default function GenerateEstimateModal({
     {
       ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
       sqft: initialSqft ? String(initialSqft) : '',
+      addons: { ...(initialAddons ?? {}) },
     },
   ])
   const [loading, setLoading] = useState(false)
@@ -156,11 +161,12 @@ export default function GenerateEstimateModal({
         {
           ...defaultScope(initialTemplate ?? FALLBACK_TEMPLATE_NAMES[0]),
           sqft: initialSqft ? String(initialSqft) : '',
+          addons: { ...(initialAddons ?? {}) },
         },
       ])
       setConfirmReprice(false)
     }
-  }, [open, initialTemplate, initialSqft])
+  }, [open, initialTemplate, initialSqft, JSON.stringify(initialAddons)])
 
   // Initialize addon defaults whenever the templates list lands or the user
   // switches a scope to a different template. Only fills in keys the user
@@ -184,6 +190,34 @@ export default function GenerateEstimateModal({
       })
     )
   }, [templates, scopes.map((s) => s.template_name).join('|')])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Seed per-area sqft from the single sqft hint using each sub-area's
+  // default_share, so a sub-area template (walk-in shower, tub combo, half
+  // bath) opens pre-split instead of blank — the salesperson sanity-checks the
+  // split instead of measuring three areas from scratch. Only fills when every
+  // sub-area input is still empty, so it never clobbers a number being typed.
+  useEffect(() => {
+    if (templates.length === 0) return
+    setScopes((prev) =>
+      prev.map((s) => {
+        const tmpl = templates.find((t) => t.template_name === s.template_name)
+        const subAreas = tmpl?.sub_areas ?? []
+        if (subAreas.length === 0) return s
+        const base = Number(s.sqft)
+        if (!base || base <= 0) return s
+        const anyFilled = subAreas.some(
+          (a) => s.sub_sqft[a.key] && Number(s.sub_sqft[a.key]) > 0,
+        )
+        if (anyFilled) return s
+        const next: Record<string, string> = { ...s.sub_sqft }
+        for (const a of subAreas) {
+          const share = a.default_share ?? 1 / subAreas.length
+          next[a.key] = String(Math.round(base * share))
+        }
+        return { ...s, sub_sqft: next }
+      }),
+    )
+  }, [templates, scopes.map((s) => `${s.template_name}:${s.sqft}`).join('|')])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return

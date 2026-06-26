@@ -810,6 +810,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                   estimateSent={!!job.estimate_sent_at}
                   initialSqft={job.square_footage ?? quoteHints.initialSqft}
                   initialTemplate={quoteHints.initialTemplate ?? undefined}
+                  initialAddons={quoteHints.initialAddons}
                 />
               </div>
 

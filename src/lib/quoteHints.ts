@@ -8,7 +8,17 @@
 export type QuoteHints = {
   initialTemplate: string | null
   initialSqft: number | null
+  // Addon flags the form answers already imply (keyed by template addon.key,
+  // e.g. large_format). The modal seeds matching checkboxes from these so Vince
+  // doesn't re-toggle what the customer already told us. Only keys an actual
+  // template declares take effect; unknown keys are ignored downstream.
+  initialAddons: Record<string, boolean>
 }
+
+// Tile-style / tile-size answers that mean "large-format" (12"+), which the
+// estimator gates the Platinum-thinset swap on. 'pattern' counts because a
+// mixed/large pattern layout sets like large-format. 'subway'/'mosaic' do not.
+const LARGE_FORMAT_TILE_VALUES = new Set(['large', 'pattern'])
 
 // Bathroom & shower sizes: midpoint of the band the form offers.
 const BATHROOM_SIZE_SQFT: Record<string, number> = {
@@ -53,6 +63,14 @@ export function deriveQuoteHints(
 
   let initialSqft: number | null = null
   let initialTemplate: string | null = null
+  const initialAddons: Record<string, boolean> = {}
+
+  // Large-format signal — backsplash asks `tileStyle`, kitchen floor asks
+  // `tileSize`; both were previously dropped on the floor. Map either to the
+  // large_format addon so the modal pre-checks it (drives the Platinum swap).
+  if (LARGE_FORMAT_TILE_VALUES.has(a.tileStyle) || LARGE_FORMAT_TILE_VALUES.has(a.tileSize)) {
+    initialAddons.large_format = true
+  }
 
   if (type === 'bathroom') {
     initialSqft = BATHROOM_SIZE_SQFT[a.size] ?? null
@@ -93,7 +111,7 @@ export function deriveQuoteHints(
     initialTemplate = 'Bathroom Floor (Medium)'
   }
 
-  return { initialTemplate, initialSqft }
+  return { initialTemplate, initialSqft, initialAddons }
 }
 
 // Map a job's free-text job_type (e.g. "Bathroom Tile", "Shower Tile",

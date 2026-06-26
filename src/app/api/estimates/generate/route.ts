@@ -224,7 +224,8 @@ export async function POST(req: NextRequest) {
     for (const li of job.line_items as Array<Record<string, unknown>>) {
       const status = li?.status as string | undefined
       if (li?.category === 'materials' && status && status !== 'needed') {
-        prevStatus.set(`${(li.section as string) ?? ''}::${li.description as string}`, status)
+        const section = typeof li.section === 'string' ? li.section : ''
+        prevStatus.set(`${section}::${li.description as string}`, status)
       }
     }
     if (prevStatus.size > 0) {

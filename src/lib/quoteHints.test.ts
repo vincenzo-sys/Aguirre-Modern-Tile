@@ -51,6 +51,11 @@ describe('deriveQuoteHints', () => {
     const h = deriveQuoteHints('kitchen-floor', { size: 'medium', exactSqft: '' })
     expect(h.initialSqft).toBe(150)
   })
+
+  it('rounds a decimal exact sqft to a whole number', () => {
+    expect(deriveQuoteHints('bathroom', { size: 'small', exactSqft: '52.5' }).initialSqft).toBe(53)
+    expect(deriveQuoteHints('kitchen-floor', { size: 'medium', exactSqft: '219.2' }).initialSqft).toBe(219)
+  })
 })
 
 describe('templateForJobType', () => {

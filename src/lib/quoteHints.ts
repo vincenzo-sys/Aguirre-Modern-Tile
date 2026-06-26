@@ -120,7 +120,7 @@ export function deriveQuoteHints(
   if (type === 'backsplash' && exactLinearFeet > 0) {
     initialSqft = Math.round(exactLinearFeet * 1.5)
   } else if (exactSqft > 0) {
-    initialSqft = exactSqft
+    initialSqft = Math.round(exactSqft)
   }
 
   return { initialTemplate, initialSqft, initialAddons }

@@ -81,6 +81,15 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
     setIsSubmitting(true)
 
     try {
+      // If the visitor arrived via a /refer/<code> link, attach the code so
+      // /api/quotes can credit the referrer (referred_by_customer_id).
+      let referralCode: string | null = null
+      try {
+        referralCode = localStorage.getItem('referralCode')
+      } catch {
+        // storage disabled — no attribution
+      }
+
       const payload = {
         name: contactInfo.name,
         email: contactInfo.email,
@@ -88,6 +97,7 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
         projectType,
         answers,
         source: 'quote',
+        ...(referralCode ? { referralCode } : {}),
       }
 
       // Send email notification and save to database in parallel
@@ -130,6 +140,7 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
       setIsSubmitting(false)
       setIsSubmitted(true)
       localStorage.removeItem('leadContact')
+      localStorage.removeItem('referralCode')
     } catch {
       setIsSubmitting(false)
       setSubmitError('Something went wrong. Please call us at (617) 766-1259.')

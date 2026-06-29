@@ -157,6 +157,18 @@ export async function PATCH(
         if (newStatus === 'completed') {
           const clientEmail = (job as any).client_email
           if (clientEmail) {
+            // Pull the customer's referral code so the close-out email can
+            // invite them to refer a friend ($100 each).
+            const custId = (job as any).customer_id || oldJob.customer_id
+            let referralCode: string | null = null
+            if (custId) {
+              const { data: cust } = await supabaseAdmin
+                .from('customers')
+                .select('referral_code')
+                .eq('id', custId)
+                .single()
+              referralCode = cust?.referral_code ?? null
+            }
             sendCompletionEmail({
               email: clientEmail,
               firstName: ((job as any).client_name || '').split(' ')[0] || '',
@@ -164,6 +176,7 @@ export async function PATCH(
               estimatedCost: Number((job as any).estimated_cost ?? 0),
               amountPaid: Number((job as any).amount_paid ?? 0),
               estimateToken: (job as any).estimate_token,
+              referralCode,
             }).catch((err) => console.error('completion email failed:', err))
           }
         }
@@ -184,6 +197,7 @@ async function sendCompletionEmail({
   estimatedCost,
   amountPaid,
   estimateToken,
+  referralCode,
 }: {
   email: string
   firstName: string
@@ -191,6 +205,7 @@ async function sendCompletionEmail({
   estimatedCost: number
   amountPaid: number
   estimateToken: string | null
+  referralCode?: string | null
 }) {
   const balance = Math.max(0, estimatedCost - amountPaid)
   const balanceStr = balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -200,6 +215,7 @@ async function sendCompletionEmail({
     'https://www.google.com/maps/place/Aguirre+Modern+Tile'
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
   const estimateUrl = estimateToken ? `${baseUrl}/estimates/${estimateToken}` : null
+  const referralUrl = referralCode ? `${baseUrl}/refer/${referralCode}` : null
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111827;">
@@ -225,6 +241,17 @@ async function sendCompletionEmail({
         <p style="font-size: 13px; color:#0c4a6e; margin: 0 0 14px 0;">Five-star reviews are the single biggest reason new customers choose us — it really makes a difference for a small team like ours.</p>
         <a href="${reviewUrl}" target="_blank" style="display:inline-block; padding:10px 20px; background:#0284c7; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;">Leave a Google review →</a>
       </div>
+
+      ${
+        referralUrl
+          ? `<div style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:18px; margin: 0 0 20px 0; text-align:center;">
+              <p style="font-size: 15px; color:#5b21b6; font-weight:600; margin: 0 0 6px 0;">Know someone who needs tile work?</p>
+              <p style="font-size: 13px; color:#6d28d9; margin: 0 0 14px 0;">Refer a friend and <strong>you both get $100</strong> toward your projects when they book. Share your link:</p>
+              <a href="${referralUrl}" target="_blank" style="display:inline-block; padding:10px 20px; background:#7c3aed; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;">Refer a friend →</a>
+              <p style="font-size: 12px; color:#7c3aed; margin: 12px 0 0 0; word-break: break-all;">${referralUrl}</p>
+            </div>`
+          : ''
+      }
 
       <p style="font-size: 14px; line-height: 1.5; margin: 0 0 16px 0; color:#374151;">
         A couple of care tips for the first 72 hours: avoid heavy water on the grout while it cures, and don't move furniture across the floor. Beyond that, the tile is yours — enjoy it.

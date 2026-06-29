@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
+import { decideReferralAttribution, leadSourceFor } from '@/lib/referral'
 import { createNotionJob } from '@/lib/notion'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
 import { sendCustomerEmail } from '@/lib/email'
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
     const email = sanitize(body.email || '')
     const phone = sanitize(body.phone || '')
     const projectType = sanitize(body.projectType || '')
+    // Referral attribution: a /refer/<code> link stashed this in the browser
+    // and ProjectQuoteForm forwarded it. Resolved to a referrer below.
+    const referralCode = sanitize(body.referralCode || '')
 
     // Server-side validation — email optional for the quote intake (name +
     // phone is enough; SMS is the primary follow-up channel).
@@ -101,11 +105,42 @@ export async function POST(req: NextRequest) {
               name,
               email: email || null,
               phone: phone || null,
-              source: 'website',
+              source: leadSourceFor(referralCode),
             })
             .select('id')
             .single()
           if (newCustomer) customerId = newCustomer.id
+        }
+
+        // Referral attribution: credit the referrer if the code resolves to a
+        // different, not-yet-attributed customer. The decision (self-referral,
+        // already-attributed, etc.) lives in decideReferralAttribution so it
+        // can be unit-tested; here we just supply the two DB lookups it needs.
+        if (referralCode && customerId) {
+          const { data: referrer } = await supabase
+            .from('customers')
+            .select('id')
+            .eq('referral_code', referralCode)
+            .single()
+          const { data: current } = referrer
+            ? await supabase
+                .from('customers')
+                .select('referred_by_customer_id')
+                .eq('id', customerId)
+                .single()
+            : { data: null }
+          const decision = decideReferralAttribution({
+            referralCode,
+            customerId,
+            referrerId: referrer?.id ?? null,
+            currentReferredBy: current?.referred_by_customer_id ?? null,
+          })
+          if (decision.attribute) {
+            await supabase
+              .from('customers')
+              .update({ referred_by_customer_id: decision.referrerId })
+              .eq('id', customerId)
+          }
         }
       } catch (err) {
         // Non-fatal: quote still saves even if customer creation fails

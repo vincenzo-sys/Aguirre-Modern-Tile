@@ -36,6 +36,8 @@ export interface Customer {
   openphone_contact_id: string | null
   referred_by_customer_id: string | null
   referral_reward_paid: boolean
+  // Shareable referral code (migration 041) powering /refer/<code>.
+  referral_code: string | null
   created_at: string
   updated_at: string
 }

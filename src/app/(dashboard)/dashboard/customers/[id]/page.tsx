@@ -5,6 +5,7 @@ import { getDemoCustomer, demoJobs, demoInvoices } from '@/lib/demo'
 import { shouldUseDemoData } from '@/lib/useDemoFallback'
 import CustomerTimeline from '@/components/dashboard/CustomerTimeline'
 import ReferralRewardToggle from '@/components/dashboard/ReferralRewardToggle'
+import CopyReferralLink from '@/components/dashboard/CopyReferralLink'
 import CallHistory, { type CallLogEntry } from '@/components/dashboard/CallHistory'
 import EditCustomerForm from '@/components/dashboard/EditCustomerForm'
 import type { Customer, Job, Invoice, QuoteRequest } from '@/lib/supabase/types'
@@ -251,13 +252,22 @@ export default async function CustomerDetailPage({
         </div>
       )}
 
-      {/* Referrals */}
-      {(referrer || referralsGiven.length > 0) && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-          <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Users className="w-3.5 h-3.5" />
-            Referrals
+      {/* Referrals — always shown so Vince can grab the customer's
+          refer-a-friend link; referrer/given sections fill in when relevant. */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+        <div className="flex items-center gap-2 text-gray-500 text-xs font-semibold uppercase tracking-wider mb-3">
+          <Users className="w-3.5 h-3.5" />
+          Referrals
+        </div>
+
+        {customer.referral_code && (
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-1.5">Refer-a-friend link — both get $100</p>
+            <CopyReferralLink code={customer.referral_code} />
           </div>
+        )}
+
+        {(referrer || referralsGiven.length > 0) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {referrer && (
               <div>
@@ -299,8 +309,8 @@ export default async function CustomerDetailPage({
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Call history with expandable transcripts (fed by OpenPhone webhook + cron) */}
       <CallHistory calls={calls} />

@@ -20,7 +20,16 @@ export const GalleryProjects: CollectionConfig = {
       type: 'text',
       required: true,
       admin: {
-        description: 'Image path, e.g. "/images/gallery/bathroom-1.jpg"',
+        description: 'Main (after) image path, e.g. "/images/gallery/bathroom-1.jpg"',
+      },
+    },
+    {
+      name: 'beforeImage',
+      type: 'text',
+      required: false,
+      admin: {
+        description:
+          'Optional "before" photo. When set, the gallery shows an interactive before/after slider (uses the main image above as the "after").',
       },
     },
     {

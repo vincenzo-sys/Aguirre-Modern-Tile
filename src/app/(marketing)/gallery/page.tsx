@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
-import Image from 'next/image'
 import { getCmsCollection } from '@/lib/cms'
+import GalleryGrid, { type GalleryProject } from '@/components/GalleryGrid'
 
 export const metadata: Metadata = {
   title: 'Gallery | Aguirre Modern Tile',
@@ -57,7 +57,7 @@ const defaultProjects = [
 ]
 
 export default async function GalleryPage() {
-  let projects = defaultProjects
+  let projects: GalleryProject[] = defaultProjects
 
   try {
     const galleryData = await getCmsCollection<any>('gallery-projects', { sort: 'sortOrder', limit: '100' })
@@ -68,6 +68,9 @@ export default async function GalleryPage() {
         image: p.image,
         title: p.title,
         category: p.category,
+        // Optional "before" shot — when set, the gallery renders an interactive
+        // before/after slider. Absent on single-photo projects.
+        beforeImage: p.beforeImage ?? null,
       }))
     }
   } catch {
@@ -88,29 +91,11 @@ export default async function GalleryPage() {
         </div>
       </section>
 
-      {/* Gallery Grid */}
+      {/* Gallery Grid — filterable, click-to-enlarge lightbox, before/after
+          slider for projects that have a paired "before" photo. */}
       <section className="section-padding">
         <div className="container-custom">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {projects.map((project) => (
-              <div key={project.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden shadow-sm">
-                <Image
-                  src={project.image}
-                  alt={project.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <span className="text-xs font-medium px-2 py-1 bg-primary-500 text-white rounded-full">
-                      {project.category}
-                    </span>
-                    <h3 className="text-white font-semibold mt-2">{project.title}</h3>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <GalleryGrid projects={projects} />
         </div>
       </section>
 

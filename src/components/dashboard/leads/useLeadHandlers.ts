@@ -425,7 +425,7 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
       })
       if (!res.ok) { toast('Failed to advance — refresh to recover', 'error'); return }
       toast('Sent to Jobs', 'success')
-      router.push(`/dashboard/jobs/${item.id}`)
+      router.push(`/dashboard/leads/${item.id}`)
     },
     [setItems, router],
   )
@@ -443,13 +443,13 @@ export function useLeadHandlers({ items, setItems, loadPipeline }: Params) {
         if (!res.ok) {
           if (res.status === 409 && data.existing_job_id) {
             toast('Lead already converted — opening job', 'success')
-            router.push(`/dashboard/jobs/${data.existing_job_id}`)
+            router.push(`/dashboard/leads/${data.existing_job_id}`)
             return
           }
           throw new Error(data.error || 'Failed to convert')
         }
         toast('Job created — pick a template, use Claude, or edit line items', 'success')
-        router.push(`/dashboard/jobs/${data.job.id}`)
+        router.push(`/dashboard/leads/${data.job.id}`)
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Conversion failed', 'error')
       }

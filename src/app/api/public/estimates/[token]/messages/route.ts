@@ -121,7 +121,7 @@ async function notifyVince(
   messageBody: string,
   senderName: string
 ) {
-  const dashboardLink = `${SITE_URL}/dashboard/jobs/${job.id}#messages`
+  const dashboardLink = `${SITE_URL}/dashboard/leads/${job.id}#messages`
   const preview = messageBody.length > 240 ? messageBody.slice(0, 240) + '…' : messageBody
 
   const ownerPhone = process.env.OWNER_PHONE

@@ -6,7 +6,7 @@ import type { JobWithAssignee } from '@/lib/supabase/types'
 export default function JobCard({ job }: { job: JobWithAssignee }) {
   return (
     <Link
-      href={`/dashboard/jobs/${job.id}`}
+      href={`/dashboard/leads/${job.id}`}
       className="block bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md hover:border-primary-300 transition-all"
     >
       <div className="flex items-start justify-between gap-3">

@@ -5,7 +5,7 @@ import { Send, Loader2, MessageCircle } from 'lucide-react'
 
 // Shared customer ↔ Aguirre conversation thread used on:
 //   - Public estimate page    /estimates/[token]      (mode='customer')
-//   - Dashboard job detail    /dashboard/jobs/[id]    (mode='aguirre')
+//   - Dashboard job detail    /dashboard/leads/[id]    (mode='aguirre')
 //
 // Both sides hit different endpoints and label their own messages
 // differently, but the rendered shape is identical.

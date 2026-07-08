@@ -479,7 +479,7 @@ export default function InvoiceDetailPage() {
             <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
             {invoice.job && (
               <Link
-                href={`/dashboard/jobs/${invoice.job.id}`}
+                href={`/dashboard/leads/${invoice.job.id}`}
                 className="text-sm text-primary-600 hover:text-primary-700 mt-1 inline-block"
               >
                 #{invoice.job.job_number} {invoice.job.title}

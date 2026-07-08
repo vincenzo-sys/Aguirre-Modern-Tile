@@ -135,7 +135,7 @@ export default function CustomerTimeline({
       icon: 'job',
       title: 'Job created',
       detail: j.title,
-      href: `/dashboard/jobs/${j.id}`,
+      href: `/dashboard/leads/${j.id}`,
     })
 
     if ((j.amount_paid ?? 0) > 0) {
@@ -144,7 +144,7 @@ export default function CustomerTimeline({
         icon: 'deposit',
         title: 'Deposit recorded',
         detail: `${fmt(Number(j.amount_paid))} on ${j.title}`,
-        href: `/dashboard/jobs/${j.id}`,
+        href: `/dashboard/leads/${j.id}`,
       })
     }
 
@@ -154,7 +154,7 @@ export default function CustomerTimeline({
         icon: 'scheduled',
         title: 'Scheduled',
         detail: `${j.title}${j.scheduled_end && j.scheduled_end !== j.scheduled_start ? ` → ${fmtDate(j.scheduled_end)}` : ''}`,
-        href: `/dashboard/jobs/${j.id}`,
+        href: `/dashboard/leads/${j.id}`,
       })
     }
 
@@ -164,7 +164,7 @@ export default function CustomerTimeline({
         icon: 'in_progress',
         title: 'Work in progress',
         detail: j.title,
-        href: `/dashboard/jobs/${j.id}`,
+        href: `/dashboard/leads/${j.id}`,
       })
     }
 
@@ -174,7 +174,7 @@ export default function CustomerTimeline({
         icon: 'completed',
         title: 'Work completed',
         detail: j.title,
-        href: `/dashboard/jobs/${j.id}`,
+        href: `/dashboard/leads/${j.id}`,
       })
     }
   }

@@ -295,7 +295,7 @@ export default function AddEventModal({
                     {linkedJob.client_name}
                   </div>
                   <a
-                    href={`/dashboard/jobs/${linkedJob.id}`}
+                    href={`/dashboard/leads/${linkedJob.id}`}
                     className="inline-flex items-center gap-1 text-[11px] text-primary-700 hover:underline shrink-0"
                   >
                     Open job

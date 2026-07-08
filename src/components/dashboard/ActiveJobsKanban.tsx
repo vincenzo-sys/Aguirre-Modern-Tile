@@ -37,7 +37,7 @@ export default function ActiveJobsKanban({ jobs }: { jobs: JobWithAssignee[] }) 
                   {colJobs.map((job) => (
                     <Link
                       key={job.id}
-                      href={`/dashboard/jobs/${job.id}`}
+                      href={`/dashboard/leads/${job.id}`}
                       className={`block p-3 rounded-lg border-l-4 ${col.color} bg-gray-50 hover:bg-gray-100 transition-colors`}
                     >
                       <div className="flex items-start justify-between gap-2">

@@ -47,7 +47,7 @@ export default function JobsFilterBar({ jobCount }: { jobCount: number }) {
         params.delete(key)
       }
     }
-    router.push(`/dashboard/jobs?${params}`)
+    router.push(`/dashboard/leads/board?${params}`)
   }
 
   return (

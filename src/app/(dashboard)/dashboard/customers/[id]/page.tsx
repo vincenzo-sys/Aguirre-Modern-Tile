@@ -174,7 +174,7 @@ export default async function CustomerDetailPage({
               {/* Skip the lead stage and create a job directly, pre-linked to
                   this customer via ?customer_id= (jobs/new reads these params). */}
               <Link
-                href={`/dashboard/jobs/new?customer_id=${customer.id}&name=${encodeURIComponent(customer.name)}&phone=${encodeURIComponent(customer.phone ?? '')}&email=${encodeURIComponent(customer.email ?? '')}`}
+                href={`/dashboard/leads/board/new?customer_id=${customer.id}&name=${encodeURIComponent(customer.name)}&phone=${encodeURIComponent(customer.phone ?? '')}&email=${encodeURIComponent(customer.email ?? '')}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
               >
                 <Briefcase className="w-4 h-4" />

@@ -303,7 +303,7 @@ export default function CrewWeekView({
                             {cellJobs.map((j) => (
                               <button
                                 key={j.id}
-                                onClick={() => router.push(`/dashboard/jobs/${j.id}`)}
+                                onClick={() => router.push(`/dashboard/leads/${j.id}`)}
                                 className={`block w-full text-left truncate rounded px-1.5 py-1 text-[11px] font-medium leading-tight ${statusColors[j.status]} hover:opacity-80`}
                                 title={j.title}
                               >
@@ -333,7 +333,7 @@ export default function CrewWeekView({
                                 title={job?.title ?? 'Job'}
                               >
                                 <button
-                                  onClick={() => job && router.push(`/dashboard/jobs/${job.id}`)}
+                                  onClick={() => job && router.push(`/dashboard/leads/${job.id}`)}
                                   className="min-w-0 flex-1 text-left truncate hover:opacity-80"
                                 >
                                   {job?.title ?? 'Job'}

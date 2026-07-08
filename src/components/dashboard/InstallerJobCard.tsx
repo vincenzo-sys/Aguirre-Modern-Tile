@@ -256,13 +256,13 @@ export default function InstallerJobCard({ job }: { job: Job }) {
         {/* Footer actions */}
         <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
           <Link
-            href={`/dashboard/jobs/${job.id}`}
+            href={`/dashboard/leads/${job.id}`}
             className="flex-1 text-center text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md py-2"
           >
             Full details
           </Link>
           <Link
-            href={`/dashboard/jobs/${job.id}#photos`}
+            href={`/dashboard/leads/${job.id}#photos`}
             className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
           >
             <Camera className="w-4 h-4" />

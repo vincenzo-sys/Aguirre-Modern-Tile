@@ -217,7 +217,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
               <li>Balance remaining: $${Math.max(0, Number(job.estimated_cost ?? 0) - newAmountPaid).toLocaleString()}</li>
               <li>Status: ${updates.status ?? job.status}</li>
             </ul>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}/dashboard/jobs/${jobId}">Open job →</a></p>
+            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL || ''}/dashboard/leads/${jobId}">Open job →</a></p>
           `,
         })
         .catch((err) => console.error('Owner email notification failed:', err))

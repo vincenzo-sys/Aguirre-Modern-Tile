@@ -58,7 +58,7 @@ export const ownerSections: NavSection[] = [
     heading: 'Operations',
     items: [
       { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays, pinnedToTabBar: true },
-      { label: 'Jobs', href: '/dashboard/jobs', icon: ClipboardList, pinnedToTabBar: true },
+      { label: 'Installs', href: '/dashboard/leads/board', icon: ClipboardList, pinnedToTabBar: true },
       { label: 'Materials', href: '/dashboard/materials', icon: Package },
       { label: 'Crew', href: '/dashboard/settings/crew', icon: HardHat },
       { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
@@ -82,7 +82,9 @@ export const installerHome: NavItem = {
 }
 
 export const installerExtras: NavItem[] = [
-  { label: 'Week', href: '/dashboard/jobs', icon: CalendarDays, pinnedToTabBar: true },
+  // The crew's week view is the Installs board filtered to their assigned jobs
+  // (the board applies the assigned_to filter for non-owners).
+  { label: 'Week', href: '/dashboard/leads/board', icon: CalendarDays, pinnedToTabBar: true },
 ]
 
 export type Role = 'owner' | 'crew'
@@ -98,10 +100,18 @@ export function getTabBarItems(role: Role): NavItem[] {
 }
 
 // Active-tab logic shared by sidebar and tab bar so a route never lights
-// one nav element but not the other. Exact match for /dashboard, prefix
-// for nested routes (so /dashboard/jobs/abc keeps Jobs lit).
+// one nav element but not the other. Exact match for /dashboard, prefix for
+// nested routes. The Installs board lives *under* the leads path
+// (/dashboard/leads/board), so it needs an explicit branch — otherwise the
+// board would light both Installs and Leads, and Leads would swallow it.
 export function isNavActive(href: string, pathname: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
-  if (href === '/dashboard/jobs') return pathname.startsWith('/dashboard/jobs')
+  if (href === '/dashboard/leads/board') return pathname.startsWith('/dashboard/leads/board')
+  if (href === '/dashboard/leads') {
+    return (
+      pathname === '/dashboard/leads' ||
+      (pathname.startsWith('/dashboard/leads/') && !pathname.startsWith('/dashboard/leads/board'))
+    )
+  }
   return pathname.startsWith(href)
 }

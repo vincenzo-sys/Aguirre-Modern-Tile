@@ -37,7 +37,7 @@ function formatRange(start: string | null, end: string | null): string {
 function JobCard({ job }: { job: JobWithAssignee }) {
   return (
     <Link
-      href={`/dashboard/jobs/${job.id}`}
+      href={`/dashboard/leads/${job.id}`}
       className="block bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-primary-300 hover:shadow-md transition-all"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -161,7 +161,7 @@ export default function TodayUpcomingJobs({ jobs }: { jobs: JobWithAssignee[] })
             {needsSchedule.map((job) => (
               <li key={job.id}>
                 <Link
-                  href={`/dashboard/jobs/${job.id}`}
+                  href={`/dashboard/leads/${job.id}`}
                   className="block px-4 py-3 hover:bg-gray-50"
                 >
                   <div className="flex items-center justify-between gap-3">

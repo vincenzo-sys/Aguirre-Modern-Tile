@@ -13,7 +13,7 @@ export default function KanbanCard({ job, onDragStart, draggable }: KanbanCardPr
 
   return (
     <Link
-      href={`/dashboard/jobs/${job.id}`}
+      href={`/dashboard/leads/${job.id}`}
       draggable={draggable}
       onDragStart={(e) => {
         if (!draggable) {

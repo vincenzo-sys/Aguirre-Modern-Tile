@@ -32,7 +32,7 @@ export default function DeleteJobButton({
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Delete failed')
       toast(`Job #${jobNumber} deleted`, 'success')
-      router.push('/dashboard/jobs')
+      router.push('/dashboard/leads/board')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Delete failed', 'error')
       setLoading(false)

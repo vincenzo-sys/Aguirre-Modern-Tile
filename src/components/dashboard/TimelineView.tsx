@@ -129,7 +129,7 @@ export default function TimelineView({ jobs, team }: { jobs: JobWithAssignee[]; 
                   return (
                     <button
                       key={job.id}
-                      onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                      onClick={() => router.push(`/dashboard/leads/${job.id}`)}
                       title={`#${job.job_number} ${job.title}`}
                       className={`absolute h-7 rounded ${statusColors[job.status]} hover:opacity-80 text-xs font-medium text-gray-900 px-2 truncate flex items-center`}
                       style={{ left, width: Math.max(width, PX_PER_DAY), top: idx * 36 + 4 }}

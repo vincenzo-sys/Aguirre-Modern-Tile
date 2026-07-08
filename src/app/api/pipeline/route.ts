@@ -121,14 +121,19 @@ export async function GET(req: NextRequest) {
         .from('quote_requests')
         .select('id, status, client_name, client_email, client_phone, project_type, source, last_contact_at, next_follow_up, site_visit_at, site_visit_notes, notes, converted_job_id, created_at, updated_at, answers')
         .not('status', 'in', '(converted,archived)')
+        // converted_job_id is the source of truth for "this lead became a job":
+        // once it's set, the job carries the deal and the QR must not also
+        // appear, or the same lead shows in two stages (New + Quoted). This
+        // guard holds even if a conversion path forgot to flip status.
+        .is('converted_job_id', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('jobs')
         .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, scope_notes, created_at, updated_at')
         // Extended pipeline: leads + quoted + the new 'awaiting_response' chase
         // bucket + accepted/scheduled jobs that aren't yet on the install bench.
-        // Stops at 'in_progress' — once the crew is on-site the job lives on
-        // /dashboard/jobs, not on /leads.
+        // Stops at 'in_progress' — once the crew is on-site the job shows on
+        // the Installs board (/dashboard/leads/board), not in this pipeline.
         .in('status', [
           'lead',
           'quoted',

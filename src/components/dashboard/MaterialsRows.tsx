@@ -181,7 +181,7 @@ export default function MaterialsRows({
                   {row.jobs.map((j, i) => (
                     <div key={`${j.id}-${i}`} className="flex items-center justify-between gap-3">
                       <Link
-                        href={`/dashboard/jobs/${j.id}`}
+                        href={`/dashboard/leads/${j.id}`}
                         className="text-sm text-primary-600 hover:underline truncate min-w-0"
                       >
                         {j.title} <span className="text-gray-400">({j.quantity} {row.unit})</span>

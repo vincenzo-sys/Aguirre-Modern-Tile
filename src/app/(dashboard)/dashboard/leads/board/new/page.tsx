@@ -1,0 +1,696 @@
+'use client'
+
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
+import PhotoUpload from '@/components/dashboard/PhotoUpload'
+import { toast } from '@/components/Toast'
+import { logError } from '@/lib/logger'
+import { demoTeamMembers } from '@/lib/demo'
+import type { Profile, JobTemplate } from '@/lib/supabase/types'
+
+const JOB_TYPES = [
+  'Bathroom Tile',
+  'Shower Tile',
+  'Floor Tile',
+  'Backsplash',
+  'Tile Repair',
+  'Tile Reglazing',
+  'Other',
+]
+
+const isDemoMode = !process.env.NEXT_PUBLIC_SUPABASE_URL
+
+type CustomerSearchResult = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  job_count?: number
+}
+
+function mapProjectTypeToJobType(projectType: string): string {
+  const map: Record<string, string> = {
+    bathroom: 'Bathroom Tile',
+    shower: 'Shower Tile',
+    'kitchen-floor': 'Floor Tile',
+    backsplash: 'Backsplash',
+    other: 'Other',
+  }
+  return map[projectType] || ''
+}
+
+export default function NewJobPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12 text-gray-500">Loading...</div>}>
+      <NewJobForm />
+    </Suspense>
+  )
+}
+
+function NewJobForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [teamMembers, setTeamMembers] = useState<Profile[]>([])
+  const [templates, setTemplates] = useState<JobTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [photos, setPhotos] = useState<File[]>([])
+  const fromLeadId = searchParams.get('from_lead') || ''
+  const customerIdParam = searchParams.get('customer_id') || ''
+
+  // Existing-customer link. Seeded from the query param when the form is
+  // launched from a customer page / lead, but also editable via the search
+  // picker below so a prior customer can be attached from Jobs → New Job.
+  const [customerId, setCustomerId] = useState(customerIdParam)
+  const [linkedCustomerName, setLinkedCustomerName] = useState(searchParams.get('name') || '')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([])
+  const [searchingCustomers, setSearchingCustomers] = useState(false)
+
+  // Pre-fill from lead conversion query params
+  const [form, setForm] = useState({
+    title: '',
+    client_name: searchParams.get('name') || '',
+    client_phone: searchParams.get('phone') || '',
+    client_email: searchParams.get('email') || '',
+    client_address: '',
+    job_type: mapProjectTypeToJobType(searchParams.get('type') || ''),
+    square_footage: '',
+    scope_notes: searchParams.get('notes') || '',
+    scheduled_start: '',
+    scheduled_end: '',
+    estimated_days: '',
+    estimated_cost: '',
+    assigned_to: '',
+    notes: '',
+  })
+
+  useEffect(() => {
+    if (isDemoMode) {
+      setTeamMembers(demoTeamMembers)
+      return
+    }
+
+    async function checkOwnerAndLoadTeam() {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      const p = profile as Profile | null
+      if (p?.role !== 'owner') {
+        router.push('/dashboard')
+        return
+      }
+
+      const { data: members } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name')
+
+      setTeamMembers((members ?? []) as Profile[])
+
+      const { data: tmpls } = await supabase
+        .from('job_templates')
+        .select('*')
+        .order('template_name')
+
+      setTemplates((tmpls ?? []) as JobTemplate[])
+    }
+
+    checkOwnerAndLoadTeam()
+  }, [router])
+
+  // Debounced customer search against the existing /api/customers?q= endpoint.
+  useEffect(() => {
+    if (isDemoMode) return
+    const q = customerSearch.trim()
+    if (q.length < 2) {
+      setCustomerResults([])
+      return
+    }
+    let active = true
+    setSearchingCustomers(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`)
+        if (!res.ok) throw new Error('Customer search failed')
+        const data = await res.json()
+        if (active) setCustomerResults(Array.isArray(data) ? data.slice(0, 8) : [])
+      } catch (err) {
+        logError('Customer search failed:', err)
+        if (active) setCustomerResults([])
+      } finally {
+        if (active) setSearchingCustomers(false)
+      }
+    }, 300)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [customerSearch])
+
+  function selectCustomer(c: CustomerSearchResult) {
+    setCustomerId(c.id)
+    setLinkedCustomerName(c.name)
+    setForm((prev) => ({
+      ...prev,
+      client_name: c.name || prev.client_name,
+      client_phone: c.phone || prev.client_phone,
+      client_email: c.email || prev.client_email,
+      client_address: c.address || prev.client_address,
+    }))
+    setCustomerSearch('')
+    setCustomerResults([])
+    toast(`Linked to ${c.name}`)
+  }
+
+  function clearLinkedCustomer() {
+    setCustomerId('')
+    setLinkedCustomerName('')
+  }
+
+  function applyTemplate(templateId: string) {
+    setSelectedTemplateId(templateId)
+    if (!templateId) return
+
+    const tmpl = templates.find((t) => t.id === templateId)
+    if (!tmpl) return
+
+    const midPrice =
+      tmpl.base_price_low && tmpl.base_price_high
+        ? (Number(tmpl.base_price_low) + Number(tmpl.base_price_high)) / 2
+        : tmpl.base_price_low ?? tmpl.base_price_high ?? null
+
+    const totalDays = (tmpl.demo_days ?? 0) + (tmpl.install_days ?? 0)
+
+    setForm((prev) => ({
+      ...prev,
+      title: prev.title || tmpl.template_name,
+      job_type: tmpl.job_type || prev.job_type,
+      scope_notes:
+        prev.scope_notes ||
+        [tmpl.notes, tmpl.typical_materials && `Typical materials: ${tmpl.typical_materials}`]
+          .filter(Boolean)
+          .join('\n\n'),
+      estimated_days: prev.estimated_days || (totalDays > 0 ? String(totalDays) : ''),
+      estimated_cost: prev.estimated_cost || (midPrice ? String(Math.round(midPrice)) : ''),
+    }))
+    toast(`Applied template: ${tmpl.template_name}`)
+  }
+
+  function updateField(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+
+    if (form.scheduled_start && form.scheduled_end && form.scheduled_end < form.scheduled_start) {
+      setError('End date must be on or after start date')
+      return
+    }
+
+    setLoading(true)
+
+    if (isDemoMode) {
+      // In demo mode, just redirect back with a success message
+      toast('Demo mode: Job would be created. Connect Supabase to save real data.')
+      setLoading(false)
+      router.push('/dashboard')
+      return
+    }
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      // Create the job
+      const { data: job, error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          title: form.title,
+          customer_id: customerId || null,
+          client_name: form.client_name,
+          client_phone: form.client_phone || null,
+          client_email: form.client_email || null,
+          client_address: form.client_address || null,
+          job_type: form.job_type || null,
+          square_footage: form.square_footage ? parseFloat(form.square_footage) : null,
+          scope_notes: form.scope_notes || null,
+          scheduled_start: form.scheduled_start || null,
+          scheduled_end: form.scheduled_end || null,
+          estimated_days: form.estimated_days ? parseInt(form.estimated_days) : null,
+          estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
+          actual_days: null,
+          actual_cost: null,
+          amount_invoiced: 0,
+          amount_paid: 0,
+          line_items: [],
+          assigned_to: form.assigned_to || null,
+          notes: form.notes || null,
+          created_by: user.id,
+          status: 'lead',
+        })
+        .select()
+        .single()
+
+      if (jobError) throw jobError
+
+      // Mark lead as converted if this came from a lead
+      if (fromLeadId && job) {
+        await supabase
+          .from('quote_requests')
+          .update({ status: 'converted', converted_job_id: job.id })
+          .eq('id', fromLeadId)
+      }
+
+      // Upload photos
+      if (photos.length > 0 && job) {
+        for (const file of photos) {
+          const ext = file.name.split('.').pop()
+          const storagePath = `${job.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('job-photos')
+            .upload(storagePath, file)
+
+          if (uploadError) {
+            logError('Photo upload failed:', uploadError)
+            continue
+          }
+
+          await supabase.from('job_photos').insert({
+            job_id: job.id,
+            storage_path: storagePath,
+            file_name: file.name,
+            photo_type: 'reference',
+            uploaded_by: user.id,
+          })
+        }
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Failed to create job')
+      setLoading(false)
+    }
+  }
+
+  const inputClass =
+    'mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm'
+  const labelClass = 'block text-sm font-medium text-gray-700'
+
+  return (
+    <div className="max-w-3xl">
+      <Link
+        href="/dashboard/leads/board"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-4"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to installs
+      </Link>
+
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">New Job</h1>
+
+      {isDemoMode && (
+        <div className="mb-6 rounded-md bg-amber-50 border border-amber-200 p-3">
+          <p className="text-sm text-amber-800">
+            <strong>Demo Mode</strong> — Form is functional but won't save. Connect Supabase to create real jobs.
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Template picker */}
+        {templates.length > 0 && (
+          <section className="bg-primary-50 rounded-lg border border-primary-200 p-4">
+            <label htmlFor="template_picker" className="block text-sm font-semibold text-primary-900 mb-1">
+              Start from a template <span className="text-primary-700 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-primary-700 mb-2">
+              Pre-fills job type, scope, estimated days, and price based on past projects.
+            </p>
+            <select
+              id="template_picker"
+              value={selectedTemplateId}
+              onChange={(e) => applyTemplate(e.target.value)}
+              className="w-full rounded-md border border-primary-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 text-sm bg-white"
+            >
+              <option value="">— No template —</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.template_name}
+                  {t.base_price_low && t.base_price_high
+                    ? ` — $${Number(t.base_price_low).toLocaleString()}–$${Number(t.base_price_high).toLocaleString()}`
+                    : ''}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
+
+        {/* Job Info */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Info</h2>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="title" className={labelClass}>
+                Job Title *
+              </label>
+              <input
+                id="title"
+                type="text"
+                required
+                value={form.title}
+                onChange={(e) => updateField('title', e.target.value)}
+                className={inputClass}
+                placeholder="e.g. Master Bathroom Remodel"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="job_type" className={labelClass}>
+                  Job Type
+                </label>
+                <select
+                  id="job_type"
+                  value={form.job_type}
+                  onChange={(e) => updateField('job_type', e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select type...</option>
+                  {JOB_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="square_footage" className={labelClass}>
+                  Square Footage
+                </label>
+                <input
+                  id="square_footage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.square_footage}
+                  onChange={(e) => updateField('square_footage', e.target.value)}
+                  className={inputClass}
+                  placeholder="e.g. 120"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="scope_notes" className={labelClass}>
+                Scope of Work
+              </label>
+              <textarea
+                id="scope_notes"
+                rows={4}
+                value={form.scope_notes}
+                onChange={(e) => updateField('scope_notes', e.target.value)}
+                className={inputClass}
+                placeholder="Describe the work to be done..."
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Client Info */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Client</h2>
+          <div className="space-y-4">
+            {/* Existing-customer picker */}
+            {!isDemoMode && (
+              <div className="rounded-md bg-gray-50 border border-gray-200 p-3">
+                {customerId ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-gray-700">
+                      Linked to existing customer:{' '}
+                      <span className="font-semibold text-gray-900">
+                        {linkedCustomerName || 'Selected customer'}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearLinkedCustomer}
+                      className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <label htmlFor="customer_search" className="block text-sm font-medium text-gray-700 mb-1">
+                      Link an existing customer <span className="font-normal text-gray-500">(optional)</span>
+                    </label>
+                    <input
+                      id="customer_search"
+                      type="text"
+                      autoComplete="off"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className={inputClass}
+                      placeholder="Search by name, phone, or email…"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Leave blank to create a brand-new customer from the fields below.
+                    </p>
+                    {(searchingCustomers || customerResults.length > 0) && customerSearch.trim().length >= 2 && (
+                      <ul className="absolute z-10 mt-1 w-full max-h-64 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                        {searchingCustomers && customerResults.length === 0 && (
+                          <li className="px-3 py-2 text-sm text-gray-500">Searching…</li>
+                        )}
+                        {!searchingCustomers && customerResults.length === 0 && (
+                          <li className="px-3 py-2 text-sm text-gray-500">No matching customers.</li>
+                        )}
+                        {customerResults.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => selectCustomer(c)}
+                              className="w-full text-left px-3 py-2 hover:bg-primary-50 focus:bg-primary-50 focus:outline-none"
+                            >
+                              <span className="block text-sm font-medium text-gray-900">{c.name}</span>
+                              <span className="block text-xs text-gray-500">
+                                {[c.phone, c.email].filter(Boolean).join(' · ') || 'No contact info'}
+                                {c.job_count ? ` · ${c.job_count} prior job${c.job_count === 1 ? '' : 's'}` : ''}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
+              <label htmlFor="client_name" className={labelClass}>
+                Client Name *
+              </label>
+              <input
+                id="client_name"
+                type="text"
+                required
+                value={form.client_name}
+                onChange={(e) => updateField('client_name', e.target.value)}
+                className={inputClass}
+                placeholder="John Smith"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="client_phone" className={labelClass}>
+                  Phone
+                </label>
+                <input
+                  id="client_phone"
+                  type="tel"
+                  value={form.client_phone}
+                  onChange={(e) => updateField('client_phone', e.target.value)}
+                  className={inputClass}
+                  placeholder="(617) 555-1234"
+                />
+              </div>
+              <div>
+                <label htmlFor="client_email" className={labelClass}>
+                  Email
+                </label>
+                <input
+                  id="client_email"
+                  type="email"
+                  value={form.client_email}
+                  onChange={(e) => updateField('client_email', e.target.value)}
+                  className={inputClass}
+                  placeholder="john@example.com"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="client_address" className={labelClass}>
+                Address
+              </label>
+              <input
+                id="client_address"
+                type="text"
+                value={form.client_address}
+                onChange={(e) => updateField('client_address', e.target.value)}
+                className={inputClass}
+                placeholder="123 Main St, Revere, MA 02151"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Schedule */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Schedule</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="scheduled_start" className={labelClass}>
+                Start Date
+              </label>
+              <input
+                id="scheduled_start"
+                type="date"
+                value={form.scheduled_start}
+                onChange={(e) => updateField('scheduled_start', e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="scheduled_end" className={labelClass}>
+                End Date
+              </label>
+              <input
+                id="scheduled_end"
+                type="date"
+                value={form.scheduled_end}
+                onChange={(e) => updateField('scheduled_end', e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="estimated_days" className={labelClass}>
+                Estimated Days
+              </label>
+              <input
+                id="estimated_days"
+                type="number"
+                min="1"
+                value={form.estimated_days}
+                onChange={(e) => updateField('estimated_days', e.target.value)}
+                className={inputClass}
+                placeholder="e.g. 3"
+              />
+            </div>
+            <div>
+              <label htmlFor="estimated_cost" className={labelClass}>
+                Estimated Cost ($)
+              </label>
+              <input
+                id="estimated_cost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.estimated_cost}
+                onChange={(e) => updateField('estimated_cost', e.target.value)}
+                className={inputClass}
+                placeholder="e.g. 5000"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Assignment */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Assignment</h2>
+          <div>
+            <label htmlFor="assigned_to" className={labelClass}>
+              Assign to
+            </label>
+            <select
+              id="assigned_to"
+              value={form.assigned_to}
+              onChange={(e) => updateField('assigned_to', e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Unassigned</option>
+              {teamMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.full_name} ({member.role})
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
+
+        {/* Photos */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Photos</h2>
+          <PhotoUpload files={photos} onChange={setPhotos} />
+        </section>
+
+        {/* Notes */}
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Internal Notes</h2>
+          <textarea
+            id="notes"
+            rows={3}
+            value={form.notes}
+            onChange={(e) => updateField('notes', e.target.value)}
+            className={inputClass}
+            placeholder="Notes visible only to the team..."
+          />
+        </section>
+
+        {/* Error + Submit */}
+        {error && (
+          <div className="rounded-md bg-red-50 p-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-6 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Creating...' : 'Create Job'}
+          </button>
+          <Link
+            href="/dashboard/leads/board"
+            className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </Link>
+        </div>
+      </form>
+    </div>
+  )
+}

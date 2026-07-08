@@ -315,7 +315,7 @@ function OwnerHome({
               {activeJobs.map((job) => (
                 <li key={job.id}>
                   <Link
-                    href={`/dashboard/jobs/${job.id}`}
+                    href={`/dashboard/leads/${job.id}`}
                     className="block p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200"
                   >
                     <p className="text-sm font-medium text-gray-900 truncate">{job.title}</p>
@@ -331,7 +331,7 @@ function OwnerHome({
           )}
 
           <Link
-            href="/dashboard/jobs"
+            href="/dashboard/leads/board"
             className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline mt-3"
           >
             View board <ArrowRight className="w-3 h-3" />
@@ -455,7 +455,7 @@ function InstallerHome({
             {otherJobs.map((job) => (
               <li key={job.id}>
                 <Link
-                  href={`/dashboard/jobs/${job.id}`}
+                  href={`/dashboard/leads/${job.id}`}
                   className="block px-4 py-3 hover:bg-gray-50"
                 >
                   <div className="flex items-center justify-between">

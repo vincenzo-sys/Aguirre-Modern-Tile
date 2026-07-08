@@ -147,7 +147,7 @@ export default async function GalleryPage({
                     </p>
                   </div>
                   <Link
-                    href={`/dashboard/jobs/${project.id}`}
+                    href={`/dashboard/leads/${project.id}`}
                     className="text-xs font-medium text-primary-600 hover:underline"
                   >
                     Full job →

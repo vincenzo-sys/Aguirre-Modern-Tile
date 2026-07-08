@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
-  const dashUrl = `${baseUrl}/dashboard/jobs/${job.id}`
+  const dashUrl = `${baseUrl}/dashboard/leads/${job.id}`
   const total = Math.round(Number(job.estimated_cost ?? 0)).toLocaleString()
   const days = String(Math.round(Number(job.estimated_days ?? 0) * 10) / 10)
   const body = AUTO_MESSAGES.crew_approval_request(job.title, total, days, dashUrl)

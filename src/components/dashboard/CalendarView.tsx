@@ -316,7 +316,7 @@ export default function CalendarView({ jobs: initialJobs }: { jobs: JobWithAssig
                         }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/dashboard/jobs/${j.id}`)
+                          router.push(`/dashboard/leads/${j.id}`)
                         }}
                         className={`block w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight cursor-grab active:cursor-grabbing ${statusColors[j.status]} hover:opacity-80 ${
                           draggingId === j.id ? 'opacity-40' : ''

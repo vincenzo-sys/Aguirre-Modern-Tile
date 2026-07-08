@@ -24,7 +24,7 @@ export default function ViewSwitcher({ prominent = false }: { prominent?: boolea
       params.set('view', view)
     }
     const qs = params.toString()
-    router.push(`/dashboard/jobs${qs ? `?${qs}` : ''}`)
+    router.push(`/dashboard/leads/board${qs ? `?${qs}` : ''}`)
   }
 
   if (prominent) {

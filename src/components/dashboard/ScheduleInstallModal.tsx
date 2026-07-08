@@ -284,7 +284,7 @@ function CustomerDetails({ job }: { job: JobWithAssignee }) {
           {job.client_name}
         </div>
         <a
-          href={`/dashboard/jobs/${job.id}`}
+          href={`/dashboard/leads/${job.id}`}
           className="inline-flex items-center gap-1 text-[11px] text-primary-700 hover:underline shrink-0"
         >
           Open job

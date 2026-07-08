@@ -164,8 +164,11 @@ export async function POST(
   await supabase
     .from('quote_requests')
     .update({
+      // 'converted' (not 'reviewed') — the pipeline hides converted QRs, so
+      // anything short of this leaves the lead showing under 'New' while its
+      // new job shows under 'Quoted': the same deal in two stages at once.
       converted_job_id: job.id,
-      status: 'reviewed',
+      status: 'converted',
       last_contact_at: new Date().toISOString(),
     })
     .eq('id', leadId)

@@ -5,11 +5,18 @@
 // different column calls saveStage. Native HTML5 drag (no DnD lib) —
 // works great on desktop; cards keep the inline stage dropdown for
 // touch users where drag is awkward.
+//
+// The terminal 'completed' column collapses to a slim rail by default
+// (persisted, shared with the mobile StageList) so finished deals never
+// crowd out active work — click to expand, and it stays a drop target
+// while collapsed so drag-to-complete still works.
 
 import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import type { PipelineItem, PipelineStage } from '@/app/api/pipeline/route'
 import LeadCard, { type LeadCardHandlers } from '@/components/dashboard/LeadCard'
 import { STAGE_ORDER, STAGE_META, isQrStage } from '@/lib/leadStages'
+import { useLocalStorageState } from '@/lib/useLocalStorageState'
 import { formatMoneyShort } from './formatters'
 
 // Custom MIME tells the drop handler that the drag payload is one of
@@ -29,6 +36,11 @@ export default function KanbanBoard({
 
   // Highlighted column on dragover. Null when no card is being dragged.
   const [hoverStage, setHoverStage] = useState<PipelineStage | null>(null)
+  // Terminal 'completed' column starts collapsed; the choice persists and is
+  // shared with the mobile StageList section.
+  const [completedOpen, setCompletedOpen] = useLocalStorageState<boolean>(
+    'leads_completed_open_v1', false, (v): v is boolean => typeof v === 'boolean',
+  )
 
   function decode(e: React.DragEvent): { id: string; kind: 'quote_request' | 'job' } | null {
     try {
@@ -60,6 +72,21 @@ export default function KanbanBoard({
     catch { /* saveStage surfaces its own toast on failure */ }
   }
 
+  // Shared drag-target handlers so the collapsed rail and full columns
+  // behave identically. dragover only reacts to our own card payload.
+  function onColumnDragOver(stage: PipelineStage, e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return
+    e.preventDefault()  // required to allow drop
+    e.dataTransfer.dropEffect = 'move'
+    if (hoverStage !== stage) setHoverStage(stage)
+  }
+  function onColumnDragLeave(stage: PipelineStage, e: React.DragEvent) {
+    // dragleave fires on every internal element; only clear when leaving
+    // the column itself.
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+    if (hoverStage === stage) setHoverStage(null)
+  }
+
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0 pb-4">
       <div className="flex gap-3 px-4 sm:px-0 min-w-min">
@@ -70,6 +97,41 @@ export default function KanbanBoard({
           const Icon = meta.icon
           const isFocused = focusedStage === stage
           const isDropTarget = hoverStage === stage
+
+          // Collapsed terminal column → slim vertical rail. Still a drop
+          // target, so you can drag a Scheduled card onto it to complete.
+          if (stage === 'completed' && !completedOpen) {
+            return (
+              <div
+                key={stage}
+                onDragOver={(e) => onColumnDragOver(stage, e)}
+                onDragLeave={(e) => onColumnDragLeave(stage, e)}
+                onDrop={(e) => handleDrop(stage, e)}
+                className={`flex-shrink-0 w-12 bg-gray-50 rounded-xl border border-gray-200 border-t-4 ${meta.topBorder} transition ${
+                  isDropTarget ? 'ring-2 ring-primary-500 bg-primary-50/50' : ''
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCompletedOpen(true)}
+                  title="Show completed"
+                  aria-label={`Show completed (${cards.length})`}
+                  className="w-full flex flex-col items-center gap-2 py-3 text-gray-500 hover:text-gray-800"
+                >
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded ${meta.iconBg}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-2 py-0.5">
+                    {cards.length}
+                  </span>
+                  <span className="text-[11px] font-semibold tracking-wide [writing-mode:vertical-rl] rotate-180">
+                    Completed
+                  </span>
+                </button>
+              </div>
+            )
+          }
+
           return (
             <div
               key={stage}
@@ -78,20 +140,8 @@ export default function KanbanBoard({
                   el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
                 }
               }}
-              onDragOver={(e) => {
-                // Only react to our own card drag payload (don't intercept
-                // file drops or arbitrary text drags).
-                if (!e.dataTransfer.types.includes(DRAG_MIME)) return
-                e.preventDefault()  // required to allow drop
-                e.dataTransfer.dropEffect = 'move'
-                if (hoverStage !== stage) setHoverStage(stage)
-              }}
-              onDragLeave={(e) => {
-                // dragleave fires on every internal element; only clear
-                // when leaving the column itself.
-                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
-                if (hoverStage === stage) setHoverStage(null)
-              }}
+              onDragOver={(e) => onColumnDragOver(stage, e)}
+              onDragLeave={(e) => onColumnDragLeave(stage, e)}
               onDrop={(e) => handleDrop(stage, e)}
               className={`flex-shrink-0 w-[280px] bg-gray-50 rounded-xl border border-gray-200 border-t-4 ${meta.topBorder} transition ${
                 isFocused ? 'ring-2 ring-primary-400' : ''
@@ -107,6 +157,17 @@ export default function KanbanBoard({
                   <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-2 py-0.5">
                     {cards.length}
                   </span>
+                  {stage === 'completed' && (
+                    <button
+                      type="button"
+                      onClick={() => setCompletedOpen(false)}
+                      title="Hide completed"
+                      aria-label="Collapse completed column"
+                      className="p-0.5 -mr-1 text-gray-400 hover:text-gray-700"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {dollars > 0 && (
                   <div className="mt-1 text-[11px] text-gray-500">{formatMoneyShort(dollars)} in stage</div>

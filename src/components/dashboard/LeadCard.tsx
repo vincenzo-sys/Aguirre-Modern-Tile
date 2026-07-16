@@ -57,7 +57,11 @@ export default function LeadCard({
   handlers: LeadCardHandlers
   compact?: boolean
 }) {
-  const urgency = urgencyBadgeFor(item)
+  // Completed is a terminal stage — suppress the "deal is rotting" signals
+  // (urgency badge + days-in-stage chip) so a finished job doesn't read as
+  // stale/overdue on the board.
+  const isTerminal = item.stage === 'completed'
+  const urgency = isTerminal ? null : urgencyBadgeFor(item)
   const [moreSheetOpen, setMoreSheetOpen] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
   const [stageSheetOpen, setStageSheetOpen] = useState(false)
@@ -121,7 +125,7 @@ export default function LeadCard({
               {urgency.label}
             </span>
           )}
-          <DaysInStageChip iso={item.updated_at} />
+          {!isTerminal && <DaysInStageChip iso={item.updated_at} />}
         </div>
         <button
           type="button"

@@ -64,6 +64,10 @@ export default function LeadsPage() {
   })
 
   const overdueCount = items.filter((i) => i.urgency >= 100).length
+  // Completed is a terminal column; keep it out of the "active" tally so the
+  // header still reflects deals that need attention.
+  const completedCount = items.filter((i) => i.stage === 'completed').length
+  const activeCount = items.length - completedCount
 
   // Loading + error states
   if (loading) return <LeadsPageSkeleton />
@@ -76,7 +80,8 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {counts.total} active · {counts.quote_requests} new inquiries · {counts.jobs} active leads
+            {activeCount} active · {counts.quote_requests} new {counts.quote_requests === 1 ? 'inquiry' : 'inquiries'}
+            {completedCount > 0 && <span> · {completedCount} completed</span>}
             {overdueCount > 0 && <span className="text-red-600 font-medium"> · {overdueCount} overdue</span>}
           </p>
         </div>

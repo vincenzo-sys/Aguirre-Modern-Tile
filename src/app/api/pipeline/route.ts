@@ -21,6 +21,7 @@ export type PipelineStage =
   | 'awaiting_response'            // estimate sat too long — Vince is now chasing
   | 'accepted_not_scheduled'       // deposit paid / signed, install not booked yet
   | 'scheduled'                    // install date locked in
+  | 'completed'                    // job finished — terminal column on the board
 
 export type PipelineItem = {
   kind: 'quote_request' | 'job'
@@ -130,10 +131,11 @@ export async function GET(req: NextRequest) {
       supabase
         .from('jobs')
         .select('id, job_number, title, status, client_name, client_email, client_phone, client_address, estimated_cost, scheduled_start, notes, scope_notes, created_at, updated_at')
-        // Extended pipeline: leads + quoted + the new 'awaiting_response' chase
-        // bucket + accepted/scheduled jobs that aren't yet on the install bench.
-        // Stops at 'in_progress' — once the crew is on-site the job shows on
-        // the Installs board (/dashboard/leads/board), not in this pipeline.
+        // Extended pipeline: leads + quoted + the 'awaiting_response' chase
+        // bucket + accepted/scheduled jobs + a terminal 'completed' column.
+        // 'in_progress'/'waiting_for_materials'/'paid' stay off this board —
+        // they live on the Installs board (/dashboard/leads/board). 'completed'
+        // is surfaced here so a finished deal is visible on the deal-stage view.
         .in('status', [
           'lead',
           'quoted',
@@ -141,6 +143,7 @@ export async function GET(req: NextRequest) {
           'awaiting_response',
           'accepted_not_scheduled',
           'scheduled',
+          'completed',
         ])
         .order('created_at', { ascending: false }),
       supabase
@@ -226,6 +229,7 @@ export async function GET(req: NextRequest) {
         : j.status === 'awaiting_response' ? 'awaiting_response'
         : j.status === 'accepted_not_scheduled' ? 'accepted_not_scheduled'
         : j.status === 'scheduled' ? 'scheduled'
+        : j.status === 'completed' ? 'completed'
         : linkedQr?.site_visit_at ? 'in_person_estimate_scheduled'
         : 'quoted'  // pre-estimate job with no visit — show in Quoted column as the most-actionable bucket
       items.push({

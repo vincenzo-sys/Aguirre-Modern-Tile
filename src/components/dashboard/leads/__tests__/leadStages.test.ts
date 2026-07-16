@@ -5,7 +5,7 @@ import {
 } from '@/lib/leadStages'
 
 describe('STAGE_ORDER', () => {
-  it('has all 7 stages in the canonical order', () => {
+  it('has all 8 stages in the canonical order', () => {
     expect(STAGE_ORDER).toEqual([
       'new',
       'in_person_estimate_scheduled',
@@ -14,6 +14,7 @@ describe('STAGE_ORDER', () => {
       'awaiting_response',
       'accepted_not_scheduled',
       'scheduled',
+      'completed',
     ])
   })
 })
@@ -37,12 +38,13 @@ describe('isQrStage / isJobStage', () => {
     expect(isQrStage('new')).toBe(true)
     expect(isQrStage('in_person_estimate_scheduled')).toBe(true)
   })
-  it('classifies the five job-only stages', () => {
+  it('classifies the six job-only stages', () => {
     expect(isJobStage('quoted')).toBe(true)
     expect(isJobStage('edits_needed')).toBe(true)
     expect(isJobStage('awaiting_response')).toBe(true)
     expect(isJobStage('accepted_not_scheduled')).toBe(true)
     expect(isJobStage('scheduled')).toBe(true)
+    expect(isJobStage('completed')).toBe(true)
   })
   it('isQrStage and isJobStage are complementary', () => {
     for (const s of STAGE_ORDER) {
@@ -58,6 +60,7 @@ describe('jobStatusForStage', () => {
     expect(jobStatusForStage('awaiting_response')).toBe('awaiting_response')
     expect(jobStatusForStage('accepted_not_scheduled')).toBe('accepted_not_scheduled')
     expect(jobStatusForStage('scheduled')).toBe('scheduled')
+    expect(jobStatusForStage('completed')).toBe('completed')
   })
   it('returns null for QR-only stages', () => {
     expect(jobStatusForStage('new')).toBe(null)
@@ -85,6 +88,7 @@ describe('stageOptionsFor', () => {
       'awaiting_response',
       'accepted_not_scheduled',
       'scheduled',
+      'completed',
     ])
   })
 

@@ -7,7 +7,7 @@
 // here. Components import what they need by name.
 
 import {
-  Inbox, Calendar, FilePlus, FileEdit, Clock, CheckCircle2, CalendarCheck,
+  Inbox, Calendar, FilePlus, FileEdit, Clock, CheckCircle2, CalendarCheck, CheckCheck,
   type LucideIcon,
 } from 'lucide-react'
 import type { PipelineStage } from '@/app/api/pipeline/route'
@@ -30,6 +30,7 @@ export const STAGE_ORDER: PipelineStage[] = [
   'awaiting_response',
   'accepted_not_scheduled',
   'scheduled',
+  'completed',
 ]
 
 type StageMeta = {
@@ -93,6 +94,15 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     iconBg: 'bg-teal-100 text-teal-800',
     icon: CalendarCheck,
   },
+  // Terminal column: the job is finished. Neutral slate/gray so it reads
+  // as "done, no action needed" against the colorful active stages.
+  completed: {
+    label: 'Completed', shortLabel: 'Done',
+    chip: 'bg-gray-100 text-gray-700',
+    topBorder: 'border-t-gray-400',
+    iconBg: 'bg-gray-100 text-gray-700',
+    icon: CheckCheck,
+  },
 }
 
 // QR-stages live on quote_requests; job-stages live on jobs. The
@@ -115,6 +125,7 @@ const JOB_STATUS_FOR_STAGE: Partial<Record<PipelineStage, string>> = {
   awaiting_response: 'awaiting_response',
   accepted_not_scheduled: 'accepted_not_scheduled',
   scheduled: 'scheduled',
+  completed: 'completed',
 }
 export function jobStatusForStage(stage: PipelineStage): string | null {
   return JOB_STATUS_FOR_STAGE[stage] ?? null

@@ -4,22 +4,30 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, X } from 'lucide-react'
+import { LogOut, X, ChevronRight } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 import {
   ownerHome,
+  ownerPrimary,
   ownerSections,
   installerHome,
   installerExtras,
   isNavActive,
   type NavItem,
 } from '@/lib/dashboardNav'
+import { useLocalStorageState } from '@/lib/useLocalStorageState'
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Collapsible "More" region — remembers open/closed across reloads.
+  const [moreOpen, setMoreOpen] = useLocalStorageState<boolean>(
+    'dashboard_sidebar_more_v1',
+    false,
+    (v): v is boolean => typeof v === 'boolean',
+  )
   const isOwner = profile.role === 'owner'
 
   // Bottom tab bar's "More" tab triggers the drawer via window event so the
@@ -70,14 +78,33 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         {renderItem(homeItem)}
 
         {isOwner ? (
-          ownerSections.map((section) => (
-            <div key={section.heading} className="pt-4 mt-2">
-              <p className="px-3 mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                {section.heading}
-              </p>
-              <div className="space-y-1">{section.items.map(renderItem)}</div>
+          <>
+            <div className="space-y-1">{ownerPrimary.map(renderItem)}</div>
+
+            {/* Everything non-essential lives behind this collapsible
+                "More" — keeps the default sidebar to Home / Leads /
+                Schedule. Sections stay grouped once expanded. */}
+            <div className="pt-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                aria-expanded={moreOpen}
+              >
+                <ChevronRight className={`w-5 h-5 transition-transform ${moreOpen ? 'rotate-90' : ''}`} />
+                More
+              </button>
+              {moreOpen &&
+                ownerSections.map((section) => (
+                  <div key={section.heading} className="pt-3">
+                    <p className="px-3 mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                      {section.heading}
+                    </p>
+                    <div className="space-y-1">{section.items.map(renderItem)}</div>
+                  </div>
+                ))}
             </div>
-          ))
+          </>
         ) : (
           <div className="pt-2">{installerExtras.map(renderItem)}</div>
         )}

@@ -33,9 +33,10 @@ export type NavSection = {
   items: NavItem[]
 }
 
-// Owner: Sales / Operations / Estimation. The home item lives outside
-// sections (rendered at the top of the sidebar) and is implicitly pinned
-// to the tab bar.
+// Owner: a stripped-down primary nav (Home / Leads / Schedule) with
+// everything else tucked into `ownerSections` behind a collapsible "More"
+// in the sidebar. The home item lives outside both (rendered at the top,
+// implicitly pinned to the tab bar).
 export const ownerHome: NavItem = {
   label: 'Home',
   href: '/dashboard',
@@ -43,11 +44,20 @@ export const ownerHome: NavItem = {
   pinnedToTabBar: true,
 }
 
+// Always-visible primary items. Both pinned, so the tab bar = Home / Leads
+// / Schedule / More.
+export const ownerPrimary: NavItem[] = [
+  { label: 'Leads', href: '/dashboard/leads', icon: Inbox, pinnedToTabBar: true },
+  { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays, pinnedToTabBar: true },
+]
+
+// Everything else — rendered under the sidebar's collapsible "More". Still
+// grouped Sales / Operations / Estimation for organization; none pinned to
+// the tab bar (they live behind the "More" tab).
 export const ownerSections: NavSection[] = [
   {
     heading: 'Sales',
     items: [
-      { label: 'Leads', href: '/dashboard/leads', icon: Inbox, pinnedToTabBar: true },
       { label: 'Customers', href: '/dashboard/customers', icon: Users },
       { label: 'Gallery', href: '/dashboard/gallery', icon: ImageIcon },
       { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
@@ -57,8 +67,7 @@ export const ownerSections: NavSection[] = [
   {
     heading: 'Operations',
     items: [
-      { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays, pinnedToTabBar: true },
-      { label: 'Installs', href: '/dashboard/leads/board', icon: ClipboardList, pinnedToTabBar: true },
+      { label: 'Installs', href: '/dashboard/leads/board', icon: ClipboardList },
       { label: 'Materials', href: '/dashboard/materials', icon: Package },
       { label: 'Crew', href: '/dashboard/settings/crew', icon: HardHat },
       { label: 'Team Map', href: '/dashboard/team-map', icon: MapPin },
@@ -95,7 +104,10 @@ export function getTabBarItems(role: Role): NavItem[] {
   if (role !== 'owner') {
     return [installerHome, ...installerExtras.filter((i) => i.pinnedToTabBar)]
   }
-  const pinned = ownerSections.flatMap((s) => s.items.filter((i) => i.pinnedToTabBar))
+  // Pinned items come from the primary nav; still scan `ownerSections` so a
+  // future `pinnedToTabBar` on a "More" item would surface here too.
+  const pinned = [...ownerPrimary, ...ownerSections.flatMap((s) => s.items)]
+    .filter((i) => i.pinnedToTabBar)
   return [ownerHome, ...pinned]
 }
 

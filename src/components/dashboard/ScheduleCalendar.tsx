@@ -121,6 +121,17 @@ export default function ScheduleCalendar({
   const resizingRef = useRef<typeof resizing>(null)
   useEffect(() => { resizingRef.current = resizing }, [resizing])
 
+  // Mobile-first default: a 7-column month grid is cramped on a phone (tiny
+  // truncated chips, "+N more"), so open to the agenda list ("next 30 days")
+  // on small screens where the real question is "what's coming up." Runs once
+  // on mount (post-hydration, to avoid an SSR mismatch on the view toggle);
+  // the toggle still lets the user switch to month/week. NB: a local
+  // `const window` (the fetch date-range, below) shadows the browser global,
+  // so reach matchMedia via globalThis.
+  useEffect(() => {
+    if (globalThis.matchMedia?.('(max-width: 767px)')?.matches) setView('agenda')
+  }, [])
+
   // Compute the date window the calendar wants to fetch, based on view + cursor
   const window = useMemo(() => {
     if (view === 'week') {

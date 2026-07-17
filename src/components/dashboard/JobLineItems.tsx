@@ -27,6 +27,8 @@ const MATERIAL_UNITS: JobLineItem['unit'][] = ['sheet', 'bag', 'tube', 'kit', 'r
 const LABOR_UNITS: JobLineItem['unit'][] = ['day', 'hr', 'ea', 'sq ft']
 
 const PROJECTWIDE_LABEL = 'Project-wide'
+// Sentinel value for the Section picker's "create a new section" option.
+const NEW_SECTION_VALUE = '__new_section__'
 
 // Aguirre target margin band (see feedback_pricing_conventions): aim for
 // 39–45%. Below 39% the footer flags the job; the "Set margin → 40%" quick
@@ -134,6 +136,18 @@ export default function JobLineItems({
   const sections = useMemo(() => groupBySection(liveItems), [liveItems])
   const showSectionHeaders =
     sections.length > 1 || (sections[0] && sections[0][0] !== PROJECTWIDE_LABEL)
+
+  // Distinct section labels already present on the line items — the options a
+  // row's Section picker offers (in addition to Project-wide + "New section…").
+  // For a generated multi-scope estimate these are the scope names already
+  // tagged onto the generated lines, so hand-added materials can join them.
+  const availableSections = useMemo(() => {
+    const seen: string[] = []
+    for (const it of liveItems) {
+      if (it.section && !seen.includes(it.section)) seen.push(it.section)
+    }
+    return seen
+  }, [liveItems])
 
   const grandTotal = liveItems.reduce((s, i) => s + (i.amount ?? 0), 0)
 
@@ -393,6 +407,7 @@ export default function JobLineItems({
               itemIndexMap={itemIndexMap}
               materialsCatalog={materialsCatalog}
               dayCost={dayCostNumber}
+              availableSections={availableSections}
               onSetStatus={setStatus}
               onUpdateRow={updateRow}
               onDeleteRow={deleteRow}
@@ -419,7 +434,7 @@ export default function JobLineItems({
                 >
                   <Plus className="w-4 h-4" /> Add labor
                 </button>
-                <span className="text-xs text-gray-400 ml-auto">New rows land in Project-wide</span>
+                <span className="text-xs text-gray-400 ml-auto">New rows start in Project-wide — set a Section on each row to group it</span>
               </div>
 
               {/* Quick price adjusters — reshape customer prices in one tap.
@@ -553,6 +568,7 @@ function SectionBlock({
   itemIndexMap,
   materialsCatalog,
   dayCost,
+  availableSections,
   onSetStatus,
   onUpdateRow,
   onDeleteRow,
@@ -567,6 +583,7 @@ function SectionBlock({
   itemIndexMap: Map<JobLineItem, number>
   materialsCatalog: MaterialPricing[]
   dayCost: number | null
+  availableSections: string[]
   onSetStatus: (index: number, status: MaterialStatus) => void
   onUpdateRow: (index: number, patch: Partial<JobLineItem>) => void
   onDeleteRow: (index: number) => void
@@ -607,6 +624,7 @@ function SectionBlock({
                     disabled={updating}
                     unitOptions={MATERIAL_UNITS}
                     catalogList="materials-catalog"
+                    sections={availableSections}
                     onPatch={(patch) => onUpdateRow(i, patch)}
                     onDescriptionBlur={(v) => onDescriptionBlur(i, v)}
                     onDelete={() => onDeleteRow(i)}
@@ -680,6 +698,7 @@ function SectionBlock({
                     item={item}
                     disabled={updating}
                     unitOptions={LABOR_UNITS}
+                    sections={availableSections}
                     onPatch={(patch) => onUpdateRow(i, patch)}
                     onDescriptionBlur={(v) => onUpdateRow(i, { description: v })}
                     onDelete={() => onDeleteRow(i)}
@@ -734,6 +753,7 @@ function LineItemEditRow({
   disabled,
   unitOptions,
   catalogList,
+  sections,
   onPatch,
   onDescriptionBlur,
   onDelete,
@@ -742,6 +762,7 @@ function LineItemEditRow({
   disabled: boolean
   unitOptions: JobLineItem['unit'][]
   catalogList?: string
+  sections: string[]
   onPatch: (patch: Partial<JobLineItem>) => void
   onDescriptionBlur: (value: string) => void
   onDelete: () => void
@@ -816,6 +837,34 @@ function LineItemEditRow({
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Section picker — assign this line to a specific portion of the job
+          (e.g. Master Bath, Shower) instead of Project-wide. Writes the
+          `section` field the grouped display already reads. */}
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Section</span>
+        <select
+          value={item.section || PROJECTWIDE_LABEL}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === NEW_SECTION_VALUE) {
+              const name = window.prompt('New section name (e.g. Master Bath, Shower):')?.trim()
+              if (name) onPatch({ section: name })
+              return
+            }
+            onPatch({ section: v === PROJECTWIDE_LABEL ? null : v })
+          }}
+          disabled={disabled}
+          className="px-2 py-1 border border-gray-200 rounded text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
+        >
+          <option value={PROJECTWIDE_LABEL}>{PROJECTWIDE_LABEL}</option>
+          {sections.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+          <option value={NEW_SECTION_VALUE}>＋ New section…</option>
+        </select>
+      </div>
+
       {item.category === 'materials' && (
         <div className="mt-1.5">
           {showSource ? (

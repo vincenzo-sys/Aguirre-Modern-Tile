@@ -71,6 +71,12 @@ export interface GenerateResult {
   demo_days: number
   install_days: number
   margin_percent: number
+  // Non-fatal issues the engine wants a human to see before sending the
+  // estimate: a formula material that couldn't be matched to the catalog
+  // (so it was dropped from the bill), or a margin outside the sane band.
+  // Empty array on a clean estimate. The estimate still generates — these
+  // are advisories, not errors.
+  warnings: string[]
 }
 
 // Legacy hardcoded bill of materials. After migration 022 every seeded template

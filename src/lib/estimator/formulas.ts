@@ -178,15 +178,20 @@ export interface LaborDaysOpts {
   formula: string
   vars: FormulaVars
   min?: number
+  max?: number
 }
 
 // Labor days round to the nearest half day (we don't quote 0.37 days), then
-// floor at the per-template min so we always quote at least one crew showing
-// up regardless of how small the scope is.
+// clamp to the per-template [min, max] window. The min floor always quotes at
+// least one crew showing up regardless of how small the scope is; the max
+// ceiling stops an absurd sqft (a fat-fingered 5000 in a 50 sqft field) from
+// producing runaway labor — and, since transportation scales off labor days,
+// a runaway total. Mirrors computeMaterialQty's clamp.
 export function computeLaborDays(opts: LaborDaysOpts): number {
   const raw = computeFormula(opts.formula, opts.vars)
   let days = Math.round(raw * 2) / 2
   if (opts.min !== undefined && opts.min !== null) days = Math.max(days, opts.min)
+  if (opts.max !== undefined && opts.max !== null) days = Math.min(days, opts.max)
   return days
 }
 
@@ -234,4 +239,6 @@ export interface LaborFormula {
   install_days?: string
   min_demo?: number
   min_install?: number
+  max_demo?: number
+  max_install?: number
 }

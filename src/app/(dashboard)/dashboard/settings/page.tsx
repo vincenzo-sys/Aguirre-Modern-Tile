@@ -45,10 +45,10 @@ const demoData: Record<string, any[]> = {
   labor_rates: [
     { id: '1', setting: 'Standard Crew Size', value: 2, notes: 'Number of tilers per job' },
     { id: '2', setting: 'Day Rate (per tiler)', value: 250, notes: 'Base daily rate per person' },
-    { id: '3', setting: 'Install Labor per Day (to customer)', value: 950, notes: '$250 x 2 guys x 1.9' },
-    { id: '4', setting: 'Demo Labor per Day (to customer)', value: 800, notes: '$250 x 2 guys x 1.6' },
-    { id: '5', setting: 'Demo Multiplier', value: 1.6, notes: 'Markup for demo labor' },
-    { id: '6', setting: 'Install Multiplier', value: 1.9, notes: 'Markup for install labor' },
+    { id: '3', setting: 'Install Labor per Day (to customer)', value: 1000, notes: '$250 x 2 guys x 2.0 (100% markup) = $1000/day' },
+    { id: '4', setting: 'Demo Labor per Day (to customer)', value: 1000, notes: '$250 x 2 guys x 2.0 (100% markup) = $1000/day' },
+    { id: '5', setting: 'Demo Multiplier', value: 2.0, notes: 'Markup for demo labor — $1000/day for 2 guys (100%)' },
+    { id: '6', setting: 'Install Multiplier', value: 2.0, notes: 'Markup for install labor — $1000/day for 2 guys (100%)' },
   ],
   operating_costs: [
     { id: '1', setting: 'Trash Disposal - Small Job', value: '$150', notes: 'Single area, less debris' },

@@ -293,6 +293,7 @@ export async function POST(req: NextRequest) {
       margin_percent: result.margin_percent,
       line_item_count: result.line_items.length,
       scope_count: scopes.length,
+      warnings: result.warnings,
     },
   })
 }

@@ -109,7 +109,12 @@ function unitForCatalog(unit: string): JobLineItem['unit'] {
   return map[unit] ?? 'ea'
 }
 
-function matchCatalog(
+// Exported so the template↔catalog contract test can assert every
+// materials_formula item name still resolves to a catalog row using the
+// exact matching the engine uses (a renamed SKU that silently drops from
+// estimates should turn CI red, not surface only when an owner notices a
+// missing line).
+export function matchCatalog(
   materialName: string,
   catalog: MaterialCatalogRow[]
 ): MaterialCatalogRow | null {
@@ -188,6 +193,10 @@ interface ScopeBuildResult {
   install_days: number
   scope_total: number
   description_line: string
+  // Formula item names that no catalog row matched. These were dropped from
+  // the bill of materials; the caller surfaces them so the owner can add the
+  // line by hand instead of the material silently vanishing from the quote.
+  unmatched: string[]
 }
 
 function buildScope(
@@ -211,14 +220,17 @@ function buildScope(
   // ── Labor ────────────────────────────────────────────────────────────
   const laborFormula = template.labor_formula ?? {}
   const demoDays = laborFormula.demo_days
-    ? computeLaborDays({ formula: laborFormula.demo_days, vars: formulaVars, min: laborFormula.min_demo })
+    ? computeLaborDays({ formula: laborFormula.demo_days, vars: formulaVars, min: laborFormula.min_demo, max: laborFormula.max_demo })
     : Number(template.demo_days ?? 0)
   const installDays = laborFormula.install_days
-    ? computeLaborDays({ formula: laborFormula.install_days, vars: formulaVars, min: laborFormula.min_install })
+    ? computeLaborDays({ formula: laborFormula.install_days, vars: formulaVars, min: laborFormula.min_install, max: laborFormula.max_install })
     : Number(template.install_days ?? 0)
 
-  const installRate = settingValue(laborRates, 'Install Labor per Day (to customer)') ?? 950
-  const demoRate = settingValue(laborRates, 'Demo Labor per Day (to customer)') ?? 800
+  // Aguirre bills a flat $1000/day for the 2-man crew (100% markup on the
+  // $500/day crew cost), demo and install alike. The DB rows are the source
+  // of truth; these fallbacks only fire if a row is missing.
+  const installRate = settingValue(laborRates, 'Install Labor per Day (to customer)') ?? 1000
+  const demoRate = settingValue(laborRates, 'Demo Labor per Day (to customer)') ?? 1000
 
   const lineItems: JobLineItem[] = []
   if (demoDays > 0) {
@@ -245,6 +257,7 @@ function buildScope(
   }
 
   // ── Materials ────────────────────────────────────────────────────────
+  const unmatched: string[] = []
   const formulas = Array.isArray(template.materials_formula) ? template.materials_formula : []
   if (formulas.length === 0) {
     // Template hasn't been migrated to formulas yet — caller should have
@@ -263,7 +276,13 @@ function buildScope(
     // adds the line manually after. We skip before computing to avoid a
     // coverage-based formula dividing by 0 on a material we can't price anyway.
     const row = matchCatalog(entry.item, catalog)
-    if (!row) continue
+    if (!row) {
+      // Catalog gap: the formula wants a material we can't price. Record it
+      // (deduped) so the caller can warn the owner instead of the line
+      // silently disappearing from the estimate and understating the total.
+      if (!unmatched.includes(entry.item)) unmatched.push(entry.item)
+      continue
+    }
     const qty = computeMaterialQty({
       formula: entry.formula,
       vars: { ...formulaVars, coverage: Number(row.coverage) || 0 },
@@ -309,6 +328,7 @@ function buildScope(
     install_days: installDays,
     scope_total: scopeTotal,
     description_line,
+    unmatched,
   }
 }
 
@@ -344,6 +364,7 @@ export function generateFromScopes(
   // Build each scope and accumulate.
   const allLineItems: JobLineItem[] = []
   const descriptions: string[] = []
+  const warnings: string[] = []
   let totalDemo = 0
   let totalInstall = 0
 
@@ -357,6 +378,11 @@ export function generateFromScopes(
     descriptions.push(built.description_line)
     totalDemo += built.demo_days
     totalInstall += built.install_days
+    for (const item of built.unmatched) {
+      warnings.push(
+        `Couldn't price "${item}" (${scope.label}) — not in the materials catalog, so it was left off the estimate. Add it as a line item manually or add the material in Settings.`
+      )
+    }
   }
 
   // ── Project-wide line items (trash + transport, one set total) ───────
@@ -418,6 +444,21 @@ export function generateFromScopes(
   }, 0)
   const marginPercent = total > 0 ? Math.round(((total - costTotal) / total) * 1000) / 10 : 0
 
+  // Margin sanity guard: the Aguirre target band is 39–45% (see
+  // feedback_pricing_conventions). A margin far below the 20% floor usually
+  // means a mispriced material or a bad measurement; a margin far above 70%
+  // usually means labor/materials fell out of the estimate. Either way, flag
+  // it so an anomalous quote self-reports before it's sent.
+  if (total > 0 && marginPercent < 20) {
+    warnings.push(
+      `Margin is ${marginPercent}%, below the 20% floor — double-check pricing and measurements before sending.`
+    )
+  } else if (marginPercent > 70) {
+    warnings.push(
+      `Margin is ${marginPercent}%, unusually high — verify labor and materials weren't left out.`
+    )
+  }
+
   // ── Scope notes ──────────────────────────────────────────────────────
   const warrantyYears = opts.warranty_years ?? 3
   const allCustomerProvides = new Set<string>()
@@ -463,5 +504,6 @@ export function generateFromScopes(
     demo_days: totalDemo,
     install_days: totalInstall,
     margin_percent: marginPercent,
+    warnings,
   }
 }

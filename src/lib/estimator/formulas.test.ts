@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFormula, computeMaterialQty, appliesWhen } from './formulas'
+import { computeFormula, computeMaterialQty, computeLaborDays, appliesWhen } from './formulas'
 
 describe('computeFormula — coverage variable', () => {
   it('exposes coverage so bag counts can derive from the catalog', () => {
@@ -29,6 +29,20 @@ describe('computeMaterialQty — clamps still apply with coverage formulas', () 
     expect(
       computeMaterialQty({ formula: 'ceil(sqft * 1.1 / coverage)', vars: { sqft: 5000, coverage: 65 }, max: 6 }),
     ).toBe(6)
+  })
+})
+
+describe('computeLaborDays — rounds to half-days and clamps', () => {
+  it('rounds to the nearest half day', () => {
+    // 130 sqft / 50 = 2.6 → nearest half = 2.5
+    expect(computeLaborDays({ formula: 'sqft / 50', vars: { sqft: 130 } })).toBe(2.5)
+  })
+  it('floors at min so a tiny scope still quotes a crew showing up', () => {
+    expect(computeLaborDays({ formula: 'sqft / 50', vars: { sqft: 20 }, min: 2 })).toBe(2)
+  })
+  it('caps at max so an absurd sqft cannot produce runaway labor', () => {
+    // 5000 / 50 = 100 days, clamped to 6
+    expect(computeLaborDays({ formula: 'sqft / 50', vars: { sqft: 5000 }, min: 2, max: 6 })).toBe(6)
   })
 })
 

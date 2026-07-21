@@ -71,6 +71,10 @@ type Result = {
   margin_percent: number
   line_item_count: number
   scope_count: number
+  // Non-fatal advisories from the engine (unpriceable material, off-band
+  // margin). Shown in the preview banner so the owner sees them before
+  // sending. Absent/empty on a clean estimate.
+  warnings?: string[]
 }
 
 let uidCounter = 0
@@ -405,6 +409,14 @@ export default function GenerateEstimateModal({
         `Estimate: $${s.total.toFixed(2)} · ${scopeText} · ${s.labor_days}d · ${s.margin_percent}% margin`,
         'success'
       )
+      // Surface engine advisories as a separate, longer-lived toast — the
+      // modal is about to close, so the amber note in the preview banner
+      // would disappear before the owner reads it.
+      if (s.warnings && s.warnings.length > 0) {
+        const first = s.warnings[0]
+        const more = s.warnings.length - 1
+        toast(more > 0 ? `${first} (+${more} more)` : first, 'warning')
+      }
       setOpen(false)
       router.refresh()
     } catch (err) {
@@ -619,6 +631,16 @@ function PreviewBanner({ preview, loading }: { preview: Result | null; loading: 
           </div>
         </div>
       </div>
+      {preview.warnings && preview.warnings.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-primary-200 pt-2">
+          {preview.warnings.map((w, i) => (
+            <li key={i} className="flex items-start gap-1.5 text-[11px] text-amber-700">
+              <span aria-hidden className="mt-px">⚠</span>
+              <span>{w}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

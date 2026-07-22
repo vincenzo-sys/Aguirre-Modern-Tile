@@ -24,9 +24,10 @@ async function resolveJob(token: string) {
 type CrewLite = { id: string; full_name: string; nickname: string | null; is_active: boolean }
 
 // Active crew ASSIGNED to this job (de-duped). May be empty when Vince hasn't
-// assigned anyone yet. This is the ONLY set a POST write may be authorized
-// against — there is deliberately no roster fallback here, so a token holder
-// can never log labor for crew who aren't part of the job.
+// assigned anyone yet. BOTH the GET picker and the POST write authorize against
+// this set — deliberately NO roster fallback anywhere — so a token holder can
+// never see or log labor for crew who aren't part of the job, and the picker
+// never offers a name that POST would reject with 403.
 async function assignedCrew(
   supabase: ReturnType<typeof createServiceClient>,
   jobId: string
@@ -46,26 +47,6 @@ async function assignedCrew(
   return Array.from(byId.values())
 }
 
-// The crew the GET picker renders: active crew ASSIGNED to this job, falling
-// back to the full active roster only when the job has no crew assigned yet
-// (so the crew can still see themselves before Vince assigns them). This
-// fallback is GET-ONLY — the POST write path authorizes against assignedCrew()
-// with no fallback (see POST) so it can never accept labor for unassigned crew.
-async function allowedCrew(
-  supabase: ReturnType<typeof createServiceClient>,
-  jobId: string
-): Promise<CrewLite[]> {
-  const assigned = await assignedCrew(supabase, jobId)
-  if (assigned.length > 0) return assigned
-
-  const { data: all } = await supabase
-    .from('crew_members')
-    .select('id, full_name, nickname, is_active')
-    .eq('is_active', true)
-    .order('full_name')
-  return (all ?? []) as CrewLite[]
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -76,8 +57,10 @@ export async function GET(
     return NextResponse.json({ error: 'Work order not found' }, { status: 404 })
   }
 
-  // Crew the holder may log for (names only — never rates).
-  const roster = await allowedCrew(supabase, jobId)
+  // Crew the holder may log for (names only — never rates). ASSIGNED crew only,
+  // matching the POST write path — the picker never offers a name POST rejects.
+  // Empty until Vince assigns crew to the job.
+  const roster = await assignedCrew(supabase, jobId)
 
   // Existing hours — no cost, just who/when/how-many.
   const { data: labor } = await supabase

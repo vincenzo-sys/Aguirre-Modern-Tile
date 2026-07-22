@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { sendCustomerEmail } from '@/lib/email'
 import { requireApiAuth } from '@/lib/apiAuth'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 
 // Admin client — auth is already enforced upstream by requireApiAuth (which
 // accepts either a session cookie or X-API-Key). Using the service-role client
@@ -65,7 +66,10 @@ export async function PATCH(
       'title', 'status', 'client_name', 'client_phone', 'client_email', 'client_address',
       'customer_id', 'job_type', 'square_footage', 'scope_notes',
       'scheduled_start', 'scheduled_end', 'estimated_days', 'actual_days',
-      'estimated_cost', 'actual_cost', 'amount_invoiced', 'amount_paid',
+      // amount_paid is DERIVED (deposit_paid + final_payment_amount + paid
+      // invoices) — never settable directly, or a later recompute would wipe
+      // it. A manually recorded deposit writes the deposit_paid channel instead.
+      'estimated_cost', 'actual_cost', 'amount_invoiced', 'deposit_paid',
       'estimate_accepted_at',
       'line_items', 'assigned_to', 'notes', 'crew_instructions', 'crew_log', 'customer_provides',
       'lost_reason',
@@ -112,6 +116,16 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // If this PATCH touched a payment channel (a manually recorded deposit),
+    // recompute amount_paid from all channels so it stays whole instead of
+    // being set directly and later overwritten. See recomputeJobFinancials.
+    let responseJob = job
+    if ('deposit_paid' in updates) {
+      await recomputeJobFinancials(supabase, id)
+      const { data: refreshed } = await supabase.from('jobs').select('*').eq('id', id).single()
+      if (refreshed) responseJob = refreshed
     }
 
     // Auto-message on status change (non-blocking)
@@ -183,7 +197,7 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json(job)
+    return NextResponse.json(responseJob)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

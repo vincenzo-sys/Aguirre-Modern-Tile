@@ -63,14 +63,20 @@ BEGIN
 END;
 $$;
 
--- 4. Best-effort backfill: jobs that already accepted an estimate (deposit
---    collected) get deposit_paid seeded from the 10% rule the checkout route
---    enforces, so their amount_paid stays whole once recompute begins folding
---    channels together. Guard: only where amount_paid actually covers the
---    computed deposit, and only if not already set.
-UPDATE jobs
-   SET deposit_paid = ROUND(estimated_cost * 0.10, 2)
- WHERE estimate_accepted_at IS NOT NULL
-   AND estimated_cost IS NOT NULL
-   AND deposit_paid = 0
-   AND amount_paid >= ROUND(estimated_cost * 0.10, 2);
+-- 4. Backfill deposit_paid by RECONSTRUCTION, not by assuming the deposit was
+--    10% of estimated_cost (manual deposits via DepositReceivedAction can be
+--    any amount). deposit_paid = whatever in amount_paid is NOT explained by
+--    the final payment or paid invoices, so once recompute runs
+--    (amount_paid = paid-invoices + final_payment_amount + deposit_paid) the
+--    historical amount_paid is preserved EXACTLY for every job. Clamped at 0.
+UPDATE jobs j
+   SET deposit_paid = GREATEST(
+     ROUND(
+       COALESCE(j.amount_paid, 0)
+       - COALESCE(j.final_payment_amount, 0)
+       - COALESCE((SELECT SUM(i.amount) FROM invoices i
+                    WHERE i.job_id = j.id AND i.status = 'paid'), 0),
+       2
+     ), 0)
+ WHERE COALESCE(j.amount_paid, 0) > 0
+   AND j.deposit_paid = 0;

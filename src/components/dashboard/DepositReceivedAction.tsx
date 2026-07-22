@@ -31,7 +31,10 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
     setSaving(true)
     try {
       const updates: Record<string, unknown> = {
-        amount_paid: num,
+        // amount_paid is derived; record the deposit in its own channel so a
+        // later recompute (invoice paid, final payment) can't wipe it. The
+        // jobs PATCH recomputes amount_paid from deposit_paid + final + invoices.
+        deposit_paid: num,
       }
       // Stamp the deposit-paid timestamp if not already set so the customer-
       // facing estimate page and the dashboard show the same payment date

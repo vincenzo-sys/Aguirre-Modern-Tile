@@ -167,7 +167,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Credit the deposit atomically (no read-modify-write race), then recompute
   // amount_paid across all channels (deposit + paid invoices + final payment).
   // See recomputeJobFinancials.
-  await supabase.rpc('increment_job_deposit', { p_job_id: jobId, p_delta: depositDollars })
+  const { error: incErr } = await supabase.rpc('increment_job_deposit', {
+    p_job_id: jobId,
+    p_delta: depositDollars,
+  })
+  if (incErr) {
+    // The credit failed AFTER we claimed the session in the ledger. Roll the
+    // claim back so Stripe's redelivery retries the whole credit — otherwise
+    // the ledger PK would no-op the retry and the deposit would be lost.
+    await supabase.from('processed_deposit_sessions').delete().eq('session_id', session.id)
+    console.error(`Deposit increment failed for session ${session.id}; rolled back ledger claim:`, incErr)
+    throw new Error(`deposit increment failed: ${(incErr as { message?: string }).message ?? 'unknown'}`)
+  }
   const { amount_paid: newAmountPaid } = await recomputeJobFinancials(supabase, jobId)
 
   const updates: Record<string, unknown> = {}

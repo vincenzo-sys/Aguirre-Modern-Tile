@@ -119,10 +119,15 @@ export async function POST(request: NextRequest) {
     const phoneDigits = phone.replace(/\D/g, '')
     if (phoneDigits.length >= 10) {
       const last10 = phoneDigits.slice(-10)
+      // Strip PostgREST-reserved chars from the exact-match term so a normal
+      // "(617) 766-1259" can't break the .or() filter (400) and silently defeat
+      // find-or-create. last10 is digits-only and already safe; the JS .find
+      // below is the authoritative match.
+      const safePhone = phone.replace(/[,().]/g, '')
       const { data: existing } = await supabaseAdmin
         .from('customers')
         .select('*')
-        .or(`phone.eq.${phone},phone.like.%${last10}`)
+        .or(`phone.eq.${safePhone},phone.like.%${last10}`)
         .limit(5)
       const match = existing?.find(
         (row: { phone: string | null }) => (row.phone || '').replace(/\D/g, '').slice(-10) === last10

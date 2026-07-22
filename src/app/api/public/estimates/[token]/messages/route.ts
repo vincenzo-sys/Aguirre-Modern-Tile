@@ -90,26 +90,26 @@ export async function POST(
 
     const senderName = job.client_name || 'Customer'
 
-    // Debounce the OUTBOUND owner notification (paid OpenPhone SMS + email) in
-    // the DATABASE, not in memory. The per-IP limiter above resets on every cold
-    // serverless invocation, so on its own it can't stop an attacker from driving
-    // unlimited paid owner SMS/emails. Read the most recent prior inbound message
-    // for this job BEFORE inserting the new row, and only notify the owner if the
-    // last one arrived more than NOTIFY_DEBOUNCE_MS ago. The incoming message is
-    // ALWAYS persisted below regardless of this check — only the owner blast is
-    // throttled, so rapid posts collapse into at most one notification per window.
-    const NOTIFY_DEBOUNCE_MS = 5 * 60_000
-    const { data: lastMessage } = await supabase
+    // Cap the OUTBOUND owner notifications (paid OpenPhone SMS + email) in the
+    // DATABASE, not in memory. The per-IP limiter above resets on every cold
+    // serverless invocation, so on its own it can't stop an attacker driving
+    // unlimited paid owner SMS/emails. Count this job's customer messages in the
+    // last hour BEFORE inserting the new row: notify while under the cap, then
+    // suppress. Unlike a last-message-time debounce, this still notifies genuine
+    // early follow-ups (e.g. a "yes, I accept!" sent 2 minutes after a question
+    // is message #2, well under the cap) while bounding abuse to NOTIFY_CAP/hour.
+    // The incoming message is ALWAYS persisted below regardless of this check.
+    const NOTIFY_WINDOW_MS = 60 * 60_000
+    const NOTIFY_CAP = 5
+    const windowStart = new Date(Date.now() - NOTIFY_WINDOW_MS).toISOString()
+    const { count: recentCount } = await supabase
       .from('estimate_messages')
-      .select('created_at')
+      .select('id', { count: 'exact', head: true })
       .eq('job_id', job.id)
       .eq('sender', 'customer')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .gte('created_at', windowStart)
 
-    const lastAt = lastMessage?.created_at ? new Date(lastMessage.created_at).getTime() : 0
-    const shouldNotifyOwner = Date.now() - lastAt > NOTIFY_DEBOUNCE_MS
+    const shouldNotifyOwner = (recentCount ?? 0) < NOTIFY_CAP
 
     const { data: inserted, error } = await supabase
       .from('estimate_messages')

@@ -144,42 +144,33 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return
   }
 
-  // Idempotency on the Stripe SESSION id (migration 045), not on
-  // estimate_accepted_at. Stripe can redeliver the same event for up to 3 days;
-  // the processed_deposit_sessions PK makes crediting exactly-once PER SESSION.
-  // A redelivery of the same session conflicts here and no-ops. Critically, a
-  // SECOND genuine deposit — a different session — still credits instead of
-  // being silently swallowed as the old estimate_accepted_at guard did (#12).
-  const { error: ledgerErr } = await supabase
-    .from('processed_deposit_sessions')
-    .insert({ session_id: session.id, job_id: jobId, amount: depositDollars })
-  if (ledgerErr) {
-    if ((ledgerErr as { code?: string }).code === '23505') {
-      console.log(`Skipping already-processed deposit session ${session.id} (job ${jobId})`)
-      return
-    }
-    // Any other ledger error: do NOT credit (a later retry would double-credit
-    // once the ledger recovers). Throw so Stripe redelivers and we try again.
-    console.error(`Deposit ledger insert failed for session ${session.id}:`, ledgerErr)
-    throw new Error(`deposit ledger insert failed: ${(ledgerErr as { message?: string }).message ?? 'unknown'}`)
+  // Idempotent, ATOMIC credit (migration 045, #12). record_deposit inserts the
+  // Stripe session into processed_deposit_sessions AND bumps jobs.deposit_paid
+  // in ONE transaction, returning whether it actually credited. Idempotency is
+  // by the session PK, not estimate_accepted_at — so a redelivery no-ops but a
+  // SECOND genuine deposit (a different session) still credits. Because the
+  // claim and the credit commit together, there is no window where a committed
+  // credit could be un-claimed and then double-counted on retry.
+  const { data: credited, error: recErr } = await supabase.rpc('record_deposit', {
+    p_session_id: session.id,
+    p_job_id: jobId,
+    p_amount: depositDollars,
+  })
+  if (recErr) {
+    // Credit not confirmed. Throw so Stripe redelivers — record_deposit is
+    // idempotent, so retrying is safe (no double-credit even if it committed).
+    console.error(`record_deposit failed for session ${session.id}:`, recErr)
+    throw new Error(`record_deposit failed: ${(recErr as { message?: string }).message ?? 'unknown'}`)
   }
 
-  // Credit the deposit atomically (no read-modify-write race), then recompute
-  // amount_paid across all channels (deposit + paid invoices + final payment).
-  // See recomputeJobFinancials.
-  const { error: incErr } = await supabase.rpc('increment_job_deposit', {
-    p_job_id: jobId,
-    p_delta: depositDollars,
-  })
-  if (incErr) {
-    // The credit failed AFTER we claimed the session in the ledger. Roll the
-    // claim back so Stripe's redelivery retries the whole credit — otherwise
-    // the ledger PK would no-op the retry and the deposit would be lost.
-    await supabase.from('processed_deposit_sessions').delete().eq('session_id', session.id)
-    console.error(`Deposit increment failed for session ${session.id}; rolled back ledger claim:`, incErr)
-    throw new Error(`deposit increment failed: ${(incErr as { message?: string }).message ?? 'unknown'}`)
-  }
+  // Always recompute (idempotent) so amount_paid reflects deposit_paid even if a
+  // prior delivery committed the credit but lost its response before recomputing.
   const { amount_paid: newAmountPaid } = await recomputeJobFinancials(supabase, jobId)
+
+  if (credited === false) {
+    console.log(`Deposit session ${session.id} already processed (job ${jobId}) — no re-credit`)
+    return
+  }
 
   const updates: Record<string, unknown> = {}
   if (!job.estimate_accepted_at) {

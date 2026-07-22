@@ -82,10 +82,14 @@ export async function POST(req: NextRequest) {
           const phoneDigits = phone.replace(/\D/g, '')
           if (phoneDigits.length >= 10) {
             const last10 = phoneDigits.slice(-10)
+            // Strip PostgREST-reserved chars so a formatted "(617) 555-1234"
+            // can't 400 the .or() and silently defeat dedup (→ duplicate
+            // customer). The JS .find below is the authoritative digits match.
+            const safePhone = phone.replace(/[,().]/g, '')
             const { data: existing } = await supabase
               .from('customers')
               .select('id, openphone_contact_id, phone')
-              .or(`phone.eq.${phone},phone.like.%${last10}`)
+              .or(`phone.eq.${safePhone},phone.like.%${last10}`)
               .limit(5)
             const match = existing?.find(
               (row) => (row.phone || '').replace(/\D/g, '').slice(-10) === last10

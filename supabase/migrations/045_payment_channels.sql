@@ -36,18 +36,29 @@ CREATE TABLE IF NOT EXISTS processed_deposit_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3. Atomic per-channel increments so concurrent writers (Stripe webhook
---    redelivery, a manual final payment, a second deposit) can't lose an update
---    through a read-modify-write race. #17
-CREATE OR REPLACE FUNCTION increment_job_deposit(p_job_id UUID, p_delta NUMERIC)
-RETURNS NUMERIC LANGUAGE plpgsql AS $$
-DECLARE v NUMERIC;
+-- 3. Atomic + idempotent money mutations.
+--    record_deposit (#12): insert the Stripe session into the ledger AND bump
+--    deposit_paid in ONE transaction. The PK makes a redelivered session a
+--    no-op (ON CONFLICT DO NOTHING -> FOUND false -> no bump); returns true
+--    only when it actually credited. One-statement atomicity closes the
+--    double-credit window a separate insert-then-increment (with error
+--    rollback) opens when a committed increment loses its HTTP response and
+--    Stripe retries.
+--    increment_job_final_payment (#17): atomic add to the final-payment channel
+--    (avoids a read-modify-write race when two payments land together).
+CREATE OR REPLACE FUNCTION record_deposit(p_session_id TEXT, p_job_id UUID, p_amount NUMERIC)
+RETURNS BOOLEAN LANGUAGE plpgsql AS $$
 BEGIN
+  INSERT INTO processed_deposit_sessions (session_id, job_id, amount)
+  VALUES (p_session_id, p_job_id, p_amount)
+  ON CONFLICT (session_id) DO NOTHING;
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
   UPDATE jobs
-     SET deposit_paid = ROUND(COALESCE(deposit_paid, 0) + p_delta, 2)
-   WHERE id = p_job_id
-  RETURNING deposit_paid INTO v;
-  RETURN v;
+     SET deposit_paid = ROUND(COALESCE(deposit_paid, 0) + p_amount, 2)
+   WHERE id = p_job_id;
+  RETURN true;
 END;
 $$;
 

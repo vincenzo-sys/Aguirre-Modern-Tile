@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { isDangerousHref } from '@/lib/urlSafety'
 
 interface LexicalNode {
   type: string
@@ -58,13 +59,9 @@ function renderNode(node: LexicalNode, index: number): React.ReactNode {
   if (node.type === 'link') {
     const fields = node.fields || {}
     const rawUrl = fields.url || node.url || '#'
-    // Block script-y schemes robustly. A bare startsWith('javascript:') is
-    // bypassable — browsers ignore case and strip ASCII whitespace (space, tab,
-    // newline, CR, form-feed) from URLs, so "JavaScript:", " javascript:" and
-    // "java\tscript:" all execute. Strip that whitespace + lowercase before
-    // testing the scheme; the rendered href still uses the original rawUrl.
-    const schemeProbe = String(rawUrl).replace(/[\t\n\r\f\v ]/g, '').toLowerCase()
-    const url = /^(javascript|data|vbscript):/.test(schemeProbe) ? '#' : rawUrl
+    // Neutralize script-capable schemes (javascript:/data:/vbscript:), robust to
+    // case + whitespace bypasses — see isDangerousHref. Tested in urlSafety.test.ts.
+    const url = isDangerousHref(rawUrl) ? '#' : rawUrl
     const newTab = fields.newTab || node.newTab
     return (
       <a

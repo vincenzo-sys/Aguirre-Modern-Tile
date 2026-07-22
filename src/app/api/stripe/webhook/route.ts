@@ -144,21 +144,35 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return
   }
 
-  // Idempotency: Stripe can redeliver the same event up to 3 days later. If
-  // estimate_accepted_at is already set, this webhook already ran for this
-  // job and we should not double-credit amount_paid. The first delivery
-  // remains canonical; subsequent redeliveries are no-ops.
-  if (job.estimate_accepted_at) {
-    console.log(
-      `Skipping duplicate deposit webhook for job ${jobId} (already accepted at ${job.estimate_accepted_at}, session ${session.id})`
-    )
-    return
+  // Idempotency on the Stripe SESSION id (migration 045), not on
+  // estimate_accepted_at. Stripe can redeliver the same event for up to 3 days;
+  // the processed_deposit_sessions PK makes crediting exactly-once PER SESSION.
+  // A redelivery of the same session conflicts here and no-ops. Critically, a
+  // SECOND genuine deposit — a different session — still credits instead of
+  // being silently swallowed as the old estimate_accepted_at guard did (#12).
+  const { error: ledgerErr } = await supabase
+    .from('processed_deposit_sessions')
+    .insert({ session_id: session.id, job_id: jobId, amount: depositDollars })
+  if (ledgerErr) {
+    if ((ledgerErr as { code?: string }).code === '23505') {
+      console.log(`Skipping already-processed deposit session ${session.id} (job ${jobId})`)
+      return
+    }
+    // Any other ledger error: do NOT credit (a later retry would double-credit
+    // once the ledger recovers). Throw so Stripe redelivers and we try again.
+    console.error(`Deposit ledger insert failed for session ${session.id}:`, ledgerErr)
+    throw new Error(`deposit ledger insert failed: ${(ledgerErr as { message?: string }).message ?? 'unknown'}`)
   }
 
-  const newAmountPaid = Number(job.amount_paid ?? 0) + depositDollars
-  const updates: Record<string, unknown> = {
-    amount_paid: newAmountPaid,
-    estimate_accepted_at: new Date().toISOString(),
+  // Credit the deposit atomically (no read-modify-write race), then recompute
+  // amount_paid across all channels (deposit + paid invoices + final payment).
+  // See recomputeJobFinancials.
+  await supabase.rpc('increment_job_deposit', { p_job_id: jobId, p_delta: depositDollars })
+  const { amount_paid: newAmountPaid } = await recomputeJobFinancials(supabase, jobId)
+
+  const updates: Record<string, unknown> = {}
+  if (!job.estimate_accepted_at) {
+    updates.estimate_accepted_at = new Date().toISOString()
   }
 
   // If the job already has a start date, flip status to 'scheduled' so it
@@ -182,7 +196,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     updates.scheduled_end = autoEnd
   }
 
-  await supabase.from('jobs').update(updates).eq('id', jobId)
+  if (Object.keys(updates).length > 0) {
+    await supabase.from('jobs').update(updates).eq('id', jobId)
+  }
 
   console.log(
     `Estimate deposit $${depositDollars} recorded for job ${jobId} (session ${session.id})`

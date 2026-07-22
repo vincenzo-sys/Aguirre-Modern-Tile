@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { requireApiAuth } from '@/lib/apiAuth'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 
 // POST /api/jobs/[id]/final-payment
 // Records that the final payment was received. Owner or crew can call it.
@@ -94,7 +95,13 @@ export async function POST(
   }
 
   const previousAmountPaid = Number(job.amount_paid ?? 0)
-  const newAmountPaid = Math.round((previousAmountPaid + amount) * 100) / 100
+
+  // Add this payment to the final-payment channel ATOMICALLY (avoids the
+  // read-modify-write race on a shared column when two payments land together),
+  // then recompute amount_paid across all channels. #17
+  await supabase.rpc('increment_job_final_payment', { p_job_id: id, p_delta: amount })
+  const { amount_paid: newAmountPaid } = await recomputeJobFinancials(supabase, id)
+
   const estimated = Number(job.estimated_cost ?? 0)
 
   // Flip to 'paid' if we've now covered the estimate (allow $1 slop for
@@ -116,12 +123,12 @@ export async function POST(
   const existingLog = typeof job.crew_log === 'string' ? job.crew_log : ''
   const updatedLog = existingLog ? `${logLine}\n${existingLog}` : logLine
 
+  // amount_paid + final_payment_amount are already persisted (RPC + recompute
+  // above). This write records the descriptive final-payment metadata + status.
   const { data: updated, error: updateErr } = await supabase
     .from('jobs')
     .update({
-      amount_paid: newAmountPaid,
       final_payment_at: new Date().toISOString(),
-      final_payment_amount: amount,
       final_payment_method: method,
       final_payment_note: note,
       final_payment_by_profile_id: profileId,

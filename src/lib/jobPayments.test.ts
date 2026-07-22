@@ -10,6 +10,7 @@ import { recomputeJobFinancials } from './jobPayments'
 function makeFakeSupabase(opts: {
   invoices: Array<{ amount: number; status: string }>
   finalPayment: number | null
+  depositPaid?: number | null
   onUpdate?: (payload: Record<string, unknown>) => void
 }): SupabaseClient {
   return {
@@ -29,7 +30,7 @@ function makeFakeSupabase(opts: {
             return resolve({ data: null, error: null })
           }
           if (table === 'invoices') return resolve({ data: opts.invoices, error: null })
-          if (table === 'jobs') return resolve({ data: { final_payment_amount: opts.finalPayment }, error: null })
+          if (table === 'jobs') return resolve({ data: { final_payment_amount: opts.finalPayment, deposit_paid: opts.depositPaid ?? 0 }, error: null })
           return resolve({ data: null, error: null })
         },
       }
@@ -81,5 +82,27 @@ describe('recomputeJobFinancials — amount_paid spans all channels', () => {
     })
     const res = await recomputeJobFinancials(supabase, 'job-3')
     expect(res.amount_paid).toBe(43.44)
+  })
+
+  it('folds the Stripe deposit channel into amount_paid (deposit no longer wiped)', async () => {
+    const supabase = makeFakeSupabase({
+      invoices: [{ amount: 9000, status: 'paid' }],
+      finalPayment: 0,
+      depositPaid: 1000,
+    })
+    const res = await recomputeJobFinancials(supabase, 'job-4')
+    // deposit 1000 + paid invoice 9000 = 10000
+    expect(res.amount_paid).toBe(10000)
+  })
+
+  it('sums all three channels: deposit + final payment + paid invoices', async () => {
+    const supabase = makeFakeSupabase({
+      invoices: [{ amount: 5000, status: 'paid' }, { amount: 200, status: 'sent' }],
+      finalPayment: 750,
+      depositPaid: 1000,
+    })
+    const res = await recomputeJobFinancials(supabase, 'job-5')
+    expect(res.amount_paid).toBe(6750) // 5000 + 750 + 1000 (unpaid 'sent' invoice excluded)
+    expect(res.amount_invoiced).toBe(5200) // 5000 + 200
   })
 })

@@ -19,10 +19,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // idempotent under Stripe webhook redelivery — but idempotent-by-recompute is
 // only correct if it recomputes from ALL channels.
 //
-// This helper preserves channel 2 (its own column). Channel 3 (the Stripe
-// deposit) has NO dedicated column yet — see the deposit_paid follow-up
-// (pending migration) — so it is NOT preserved here. Until that lands, avoid
-// mixing a Stripe-Checkout deposit with Stripe invoices on the same job.
+// This helper folds in channels 2 (final_payment_amount) and 3 (deposit_paid,
+// added by migration 045) so a recompute can never wipe a deposit or a manual
+// final payment. Both columns are disjoint from invoices, so summing them is a
+// no-double-count reconstruction of the true amount_paid.
 export async function recomputeJobFinancials(
   supabase: SupabaseClient,
   jobId: string
@@ -43,16 +43,18 @@ export async function recomputeJobFinancials(
     0
   )
 
-  // final_payment_amount is a real column (migration 020) and is disjoint from
-  // invoices, so folding it in is a strict, no-double-count correction.
+  // final_payment_amount (migration 020) and deposit_paid (migration 045) are
+  // real columns disjoint from invoices, so folding them in is a strict,
+  // no-double-count reconstruction of the true amount_paid.
   const { data: job } = await supabase
     .from('jobs')
-    .select('final_payment_amount')
+    .select('final_payment_amount, deposit_paid')
     .eq('id', jobId)
     .single()
   const finalPayment = Number(job?.final_payment_amount ?? 0)
+  const depositPaid = Number(job?.deposit_paid ?? 0)
 
-  const amount_paid = Math.round((invoicedPaid + finalPayment) * 100) / 100
+  const amount_paid = Math.round((invoicedPaid + finalPayment + depositPaid) * 100) / 100
 
   await supabase
     .from('jobs')

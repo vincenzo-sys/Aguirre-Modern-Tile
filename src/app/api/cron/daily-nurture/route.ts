@@ -34,13 +34,14 @@ function getSupabase() {
 }
 
 function isAuthorized(req: NextRequest): boolean {
-  // Vercel cron header
-  if (req.headers.get('x-vercel-cron')) return true
-  // Manual secret for testing
-  const provided = req.headers.get('authorization')
+  // Authenticate ONLY via Authorization: Bearer <CRON_SECRET>. Vercel injects
+  // this header on scheduled invocations when CRON_SECRET is set in the project
+  // env. The old `x-vercel-cron` presence check was spoofable — any external
+  // caller can set that header and trigger outbound customer SMS — so it's
+  // gone. Fail closed when CRON_SECRET is unset (misconfigured → refuse).
   const expected = process.env.CRON_SECRET
-  if (expected && provided === `Bearer ${expected}`) return true
-  return false
+  if (!expected) return false
+  return req.headers.get('authorization') === `Bearer ${expected}`
 }
 
 interface NudgeResult {

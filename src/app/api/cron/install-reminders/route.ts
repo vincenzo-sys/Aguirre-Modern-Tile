@@ -28,11 +28,14 @@ function getSupabase() {
 }
 
 function isAuthorized(req: NextRequest): boolean {
-  if (req.headers.get('x-vercel-cron')) return true
-  const provided = req.headers.get('authorization')
+  // Authenticate ONLY via Authorization: Bearer <CRON_SECRET>. Vercel injects
+  // this header on scheduled invocations when CRON_SECRET is set. The old
+  // `x-vercel-cron` presence check was spoofable — any external caller can set
+  // that header and trigger outbound customer SMS — so it's gone. Fail closed
+  // when CRON_SECRET is unset (misconfigured → refuse).
   const expected = process.env.CRON_SECRET
-  if (expected && provided === `Bearer ${expected}`) return true
-  return false
+  if (!expected) return false
+  return req.headers.get('authorization') === `Bearer ${expected}`
 }
 
 // YYYY-MM-DD in America/New_York. Jobs schedule on calendar days, not

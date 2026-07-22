@@ -90,6 +90,27 @@ export async function POST(
 
     const senderName = job.client_name || 'Customer'
 
+    // Debounce the OUTBOUND owner notification (paid OpenPhone SMS + email) in
+    // the DATABASE, not in memory. The per-IP limiter above resets on every cold
+    // serverless invocation, so on its own it can't stop an attacker from driving
+    // unlimited paid owner SMS/emails. Read the most recent prior inbound message
+    // for this job BEFORE inserting the new row, and only notify the owner if the
+    // last one arrived more than NOTIFY_DEBOUNCE_MS ago. The incoming message is
+    // ALWAYS persisted below regardless of this check — only the owner blast is
+    // throttled, so rapid posts collapse into at most one notification per window.
+    const NOTIFY_DEBOUNCE_MS = 5 * 60_000
+    const { data: lastMessage } = await supabase
+      .from('estimate_messages')
+      .select('created_at')
+      .eq('job_id', job.id)
+      .eq('sender', 'customer')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const lastAt = lastMessage?.created_at ? new Date(lastMessage.created_at).getTime() : 0
+    const shouldNotifyOwner = Date.now() - lastAt > NOTIFY_DEBOUNCE_MS
+
     const { data: inserted, error } = await supabase
       .from('estimate_messages')
       .insert({
@@ -104,10 +125,13 @@ export async function POST(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Notify Vince — fire-and-forget so a flaky OpenPhone/Resend doesn't
-    // make the customer think their message failed to send.
-    notifyVince(job, messageBody, senderName).catch((err) =>
-      console.error('[messages] notify error:', err)
-    )
+    // make the customer think their message failed to send. Skipped when the
+    // DB debounce above shows another message landed within the window.
+    if (shouldNotifyOwner) {
+      notifyVince(job, messageBody, senderName).catch((err) =>
+        console.error('[messages] notify error:', err)
+      )
+    }
 
     return NextResponse.json({ message: inserted })
   } catch (err) {

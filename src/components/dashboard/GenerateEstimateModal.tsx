@@ -139,6 +139,7 @@ export default function GenerateEstimateModal({
   initialTemplate,
   initialAddons,
   initialScopes,
+  onGenerated,
 }: {
   jobId: string
   hasExistingItems: boolean
@@ -155,6 +156,11 @@ export default function GenerateEstimateModal({
   // regenerate opens pre-loaded with these instead of one blank scope, so a
   // multi-scope estimate doesn't have to be rebuilt from scratch.
   initialScopes?: StoredScope[] | null
+  // Fired after a successful generation. router.refresh() re-runs server
+  // components, but callers that hold the job in fetch-once local state (e.g.
+  // LeadWorkspace) use this to re-fetch and show the new line items / total /
+  // margin without a full navigation.
+  onGenerated?: () => void
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -419,6 +425,9 @@ export default function GenerateEstimateModal({
       }
       setOpen(false)
       router.refresh()
+      // Let a fetch-once parent (LeadWorkspace) re-pull the job so the new
+      // line items / total / margin render without a full navigation.
+      onGenerated?.()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Generation failed', 'error')
     } finally {

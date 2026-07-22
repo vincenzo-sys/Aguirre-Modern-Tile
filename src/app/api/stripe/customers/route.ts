@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { requireApiOwner } from '@/lib/apiAuth'
 import type { Job } from '@/lib/supabase/types'
 
 export const maxDuration = 60
 
 // POST /api/stripe/customers - find or create a Stripe customer from a job's client info
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireApiOwner(req)
+  if (unauthorized) return unauthorized
+
   if (!isStripeConfigured()) {
     return NextResponse.json(
       { error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to .env.local' },

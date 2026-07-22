@@ -125,13 +125,12 @@ export async function POST(req: NextRequest) {
     // Update job's amount_invoiced
     const { data: jobInvoices } = await supabase
       .from('invoices')
-      .select('amount')
+      .select('amount, status')
       .eq('job_id', job_id)
 
-    const totalInvoiced = (jobInvoices ?? []).reduce(
-      (sum: number, inv: { amount: number }) => sum + Number(inv.amount),
-      0
-    )
+    const totalInvoiced = (jobInvoices ?? [])
+      .filter((inv: { status: string }) => inv.status !== 'void')
+      .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
 
     await supabase
       .from('jobs')

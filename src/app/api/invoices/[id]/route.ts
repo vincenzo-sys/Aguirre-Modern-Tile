@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 
 async function getSupabase() {
   const cookieStore = await cookies()
@@ -74,30 +75,11 @@ export async function PATCH(
 
     // Recalculate the job's financial totals whenever the invoiced amount could
     // have changed: a status flip to paid/void, or an edit to the line items.
+    // Recompute from ALL payment channels (paid invoices + manual final
+    // payment) so this can't wipe a deposit / final payment recorded outside
+    // the invoices table. See recomputeJobFinancials.
     if (invoice && (line_items !== undefined || status === 'paid' || status === 'void')) {
-      const { data: jobInvoices } = await supabase
-        .from('invoices')
-        .select('amount, status')
-        .eq('job_id', invoice.job_id)
-
-      const activeInvoices = (jobInvoices ?? []).filter(
-        (inv: { status: string }) => inv.status !== 'void'
-      )
-
-      const totalPaid = activeInvoices
-        .filter((inv: { status: string }) => inv.status === 'paid')
-        .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-      const totalInvoiced = activeInvoices
-        .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-      await supabase
-        .from('jobs')
-        .update({
-          amount_paid: totalPaid,
-          amount_invoiced: totalInvoiced,
-        })
-        .eq('id', invoice.job_id)
+      await recomputeJobFinancials(supabase, invoice.job_id)
     }
 
     return NextResponse.json(invoice)

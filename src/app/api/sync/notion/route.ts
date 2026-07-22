@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { fetchAllNotionJobs, type NotionJobPage } from '@/lib/notion'
 
@@ -9,8 +10,17 @@ function getSupabaseAdmin() {
   )
 }
 
-// Sync secret to prevent unauthorized calls
-const SYNC_SECRET = process.env.SYNC_SECRET || 'dev-sync-secret'
+// Sync secret to prevent unauthorized calls (no fallback — must be configured)
+const SYNC_SECRET = process.env.SYNC_SECRET
+
+// Constant-time secret comparison. timingSafeEqual throws on length mismatch,
+// so unequal lengths are treated as a non-match (unauthorized).
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided, 'utf8')
+  const b = Buffer.from(expected, 'utf8')
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
 
 export const maxDuration = 60
 
@@ -21,7 +31,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const secret = authHeader?.replace('Bearer ', '') || body.secret
 
-  if (secret !== SYNC_SECRET) {
+  // Server must be configured with a sync secret — no fallback allowed
+  if (!SYNC_SECRET) {
+    return NextResponse.json(
+      { error: 'Server misconfigured: SYNC_SECRET is not set' },
+      { status: 500 }
+    )
+  }
+
+  if (typeof secret !== 'string' || !secretsMatch(secret, SYNC_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -95,6 +113,10 @@ export async function POST(req: NextRequest) {
           .limit(1)
           .single()
 
+        // Notion-owned descriptive fields — safe to overwrite on every sync.
+        // NOTE: line_items and the money fields (estimated_cost, amount_paid,
+        // amount_invoiced) are intentionally excluded here so that updates to an
+        // existing job never clobber dashboard-built estimates or payment state.
         const jobData = {
           title: nj.title,
           status: nj.status,
@@ -113,27 +135,31 @@ export async function POST(req: NextRequest) {
           scheduled_start: nj.project_date_start,
           scheduled_end: nj.project_date_end,
           estimated_days: nj.estimated_days,
-          estimated_cost: nj.quote_amount ?? nj.final_amount,
           actual_cost: nj.actual_cost,
-          amount_paid: nj.amount_paid ?? 0,
-          amount_invoiced: nj.final_amount ?? nj.quote_amount ?? 0,
           notes: nj.notes,
           notion_page_id: nj.notion_page_id,
           notion_last_synced_at: new Date().toISOString(),
-          line_items: [],
         }
 
         if (existingJob) {
-          // Update existing job
+          // Update existing job — only refresh Notion-owned descriptive fields.
+          // Omit line_items / estimated_cost / amount_paid / amount_invoiced to
+          // preserve dashboard-built estimates and payment state.
           await supabaseAdmin
             .from('jobs')
             .update(jobData)
             .eq('id', existingJob.id)
         } else {
-          // Insert new job
+          // Insert new job — seed money fields and an empty line_items array.
           await supabaseAdmin
             .from('jobs')
-            .insert(jobData)
+            .insert({
+              ...jobData,
+              estimated_cost: nj.quote_amount ?? nj.final_amount,
+              amount_paid: nj.amount_paid ?? 0,
+              amount_invoiced: nj.final_amount ?? nj.quote_amount ?? 0,
+              line_items: [],
+            })
         }
 
         synced++

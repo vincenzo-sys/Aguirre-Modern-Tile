@@ -231,3 +231,25 @@ describe('generateFromScopes — labor_formula scaling', () => {
     expect(result.install_days).toBe(6)
   })
 })
+
+describe('generateFromScopes — material max-clamp warning', () => {
+  it('warns when a material quantity hits its per-template max (was a silent under-order)', () => {
+    const capped = template({
+      template_name: 'MatCap',
+      demo_days: 0,
+      install_days: 0,
+      // wants ceil(5000/50) = 100 bags of thinset, capped at 2
+      materials_formula: [{ item: 'Test Thinset', formula: 'ceil(sqft / 50)', min: 1, max: 2 }],
+    })
+    const result = generateFromScopes(
+      [{ id: 's1', label: 'Big Floor', template_name: 'MatCap', sqft: 5000 }],
+      [capped], catalog, laborRates, operatingCosts
+    )
+    // Line is still priced at the cap...
+    expect(itemsByDesc(result.line_items, 'Test Thinset')?.quantity).toBe(2)
+    // ...but the cap is now surfaced instead of silently under-ordering.
+    expect(
+      result.warnings.some((w) => w.includes('Test Thinset') && w.toLowerCase().includes('capped'))
+    ).toBe(true)
+  })
+})

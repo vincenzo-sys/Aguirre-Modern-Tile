@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -52,7 +52,7 @@ const sources = [
 
 const LEAD_STAGE_STATUSES = ['lead', 'quoted', 'estimate_revised']
 
-export default function LeadWorkspace({ id }: { id: string }) {
+export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: boolean }) {
   const router = useRouter()
 
   // Either or both can be set: a quote_request might have a converted job;
@@ -170,6 +170,25 @@ export default function LeadWorkspace({ id }: { id: string }) {
     }
     load()
   }, [id, router])
+
+  // Re-fetch just the job and fold the fresh row into local state. Called
+  // after an estimate is (re)generated so the new line items, quote total,
+  // and margin appear immediately — this is a fetch-once client component, so
+  // GenerateEstimateModal's router.refresh() alone can't update our state.
+  // Deliberately scoped to the job (not the whole deal) so unsaved edits in
+  // the notes / sales-tracking fields survive a regenerate.
+  const reloadJob = useCallback(async () => {
+    const jobId = job?.id ?? lead?.converted_job_id
+    if (!jobId) return
+    const res = await fetch(`/api/jobs/${jobId}`)
+    if (!res.ok) return
+    const data = (await res.json()) as Job
+    setJob(data)
+    if ((data as Job & { estimate_token?: string }).estimate_token) {
+      const baseUrl = window.location.origin.replace(/^http:\/\/localhost.*/, 'https://aguirremoderntile.com')
+      setEstimateUrl(`${baseUrl}/estimates/${(data as Job & { estimate_token: string }).estimate_token}`)
+    }
+  }, [job?.id, lead?.converted_job_id])
 
   // Once we know the customer_id, fetch their job history so the contact
   // card can show "Repeat customer — N prior jobs". Exclude the current
@@ -714,6 +733,9 @@ export default function LeadWorkspace({ id }: { id: string }) {
           {/* Estimate workspace — appears when there's a job */}
           {isWorkspaceMode && job && (
             <>
+              {/* Customer-facing estimate (share URL + Send) — owner only.
+                  Crew never see the send controls or the estimate link. */}
+              {isOwner && (
               <div className="bg-white rounded-lg border border-gray-200 p-5">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -787,34 +809,42 @@ export default function LeadWorkspace({ id }: { id: string }) {
                   </p>
                 )}
               </div>
+              )}
 
               {/* Crew work order link — a separate public link with NO pricing,
                   for texting to the install crew. Edits to scope + materials
                   below show up instantly on it, same as the customer estimate. */}
               <WorkOrderShareLink job={job} />
 
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-900">Line items</h2>
-                {/* Hints derived from the originating quote_request answers
-                    (template + sqft) so Vince doesn't re-type what the
-                    customer already told us. The modal still shows them as
-                    editable defaults — Vince confirms before generating. */}
-                <GenerateEstimateModal
-                  jobId={job.id}
-                  hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
-                  estimateSent={!!job.estimate_sent_at}
-                  initialSqft={job.square_footage ?? quoteHints.initialSqft}
-                  initialTemplate={quoteHints.initialTemplate ?? undefined}
-                  initialAddons={quoteHints.initialAddons}
-                  initialScopes={Array.isArray(job.scopes) ? job.scopes : null}
-                />
-              </div>
+              {/* Line-items header + estimate generator — owner only. The
+                  generator re-prices the job (a price-edit control), so crew
+                  don't get it. JobLineItems below still renders for crew, but
+                  with isOwner=false it hides cost/margin and the editor. */}
+              {isOwner && (
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-900">Line items</h2>
+                  {/* Hints derived from the originating quote_request answers
+                      (template + sqft) so Vince doesn't re-type what the
+                      customer already told us. The modal still shows them as
+                      editable defaults — Vince confirms before generating. */}
+                  <GenerateEstimateModal
+                    jobId={job.id}
+                    hasExistingItems={Array.isArray(job.line_items) && job.line_items.length > 0}
+                    estimateSent={!!job.estimate_sent_at}
+                    initialSqft={job.square_footage ?? quoteHints.initialSqft}
+                    initialTemplate={quoteHints.initialTemplate ?? undefined}
+                    initialAddons={quoteHints.initialAddons}
+                    initialScopes={Array.isArray(job.scopes) ? job.scopes : null}
+                    onGenerated={reloadJob}
+                  />
+                </div>
+              )}
 
               <JobLineItems
                 items={(job.line_items ?? []) as Job['line_items']}
                 jobId={job.id}
-                isOwner={true}
-                marginPercent={job.margin_percent}
+                isOwner={isOwner}
+                marginPercent={isOwner ? job.margin_percent : null}
               />
 
               <StructuredScopeEditor
@@ -1039,7 +1069,7 @@ export default function LeadWorkspace({ id }: { id: string }) {
             </>
           )}
 
-          {job && (
+          {job && isOwner && (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Estimate summary</h2>
               {/* Lost callout — surfaces the reason captured by the leads page

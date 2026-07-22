@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { requireApiOwner } from '@/lib/apiAuth'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 import type { InvoiceStatus } from '@/lib/supabase/types'
 
 export const maxDuration = 60
@@ -19,6 +21,9 @@ function mapStripeStatus(stripeStatus: string): InvoiceStatus {
 
 // POST /api/stripe/invoices/sync - poll Stripe for current invoice state and sync locally
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireApiOwner(req)
+  if (unauthorized) return unauthorized
+
   if (!isStripeConfigured()) {
     return NextResponse.json(
       { error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to .env.local' },
@@ -76,21 +81,11 @@ export async function POST(req: NextRequest) {
         .update({ status: localStatus })
         .eq('id', invoice_id)
 
-      // If newly paid, recalculate job.amount_paid
-      if (localStatus === 'paid') {
-        const { data: jobInvoices } = await supabase
-          .from('invoices')
-          .select('amount, status')
-          .eq('job_id', invoice.job_id)
-
-        const totalPaid = (jobInvoices ?? [])
-          .filter((inv: { status: string }) => inv.status === 'paid')
-          .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-        await supabase
-          .from('jobs')
-          .update({ amount_paid: totalPaid })
-          .eq('id', invoice.job_id)
+      // If newly paid or voided, recompute the job's rollups from all payment
+      // channels (paid invoices + manual final payment). Summing only paid
+      // invoices here wiped the deposit / final payment. See recomputeJobFinancials.
+      if (localStatus === 'paid' || localStatus === 'void') {
+        await recomputeJobFinancials(supabase, invoice.job_id)
       }
     }
 

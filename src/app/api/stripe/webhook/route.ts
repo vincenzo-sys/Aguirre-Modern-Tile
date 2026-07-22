@@ -7,6 +7,7 @@ import { sendCustomerEmail } from '@/lib/email'
 import { buildIcs } from '@/lib/ics'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 import { Resend } from 'resend'
 import type Stripe from 'stripe'
 
@@ -371,20 +372,10 @@ async function handleInvoicePaid(stripeInvoice: Stripe.Invoice) {
     .update({ status: 'paid' })
     .eq('id', invoice.id)
 
-  // Update the job's amount_paid (sum all paid invoices for this job)
-  const { data: jobInvoices } = await supabase
-    .from('invoices')
-    .select('amount, status')
-    .eq('job_id', invoice.job_id)
-
-  const totalPaid = (jobInvoices ?? [])
-    .filter((inv: { status: string }) => inv.status === 'paid')
-    .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-  await supabase
-    .from('jobs')
-    .update({ amount_paid: totalPaid })
-    .eq('id', invoice.job_id)
+  // Recompute the job's rollups from ALL payment channels (paid invoices +
+  // manual final payment), not just invoices — summing only paid invoices here
+  // silently wiped the deposit / final payment. See recomputeJobFinancials.
+  const { amount_paid: totalPaid } = await recomputeJobFinancials(supabase, invoice.job_id)
 
   // Sync payment to Notion if the job has a notion_page_id
   if (process.env.NOTION_API_TOKEN) {
@@ -459,20 +450,9 @@ async function handleInvoiceVoided(stripeInvoice: Stripe.Invoice) {
     .update({ status: 'void' })
     .eq('id', invoice.id)
 
-  // Recalculate job.amount_invoiced excluding voided invoices
-  const { data: jobInvoices } = await supabase
-    .from('invoices')
-    .select('amount, status')
-    .eq('job_id', invoice.job_id)
-
-  const totalInvoiced = (jobInvoices ?? [])
-    .filter((inv: { status: string }) => inv.status !== 'void')
-    .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-  await supabase
-    .from('jobs')
-    .update({ amount_invoiced: totalInvoiced })
-    .eq('id', invoice.job_id)
+  // Recompute rollups: voiding a paid invoice must also drop amount_paid, not
+  // just amount_invoiced — recomputeJobFinancials handles both consistently.
+  await recomputeJobFinancials(supabase, invoice.job_id)
 
   console.log(`Invoice ${invoice.invoice_number} marked as void via Stripe webhook`)
 }

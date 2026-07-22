@@ -161,7 +161,12 @@ export async function POST(
     )
   }
 
-  await supabase
+  // Atomically claim the lead: only set converted_job_id if it's STILL null.
+  // A double-submit that raced past the check-then-act guard above would
+  // otherwise create two jobs from one lead. The `.is('converted_job_id', null)`
+  // predicate makes the first writer the only winner; the loser gets 0 rows
+  // back, deletes the duplicate job it just created, and returns the winner.
+  const { data: claimed } = await supabase
     .from('quote_requests')
     .update({
       // 'converted' (not 'reviewed') — the pipeline hides converted QRs, so
@@ -172,6 +177,21 @@ export async function POST(
       last_contact_at: new Date().toISOString(),
     })
     .eq('id', leadId)
+    .is('converted_job_id', null)
+    .select('id')
+
+  if (!claimed || claimed.length === 0) {
+    await supabase.from('jobs').delete().eq('id', job.id)
+    const { data: current } = await supabase
+      .from('quote_requests')
+      .select('converted_job_id')
+      .eq('id', leadId)
+      .single()
+    return NextResponse.json(
+      { error: 'Lead already converted', existing_job_id: current?.converted_job_id ?? null },
+      { status: 409 }
+    )
+  }
 
   // If the customer already had jobs (excluding this brand-new one), flag
   // them as source='repeat'. Only flips from 'website' so we don't trample

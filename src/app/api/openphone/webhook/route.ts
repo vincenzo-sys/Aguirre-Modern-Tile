@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
@@ -12,10 +13,60 @@ function getSupabaseAdmin() {
 
 export const maxDuration = 30
 
+// Verify the OpenPhone webhook signature over the RAW body. OpenPhone signs as
+// `hmac;<version>;<timestamp>;<base64-signature>`, where the signature is
+// HMAC-SHA256 of `${timestamp}.${rawBody}` keyed by the base64-decoded signing
+// secret. Returns true only on a byte-exact, constant-time match.
+function verifyOpenPhoneSignature(
+  rawBody: string,
+  header: string | null,
+  secret: string
+): boolean {
+  if (!header) return false
+  const parts = header.split(';')
+  if (parts.length < 4) return false
+  const timestamp = parts[2]
+  const providedSig = parts[3]
+  if (!timestamp || !providedSig) return false
+
+  const expected = createHmac('sha256', Buffer.from(secret, 'base64'))
+    .update(`${timestamp}.${rawBody}`)
+    .digest()
+  const provided = Buffer.from(providedSig, 'base64')
+  if (provided.length !== expected.length) return false
+  return timingSafeEqual(provided, expected)
+}
+
 // POST /api/openphone/webhook — Receives events from OpenPhone
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    // Read the RAW body first so the signature check sees the exact bytes.
+    const rawBody = await req.text()
+
+    // This endpoint drives paid SMS sends and service-role CRM writes, so an
+    // unauthenticated POST is abusable (forged missed-call events → auto-texts
+    // to arbitrary numbers). Verify the signature when a signing secret is
+    // configured. Gated on OPENPHONE_WEBHOOK_SECRET for a safe rollout: once
+    // the secret is set, forged/unsigned events are rejected; until then we log
+    // loudly and continue so real events aren't dropped before the secret ships.
+    const secret = process.env.OPENPHONE_WEBHOOK_SECRET
+    if (secret) {
+      const ok = verifyOpenPhoneSignature(
+        rawBody,
+        req.headers.get('openphone-signature'),
+        secret
+      )
+      if (!ok) {
+        console.warn('OpenPhone webhook: signature verification failed — rejecting')
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
+    } else {
+      console.warn(
+        'OPENPHONE_WEBHOOK_SECRET not set — webhook is UNAUTHENTICATED. Set it to enable signature verification.'
+      )
+    }
+
+    const body = JSON.parse(rawBody)
     const eventType = body.type || body.event
 
     console.log('OpenPhone webhook:', eventType, JSON.stringify(body).slice(0, 500))

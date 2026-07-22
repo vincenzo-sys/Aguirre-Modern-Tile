@@ -38,6 +38,13 @@ export default async function LeadDetailPage({
   // sales workspace (which already knows how to load a QR or a lead-stage job).
   let opsJobId: string | null = null
 
+  // Viewer role gate for the sales workspace. Defaults to owner (demo +
+  // auth-edge) and is narrowed to the fetched profile's role, mirroring the
+  // isOwner resolution in JobOperationsDetail (profile.role === 'owner').
+  // Passed to LeadWorkspace so crew never see cost/profit/margin or the
+  // price-edit + Send controls.
+  let isOwner = true
+
   const useDemo = await shouldUseDemoData()
   if (useDemo) {
     const demoJob = getDemoJob(id)
@@ -47,6 +54,18 @@ export default async function LeadDetailPage({
   } else {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (profileData) {
+        isOwner = (profileData as { role: string }).role === 'owner'
+      }
+    }
 
     // Try the id as a job first.
     const { data: jobRow } = await supabase
@@ -83,5 +102,5 @@ export default async function LeadDetailPage({
   if (opsJobId) {
     return <JobOperationsDetail id={opsJobId} />
   }
-  return <LeadWorkspace id={id} />
+  return <LeadWorkspace id={id} isOwner={isOwner} />
 }

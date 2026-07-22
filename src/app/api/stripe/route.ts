@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { withStripeRetry } from '@/lib/stripe-retry'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { requireApiOwner } from '@/lib/apiAuth'
+import { recomputeJobFinancials } from '@/lib/jobPayments'
 
 export const maxDuration = 60
 
 // POST /api/stripe - send an invoice via Stripe
 export async function POST(req: NextRequest) {
+  // Owner-only: this finalizes/sends/voids real customer invoices in Stripe —
+  // irreversible side-effects that RLS on the DB write does not backstop.
+  const unauthorized = await requireApiOwner(req)
+  if (unauthorized) return unauthorized
+
   if (!isStripeConfigured()) {
     return NextResponse.json(
       { error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to .env.local' },
@@ -55,20 +63,9 @@ export async function POST(req: NextRequest) {
         .update({ status: 'void' })
         .eq('id', invoice_id)
 
-      // Recalculate job.amount_invoiced excluding voided invoices
-      const { data: jobInvoices } = await supabase
-        .from('invoices')
-        .select('amount, status')
-        .eq('job_id', invoice.job_id)
-
-      const totalInvoiced = (jobInvoices ?? [])
-        .filter((inv: { status: string }) => inv.status !== 'void')
-        .reduce((sum: number, inv: { amount: number }) => sum + Number(inv.amount), 0)
-
-      await supabase
-        .from('jobs')
-        .update({ amount_invoiced: totalInvoiced })
-        .eq('id', invoice.job_id)
+      // Recompute rollups from all channels — voiding a paid invoice must drop
+      // amount_paid too, not only amount_invoiced. See recomputeJobFinancials.
+      await recomputeJobFinancials(supabase, invoice.job_id)
 
       return NextResponse.json({ success: true, status: 'void' })
     }
@@ -171,20 +168,42 @@ export async function POST(req: NextRequest) {
       { label: 'invoices.sendInvoice' }
     )
 
-    // 6. Update our local record with Stripe info
-    const { error: updateError } = await supabase
+    // 6. Persist the Stripe linkage locally. This write MUST succeed — it
+    // stores stripe_invoice_id, which arms the "already sent" idempotency guard
+    // above. If it's silently dropped, a retry creates a SECOND Stripe invoice
+    // for the same bill (double-billing the customer). The user-session client
+    // can be RLS-blocked, so retry with the service-role client; if it STILL
+    // fails, return a 500 carrying the stripe_invoice_id so the sent invoice is
+    // reconciled by hand instead of re-sent.
+    const stripeLink = {
+      stripe_invoice_id: finalizedInvoice.id,
+      status: 'sent' as const,
+      // Cache the hosted pay URL so the customer-facing /invoices/[token]
+      // page can deep-link "Pay now" without a live Stripe call.
+      stripe_hosted_url: finalizedInvoice.hosted_invoice_url ?? null,
+    }
+    let { error: updateError } = await supabase
       .from('invoices')
-      .update({
-        stripe_invoice_id: finalizedInvoice.id,
-        status: 'sent' as const,
-        // Cache the hosted pay URL so the customer-facing /invoices/[token]
-        // page can deep-link "Pay now" without a live Stripe call.
-        stripe_hosted_url: finalizedInvoice.hosted_invoice_url ?? null,
-      })
+      .update(stripeLink)
       .eq('id', invoice_id)
 
     if (updateError) {
-      console.error('Failed to update local invoice after Stripe send:', updateError)
+      console.error('Local invoice update failed after Stripe send; retrying with service client:', updateError)
+      const service = createServiceClient()
+      ;({ error: updateError } = await service.from('invoices').update(stripeLink).eq('id', invoice_id))
+    }
+
+    if (updateError) {
+      console.error('CRITICAL: Stripe invoice sent but local link could not be saved:', updateError)
+      return NextResponse.json(
+        {
+          error:
+            'Invoice was sent via Stripe but saving the link failed. Do NOT resend — reconcile manually in Stripe.',
+          stripe_invoice_id: finalizedInvoice.id,
+          hosted_invoice_url: finalizedInvoice.hosted_invoice_url,
+        },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({

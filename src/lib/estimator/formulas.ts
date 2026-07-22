@@ -162,16 +162,33 @@ export interface MaterialQtyOpts {
   max?: number
 }
 
+export interface MaterialQtyResult {
+  qty: number
+  // True when the [min,max] MAX ceiling actually engaged, i.e. the formula
+  // wanted more than `max`. A silent max-clamp under-orders (and under-bills) a
+  // legitimately large job, so the caller surfaces it as a warning.
+  clampedToMax: boolean
+}
+
 // Materials always round up — you can't buy 1.3 sheets of GoBoard. Then we
 // clamp to a [min, max] window so a tiny sqft can't produce zero materials
 // (the min floor catches "0 sheets of backer board for a 5 sqft shower"
 // regression) and an absurd sqft can't accidentally order 100 sheets.
-export function computeMaterialQty(opts: MaterialQtyOpts): number {
+// Detailed variant also reports whether the max ceiling engaged.
+export function computeMaterialQtyDetailed(opts: MaterialQtyOpts): MaterialQtyResult {
   const raw = computeFormula(opts.formula, opts.vars)
   let qty = Math.ceil(raw)
   if (opts.min !== undefined && opts.min !== null) qty = Math.max(qty, opts.min)
-  if (opts.max !== undefined && opts.max !== null) qty = Math.min(qty, opts.max)
-  return qty
+  let clampedToMax = false
+  if (opts.max !== undefined && opts.max !== null && qty > opts.max) {
+    qty = opts.max
+    clampedToMax = true
+  }
+  return { qty, clampedToMax }
+}
+
+export function computeMaterialQty(opts: MaterialQtyOpts): number {
+  return computeMaterialQtyDetailed(opts).qty
 }
 
 export interface LaborDaysOpts {

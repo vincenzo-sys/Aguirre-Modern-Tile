@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     let createdNewCustomer = false
     if (!customerId) {
-      const { data: newCustomer } = await supabase
+      const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
           name: client_name,
@@ -124,7 +124,35 @@ export async function POST(request: NextRequest) {
         })
         .select('id')
         .single()
-      if (newCustomer) {
+      if (customerError) {
+        // A concurrent request may have created the same customer between our
+        // lookup above and this insert. On a unique violation, re-run the
+        // email/phone lookup and link to the customer that won the race
+        // rather than silently dropping the link (customer_id = null).
+        if (customerError.code === '23505') {
+          if (client_email) {
+            const { data: existing } = await supabase
+              .from('customers')
+              .select('id')
+              .ilike('email', client_email)
+              .limit(1)
+              .single()
+            if (existing) customerId = existing.id
+          }
+          if (!customerId && client_phone) {
+            const { data: existing } = await supabase
+              .from('customers')
+              .select('id')
+              .eq('phone', client_phone)
+              .limit(1)
+              .single()
+            if (existing) customerId = existing.id
+          }
+        } else {
+          console.error('Customer create error:', customerError.message)
+          return NextResponse.json({ error: customerError.message }, { status: 500 })
+        }
+      } else if (newCustomer) {
         customerId = newCustomer.id
         createdNewCustomer = true
       }

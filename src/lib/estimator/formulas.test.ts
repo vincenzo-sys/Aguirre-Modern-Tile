@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFormula, computeMaterialQty, computeLaborDays, appliesWhen } from './formulas'
+import { computeFormula, computeMaterialQty, computeMaterialQtyDetailed, computeLaborDays, appliesWhen } from './formulas'
 
 describe('computeFormula — coverage variable', () => {
   it('exposes coverage so bag counts can derive from the catalog', () => {
@@ -29,6 +29,25 @@ describe('computeMaterialQty — clamps still apply with coverage formulas', () 
     expect(
       computeMaterialQty({ formula: 'ceil(sqft * 1.1 / coverage)', vars: { sqft: 5000, coverage: 65 }, max: 6 }),
     ).toBe(6)
+  })
+})
+
+describe('computeMaterialQtyDetailed — reports when the max clamp engages', () => {
+  it('flags clampedToMax when the formula wants more than max (under-order signal)', () => {
+    // 5000 sqft wants ~85 bags, capped at 6 → clamp engaged
+    const r = computeMaterialQtyDetailed({ formula: 'ceil(sqft * 1.1 / coverage)', vars: { sqft: 5000, coverage: 65 }, max: 6 })
+    expect(r).toEqual({ qty: 6, clampedToMax: true })
+  })
+  it('does not flag when the quantity sits inside the window', () => {
+    const r = computeMaterialQtyDetailed({ formula: 'ceil(sqft / 50)', vars: { sqft: 100 }, min: 1, max: 10 })
+    expect(r).toEqual({ qty: 2, clampedToMax: false })
+  })
+  it('does not flag a min-floor bump as a max clamp', () => {
+    const r = computeMaterialQtyDetailed({ formula: 'ceil(sqft / 50)', vars: { sqft: 5 }, min: 2, max: 10 })
+    expect(r).toEqual({ qty: 2, clampedToMax: false })
+  })
+  it('computeMaterialQty stays a thin number-returning wrapper (back-compat)', () => {
+    expect(computeMaterialQty({ formula: 'ceil(sqft / 50)', vars: { sqft: 100 }, max: 1 })).toBe(1)
   })
 })
 

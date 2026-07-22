@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireApiAuth } from '@/lib/apiAuth'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -48,6 +49,9 @@ export interface EstimateResult {
 
 // GET /api/estimates?job_id=xxx — Generate estimate for a job
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireApiAuth(req)
+  if (unauthorized) return unauthorized
+
   const jobId = req.nextUrl.searchParams.get('job_id')
 
   if (!jobId) {

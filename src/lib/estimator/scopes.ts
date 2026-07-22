@@ -21,7 +21,7 @@ import type {
   OperatingCostRow,
 } from '@/lib/estimator'
 import {
-  computeMaterialQty,
+  computeMaterialQtyDetailed,
   computeLaborDays,
   appliesWhen,
   type MaterialFormulaEntry,
@@ -197,6 +197,10 @@ interface ScopeBuildResult {
   // the bill of materials; the caller surfaces them so the owner can add the
   // line by hand instead of the material silently vanishing from the quote.
   unmatched: string[]
+  // Materials whose quantity hit the per-template max ceiling and were capped
+  // (item + cap). A silent cap under-orders a large job, so it's surfaced as a
+  // warning rather than quietly shipped.
+  clamped: string[]
 }
 
 function buildScope(
@@ -258,6 +262,7 @@ function buildScope(
 
   // ── Materials ────────────────────────────────────────────────────────
   const unmatched: string[] = []
+  const clamped: string[] = []
   const formulas = Array.isArray(template.materials_formula) ? template.materials_formula : []
   if (formulas.length === 0) {
     // Template hasn't been migrated to formulas yet — caller should have
@@ -283,13 +288,14 @@ function buildScope(
       if (!unmatched.includes(entry.item)) unmatched.push(entry.item)
       continue
     }
-    const qty = computeMaterialQty({
+    const { qty, clampedToMax } = computeMaterialQtyDetailed({
       formula: entry.formula,
       vars: { ...formulaVars, coverage: Number(row.coverage) || 0 },
       min: entry.min,
       max: entry.max,
     })
     if (qty <= 0) continue
+    if (clampedToMax) clamped.push(`${row.item} (capped at ${entry.max})`)
     const unitPrice = Number(row.price_to_customer)
     const amount = Math.round(unitPrice * qty * 100) / 100
     lineItems.push({
@@ -329,6 +335,7 @@ function buildScope(
     scope_total: scopeTotal,
     description_line,
     unmatched,
+    clamped,
   }
 }
 
@@ -381,6 +388,11 @@ export function generateFromScopes(
     for (const item of built.unmatched) {
       warnings.push(
         `Couldn't price "${item}" (${scope.label}) — not in the materials catalog, so it was left off the estimate. Add it as a line item manually or add the material in Settings.`
+      )
+    }
+    for (const item of built.clamped) {
+      warnings.push(
+        `Capped ${item} for ${scope.label} at its per-template max — a large job may be under-ordered; verify this quantity before sending.`
       )
     }
   }

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
+import { requireApiOwner } from '@/lib/apiAuth'
 
 export const maxDuration = 60
 
 // POST /api/stripe/invoices/draft - create a Stripe draft invoice (does NOT finalize/send)
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireApiOwner(req)
+  if (unauthorized) return unauthorized
+
   if (!isStripeConfigured()) {
     return NextResponse.json(
       { error: 'Stripe is not configured. Add STRIPE_SECRET_KEY to .env.local' },

@@ -23,13 +23,11 @@ async function resolveJob(token: string) {
 
 type CrewLite = { id: string; full_name: string; nickname: string | null; is_active: boolean }
 
-// The crew a token holder is allowed to log for: active crew ASSIGNED to this
-// job. Falls back to the full active roster only when the job has no crew
-// assigned yet (so the crew can still self-log before Vince assigns them).
-// Shared by GET (to render the picker) and POST (to authorize the write) so
-// the two can never drift — a holder can only ever write for crew the picker
-// would have offered them.
-async function allowedCrew(
+// Active crew ASSIGNED to this job (de-duped). May be empty when Vince hasn't
+// assigned anyone yet. This is the ONLY set a POST write may be authorized
+// against — there is deliberately no roster fallback here, so a token holder
+// can never log labor for crew who aren't part of the job.
+async function assignedCrew(
   supabase: ReturnType<typeof createServiceClient>,
   jobId: string
 ): Promise<CrewLite[]> {
@@ -45,7 +43,20 @@ async function allowedCrew(
   // De-dupe (a crew member can be assigned multiple days).
   const byId = new Map<string, CrewLite>()
   for (const c of assigned) byId.set(c.id, c)
-  if (byId.size > 0) return Array.from(byId.values())
+  return Array.from(byId.values())
+}
+
+// The crew the GET picker renders: active crew ASSIGNED to this job, falling
+// back to the full active roster only when the job has no crew assigned yet
+// (so the crew can still see themselves before Vince assigns them). This
+// fallback is GET-ONLY — the POST write path authorizes against assignedCrew()
+// with no fallback (see POST) so it can never accept labor for unassigned crew.
+async function allowedCrew(
+  supabase: ReturnType<typeof createServiceClient>,
+  jobId: string
+): Promise<CrewLite[]> {
+  const assigned = await assignedCrew(supabase, jobId)
+  if (assigned.length > 0) return assigned
 
   const { data: all } = await supabase
     .from('crew_members')
@@ -118,12 +129,13 @@ export async function POST(
     return NextResponse.json({ error: 'hours must be between 0 and 24' }, { status: 400 })
   }
 
-  // Authorize: the holder may only log for crew the picker would have offered
-  // them (active + assigned to this job, or the full active roster when the
-  // job has no assignments yet). Prevents a token holder from writing labor
-  // against arbitrary crew on a job they aren't part of.
-  const allowed = await allowedCrew(supabase, jobId)
-  if (!allowed.some((c) => c.id === crewMemberId)) {
+  // Authorize against ASSIGNED crew only — NO roster fallback. The holder may
+  // log labor only for an active crew member explicitly assigned to this job.
+  // When the job has no assignments yet, assignedCrew() is empty and this
+  // rejects outright, rather than trusting the token holder to write labor for
+  // arbitrary crew (which would corrupt job costing).
+  const assigned = await assignedCrew(supabase, jobId)
+  if (!assigned.some((c) => c.id === crewMemberId)) {
     return NextResponse.json({ error: 'Crew member not assigned to this job' }, { status: 403 })
   }
 

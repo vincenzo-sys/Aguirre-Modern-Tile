@@ -28,7 +28,12 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (q) {
-    query = query.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
+    // Strip PostgREST-reserved characters (, ( ) .) so user-supplied text
+    // can't alter the .or() filter structure and 500 the request.
+    const safeQ = q.replace(/[,().]/g, '')
+    if (safeQ) {
+      query = query.or(`name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`)
+    }
   }
 
   if (source && source !== 'all') {
@@ -108,15 +113,23 @@ export async function POST(request: NextRequest) {
   }
 
   if (phone) {
-    const { data: existing } = await supabaseAdmin
-      .from('customers')
-      .select('*')
-      .eq('phone', phone)
-      .limit(1)
-      .single()
-
-    if (existing) {
-      return NextResponse.json(existing)
+    // Compare on digits-only so "(617) 766-1259" matches an existing record
+    // stored as "6177661259" or "+16177661259" — otherwise the same customer
+    // ends up with two records, splitting their job history.
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (phoneDigits.length >= 10) {
+      const last10 = phoneDigits.slice(-10)
+      const { data: existing } = await supabaseAdmin
+        .from('customers')
+        .select('*')
+        .or(`phone.eq.${phone},phone.like.%${last10}`)
+        .limit(5)
+      const match = existing?.find(
+        (row: { phone: string | null }) => (row.phone || '').replace(/\D/g, '').slice(-10) === last10
+      )
+      if (match) {
+        return NextResponse.json(match)
+      }
     }
   }
 

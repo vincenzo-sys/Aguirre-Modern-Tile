@@ -2,16 +2,16 @@ interface JsonLdProps {
   data: Record<string, unknown>
 }
 
-// JSON-LD structured data component.
-// Safe to use dangerouslySetInnerHTML here because:
-// 1. All data comes from hardcoded constants defined in this file or passed from server components
-// 2. JSON.stringify escapes any special characters, preventing script injection
-// 3. This is the standard Next.js pattern for structured data (per Next.js docs)
+// JSON-LD structured data component. Some callers pass CMS/dynamic strings
+// (service name/description, FAQ Q&A), so we escape "<" in the serialized JSON.
+// JSON.stringify does NOT escape "<", so a value containing "</script>" would
+// otherwise break out of this tag (stored XSS). Replacing "<" with the escape
+// "\\u003c" keeps the JSON valid while making a </script> breakout impossible.
 export default function JsonLd({ data }: JsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }}
     />
   )
 }

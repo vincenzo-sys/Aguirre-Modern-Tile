@@ -58,7 +58,13 @@ function renderNode(node: LexicalNode, index: number): React.ReactNode {
   if (node.type === 'link') {
     const fields = node.fields || {}
     const rawUrl = fields.url || node.url || '#'
-    const url = rawUrl.startsWith('javascript:') || rawUrl.startsWith('data:') ? '#' : rawUrl
+    // Block script-y schemes robustly. A bare startsWith('javascript:') is
+    // bypassable — browsers ignore case and strip ASCII whitespace (space, tab,
+    // newline, CR, form-feed) from URLs, so "JavaScript:", " javascript:" and
+    // "java\tscript:" all execute. Strip that whitespace + lowercase before
+    // testing the scheme; the rendered href still uses the original rawUrl.
+    const schemeProbe = String(rawUrl).replace(/[\t\n\r\f\v ]/g, '').toLowerCase()
+    const url = /^(javascript|data|vbscript):/.test(schemeProbe) ? '#' : rawUrl
     const newTab = fields.newTab || node.newTab
     return (
       <a

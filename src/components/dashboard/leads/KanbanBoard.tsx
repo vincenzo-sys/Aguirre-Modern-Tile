@@ -118,8 +118,8 @@ export default function KanbanBoard({
                   aria-label={`Show completed (${cards.length})`}
                   className="w-full flex flex-col items-center gap-2 py-3 text-gray-500 hover:text-gray-800"
                 >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded ${meta.iconBg}`}>
-                    <Icon className="w-3.5 h-3.5" />
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md ${meta.iconSolid}`}>
+                    <Icon className="w-4 h-4" />
                   </span>
                   <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-2 py-0.5">
                     {cards.length}
@@ -143,18 +143,19 @@ export default function KanbanBoard({
               onDragOver={(e) => onColumnDragOver(stage, e)}
               onDragLeave={(e) => onColumnDragLeave(stage, e)}
               onDrop={(e) => handleDrop(stage, e)}
-              className={`flex-shrink-0 w-[280px] bg-gray-50 rounded-xl border border-gray-200 border-t-4 ${meta.topBorder} transition ${
+              className={`flex-shrink-0 w-[248px] bg-gray-50 rounded-xl border border-gray-200 border-t-4 ${meta.topBorder} transition ${
                 isFocused ? 'ring-2 ring-primary-400' : ''
               } ${isDropTarget ? 'ring-2 ring-primary-500 bg-primary-50/50' : ''}`}
             >
-              {/* Sticky column header */}
-              <div className="sticky top-0 bg-gray-50/95 backdrop-blur rounded-t-xl px-3 py-2.5 border-b border-gray-200">
+              {/* Sticky column header — full tinted band so the stage reads at a
+                  glance even when the column is half-scrolled off screen. */}
+              <div className={`sticky top-0 ${meta.headerBar} rounded-t-xl px-3 py-2.5 border-b border-gray-200`}>
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded ${meta.iconBg}`}>
-                    <Icon className="w-3.5 h-3.5" />
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0 ${meta.iconSolid}`}>
+                    <Icon className="w-4 h-4" />
                   </span>
-                  <span className="text-xs font-semibold text-gray-800 flex-1 truncate">{meta.label}</span>
-                  <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-2 py-0.5">
+                  <span className={`text-sm font-bold flex-1 leading-tight line-clamp-2 ${meta.headerText}`}>{meta.label}</span>
+                  <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full px-2 py-0.5 flex-shrink-0">
                     {cards.length}
                   </span>
                   {stage === 'completed' && (

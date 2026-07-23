@@ -39,6 +39,13 @@ type StageMeta = {
   chip: string         // tailwind classes for the pill chip (bg + text)
   topBorder: string    // tailwind class for the kanban column top accent
   iconBg: string       // tailwind classes for the icon-in-tinted-box
+  // ── High-visibility tokens (added so the board's stage headers read at a
+  // glance in the field). Every value is a COMPLETE literal class string so
+  // Tailwind's JIT can see it — never build these by interpolating the hue.
+  headerBar: string    // full tinted band for the column/section header (bg tint)
+  headerText: string   // bold, saturated header label color
+  iconSolid: string    // saturated icon chip (solid fill + white glyph) — pops
+  spine: string        // card left-edge accent, used with `border-l-4`
   icon: LucideIcon
 }
 
@@ -50,6 +57,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-blue-100 text-blue-700',
     topBorder: 'border-t-blue-400',
     iconBg: 'bg-blue-100 text-blue-700',
+    headerBar: 'bg-blue-50', headerText: 'text-blue-900',
+    iconSolid: 'bg-blue-500 text-white', spine: 'border-l-blue-500',
     icon: Inbox,
   },
   in_person_estimate_scheduled: {
@@ -57,6 +66,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-amber-100 text-amber-800',
     topBorder: 'border-t-amber-400',
     iconBg: 'bg-amber-100 text-amber-800',
+    headerBar: 'bg-amber-50', headerText: 'text-amber-900',
+    iconSolid: 'bg-amber-500 text-white', spine: 'border-l-amber-500',
     icon: Calendar,
   },
   quoted: {
@@ -64,6 +75,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-purple-100 text-purple-800',
     topBorder: 'border-t-purple-400',
     iconBg: 'bg-purple-100 text-purple-800',
+    headerBar: 'bg-purple-50', headerText: 'text-purple-900',
+    iconSolid: 'bg-purple-500 text-white', spine: 'border-l-purple-500',
     icon: FilePlus,
   },
   edits_needed: {
@@ -71,6 +84,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-pink-100 text-pink-800',
     topBorder: 'border-t-pink-400',
     iconBg: 'bg-pink-100 text-pink-800',
+    headerBar: 'bg-pink-50', headerText: 'text-pink-900',
+    iconSolid: 'bg-pink-500 text-white', spine: 'border-l-pink-500',
     icon: FileEdit,
   },
   awaiting_response: {
@@ -78,6 +93,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-orange-100 text-orange-800',
     topBorder: 'border-t-orange-400',
     iconBg: 'bg-orange-100 text-orange-800',
+    headerBar: 'bg-orange-50', headerText: 'text-orange-900',
+    iconSolid: 'bg-orange-500 text-white', spine: 'border-l-orange-500',
     icon: Clock,
   },
   accepted_not_scheduled: {
@@ -85,6 +102,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-emerald-100 text-emerald-800',
     topBorder: 'border-t-emerald-400',
     iconBg: 'bg-emerald-100 text-emerald-800',
+    headerBar: 'bg-emerald-50', headerText: 'text-emerald-900',
+    iconSolid: 'bg-emerald-500 text-white', spine: 'border-l-emerald-500',
     icon: CheckCircle2,
   },
   scheduled: {
@@ -92,6 +111,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-teal-100 text-teal-800',
     topBorder: 'border-t-teal-400',
     iconBg: 'bg-teal-100 text-teal-800',
+    headerBar: 'bg-teal-50', headerText: 'text-teal-900',
+    iconSolid: 'bg-teal-500 text-white', spine: 'border-l-teal-500',
     icon: CalendarCheck,
   },
   // Terminal column: the job is finished. Neutral slate/gray so it reads
@@ -101,6 +122,8 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     chip: 'bg-gray-100 text-gray-700',
     topBorder: 'border-t-gray-400',
     iconBg: 'bg-gray-100 text-gray-700',
+    headerBar: 'bg-gray-100', headerText: 'text-gray-700',
+    iconSolid: 'bg-gray-400 text-white', spine: 'border-l-gray-300',
     icon: CheckCheck,
   },
 }

@@ -68,6 +68,11 @@ export default function LeadCard({
   const detailHref = `/dashboard/leads/${item.id}`
 
   const currentStageMeta = STAGE_META[item.stage]
+  // Thick colored left edge in the stage color, so the card carries its stage
+  // even when scrolled away from its column/section header. Gray on the other
+  // three sides is set separately (border-y/border-r) so no utility fights the
+  // left border-color — see the root className below.
+  const spine = currentStageMeta.spine
 
   const phoneDigits = item.client_phone ? item.client_phone.replace(/[^\d+]/g, '') : null
   const telHref = phoneDigits ? `tel:${phoneDigits}` : null
@@ -97,7 +102,7 @@ export default function LeadCard({
   return (
     <div
       {...dragProps}
-      className={`relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow pb-3 ${
+      className={`relative bg-white border-y border-r border-gray-200 border-l-4 ${spine} rounded-xl shadow-sm hover:shadow-md transition-shadow pb-3 ${
         dragging ? 'opacity-60' : ''
       } ${compact ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >

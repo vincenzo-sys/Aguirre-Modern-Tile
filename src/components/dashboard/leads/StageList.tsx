@@ -52,12 +52,12 @@ export default function StageList({
 
         const headerInner = (
           <>
-            <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${meta.iconBg}`}>
-              <Icon className="w-4 h-4" />
+            <div className={`flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0 ${meta.iconSolid}`}>
+              <Icon className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <h2 className="text-sm font-semibold text-gray-900 truncate">{meta.label}</h2>
-              <p className="text-[11px] text-gray-500">
+              <h2 className={`text-base font-bold leading-tight ${meta.headerText}`}>{meta.label}</h2>
+              <p className="text-xs font-medium text-gray-600 mt-0.5">
                 {cards.length} {cards.length === 1 ? 'lead' : 'leads'}
                 {dollars > 0 && <> · {formatMoneyShort(dollars)}</>}
               </p>
@@ -72,13 +72,13 @@ export default function StageList({
                 type="button"
                 onClick={() => setCompletedOpen((v) => !v)}
                 aria-expanded={!collapsed}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 border-t-4 ${meta.topBorder} bg-white`}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border-l-[6px] ${meta.spine} ${meta.headerBar}`}
               >
                 {headerInner}
-                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+                <ChevronRight className={`w-5 h-5 text-gray-500 flex-shrink-0 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
               </button>
             ) : (
-              <div className={`flex items-center gap-3 px-3 py-2 mb-3 rounded-lg border border-gray-200 border-t-4 ${meta.topBorder} bg-white`}>
+              <div className={`flex items-center gap-3 px-3 py-2.5 mb-3 rounded-lg border-l-[6px] ${meta.spine} ${meta.headerBar}`}>
                 {headerInner}
               </div>
             )}

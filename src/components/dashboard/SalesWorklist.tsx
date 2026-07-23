@@ -223,7 +223,8 @@ export default function SalesWorklist({
         </span>
       </div>
 
-      <table className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px]">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-2">
@@ -291,7 +292,8 @@ export default function SalesWorklist({
             ))
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   )
 }

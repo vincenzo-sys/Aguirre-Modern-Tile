@@ -84,7 +84,7 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+        className="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
       >
         <CheckCircle2 className="w-4 h-4" />
         Deposit received
@@ -105,7 +105,7 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !saving) submit()
           }}
-          className="w-32 pl-7 pr-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className="w-32 pl-7 pr-2 py-1.5 min-h-[44px] border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           placeholder={String(defaultAmount || '0')}
           autoFocus
         />
@@ -114,7 +114,7 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
         type="button"
         onClick={submit}
         disabled={saving}
-        className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1 px-3 py-1.5 min-h-[44px] bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
       >
         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
         Confirm
@@ -123,7 +123,7 @@ export default function DepositReceivedAction({ job }: { job: Job }) {
         type="button"
         onClick={() => setOpen(false)}
         disabled={saving}
-        className="p-1.5 text-gray-400 hover:text-gray-600"
+        className="p-2 text-gray-400 hover:text-gray-600"
         title="Cancel"
       >
         <X className="w-4 h-4" />

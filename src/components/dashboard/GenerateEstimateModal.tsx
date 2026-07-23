@@ -458,7 +458,7 @@ export default function GenerateEstimateModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+        className="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
       >
         <Sparkles className="w-4 h-4" />
         {hasExistingItems ? 'Regenerate estimate' : 'Generate estimate'}
@@ -484,7 +484,8 @@ export default function GenerateEstimateModal({
               <button
                 onClick={() => setOpen(false)}
                 disabled={loading}
-                className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                aria-label="Close"
+                className="p-2 -mr-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -508,7 +509,7 @@ export default function GenerateEstimateModal({
                 type="button"
                 onClick={addScope}
                 disabled={loading}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-700 border border-dashed border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50 w-full justify-center"
+                className="inline-flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm font-medium text-primary-700 border border-dashed border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50 w-full justify-center"
               >
                 <Plus className="w-4 h-4" />
                 Add another scope
@@ -567,7 +568,7 @@ export default function GenerateEstimateModal({
                 <button
                   onClick={() => setOpen(false)}
                   disabled={loading}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md disabled:opacity-50"
+                  className="px-4 py-2 min-h-[44px] text-sm text-gray-700 hover:bg-gray-50 rounded-md disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -575,7 +576,7 @@ export default function GenerateEstimateModal({
                   onClick={handleGenerate}
                   disabled={loading || !scopesValid || (isSentReprice && !confirmReprice)}
                   title={!scopesValid ? 'Enter a square footage for every scope first' : undefined}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
                   {loading ? (
                     <>

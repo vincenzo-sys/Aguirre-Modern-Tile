@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireApiAuth } from '@/lib/apiAuth'
+import { findCustomerByPhone } from '@/lib/phoneMatch'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -99,13 +100,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (!customerId && client_phone) {
-      const { data: existing } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', client_phone)
-        .limit(1)
-        .single()
-      if (existing) customerId = existing.id
+      // Digits-based match so a hand-typed "(617) 555-1234" links to the
+      // customer stored as "+16175551234" instead of forking a duplicate.
+      const match = await findCustomerByPhone(supabase, client_phone)
+      if (match) customerId = match.id
     }
 
     let createdNewCustomer = false
@@ -140,13 +138,8 @@ export async function POST(request: NextRequest) {
             if (existing) customerId = existing.id
           }
           if (!customerId && client_phone) {
-            const { data: existing } = await supabase
-              .from('customers')
-              .select('id')
-              .eq('phone', client_phone)
-              .limit(1)
-              .single()
-            if (existing) customerId = existing.id
+            const match = await findCustomerByPhone(supabase, client_phone)
+            if (match) customerId = match.id
           }
         } else {
           console.error('Customer create error:', customerError.message)

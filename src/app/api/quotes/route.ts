@@ -5,6 +5,7 @@ import { decideReferralAttribution, leadSourceFor } from '@/lib/referral'
 import { createNotionJob } from '@/lib/notion'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
 import { sendCustomerEmail } from '@/lib/email'
+import { findCustomerByPhone } from '@/lib/phoneMatch'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -79,25 +80,14 @@ export async function POST(req: NextRequest) {
         // "6175551234" or "+16175551234" — otherwise the same customer
         // can end up with two records, splitting their job history.
         if (!customerId && phone) {
-          const phoneDigits = phone.replace(/\D/g, '')
-          if (phoneDigits.length >= 10) {
-            const last10 = phoneDigits.slice(-10)
-            // Strip PostgREST-reserved chars so a formatted "(617) 555-1234"
-            // can't 400 the .or() and silently defeat dedup (→ duplicate
-            // customer). The JS .find below is the authoritative digits match.
-            const safePhone = phone.replace(/[,().]/g, '')
-            const { data: existing } = await supabase
-              .from('customers')
-              .select('id, openphone_contact_id, phone')
-              .or(`phone.eq.${safePhone},phone.like.%${last10}`)
-              .limit(5)
-            const match = existing?.find(
-              (row) => (row.phone || '').replace(/\D/g, '').slice(-10) === last10
-            )
-            if (match) {
-              customerId = match.id
-              existingOpenPhoneId = match.openphone_contact_id
-            }
+          const match = await findCustomerByPhone<{
+            id: string
+            openphone_contact_id: string | null
+            phone: string | null
+          }>(supabase, phone, 'id, openphone_contact_id, phone')
+          if (match) {
+            customerId = match.id
+            existingOpenPhoneId = match.openphone_contact_id
           }
         }
 

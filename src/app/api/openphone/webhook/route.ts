@@ -4,7 +4,12 @@ import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
 import { verifyOpenPhoneSignature } from '@/lib/openphoneSignature'
 import { findCustomerByPhone } from '@/lib/phoneMatch'
-import { parseCallEvent, parseMessageEvent, shouldSendMissedCallText } from '@/lib/openphoneEvents'
+import {
+  parseCallEvent,
+  parseMessageEvent,
+  shouldSendMissedCallText,
+  initialCallReadAt,
+} from '@/lib/openphoneEvents'
 import { bumpLastContactForCustomer, findSingleActiveJobId } from '@/lib/lastContact'
 
 function getSupabaseAdmin() {
@@ -130,6 +135,9 @@ async function handleCall(body: any) {
       duration: ev.duration,
       recording_url: ev.recordingUrl,
       openphone_call_id: ev.openphoneCallId,
+      // Inbox read-state: only an unanswered inbound call is "waiting on
+      // you" — answered and outbound calls are born read.
+      read_at: initialCallReadAt(ev),
     })
   }
 

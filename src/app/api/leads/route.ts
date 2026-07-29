@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireApiAuth } from '@/lib/apiAuth'
-import { findCustomerByPhone } from '@/lib/phoneMatch'
+import { findCustomerByPhone, last10 } from '@/lib/phoneMatch'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -194,6 +194,27 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Lead create error:', error.message)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Attach any orphaned call/text history from this phone to the customer.
+    // This is what makes the Inbox's "New lead" convert pull an unknown
+    // number's prior messages into the customer record.
+    if (customerId && client_phone) {
+      const key = last10(client_phone)
+      if (key) {
+        await Promise.all([
+          supabase
+            .from('message_log')
+            .update({ customer_id: customerId })
+            .is('customer_id', null)
+            .like('phone_number', `%${key}`),
+          supabase
+            .from('call_log')
+            .update({ customer_id: customerId })
+            .is('customer_id', null)
+            .like('phone_number', `%${key}`),
+        ])
+      }
     }
 
     return NextResponse.json(lead, { status: 201 })

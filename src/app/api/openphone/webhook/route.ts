@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
 import { verifyOpenPhoneSignature } from '@/lib/openphoneSignature'
+import { findCustomerByPhone } from '@/lib/phoneMatch'
+import { parseCallEvent, parseMessageEvent, shouldSendMissedCallText } from '@/lib/openphoneEvents'
+import { bumpLastContactForCustomer, findSingleActiveJobId } from '@/lib/lastContact'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -49,8 +52,13 @@ export async function POST(req: NextRequest) {
 
     switch (eventType) {
       case 'call.completed':
-      case 'call.ringing':
         await handleCall(body)
+        break
+      case 'call.ringing':
+        // Deliberately ignored. Running the call handler on ring used to
+        // read duration 0 as "missed" and fire the sorry-we-missed-you
+        // auto-text while the phone was still ringing, then log a duplicate
+        // call_log row when call.completed arrived seconds later.
         break
       case 'call.transcript.completed':
       case 'call.recording.completed':
@@ -77,66 +85,67 @@ export async function POST(req: NextRequest) {
 
 async function handleCall(body: any) {
   const supabase = getSupabaseAdmin()
-  const callData = body.data?.object || body.data || body
-
-  const phoneNumber = callData.from || callData.callerNumber || callData.participants?.[0]?.phoneNumber
-  const direction = callData.direction || 'inbound'
-  const duration = callData.duration || 0
-  const status = callData.status === 'missed' || duration === 0 ? 'missed' : 'completed'
-  const recordingUrl = callData.recordingUrl || callData.media?.url || null
-  const openphoneCallId = callData.id || null
-
-  if (!phoneNumber) {
+  const ev = parseCallEvent(body)
+  if (!ev) {
     console.warn('OpenPhone webhook: no phone number found')
     return
   }
 
-  // Find or create customer by phone number
-  let customerId: string | null = null
-  const { data: existing } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('phone', phoneNumber)
-    .limit(1)
-    .single()
+  // Link by last-10 digits — OpenPhone sends E.164 while web intake stores
+  // whatever the customer typed, so exact equality misses real matches.
+  // No auto-create: unknown callers surface in the Inbox with a one-tap
+  // "New lead" instead of forking a customer record named after the number.
+  const customer = await findCustomerByPhone(supabase, ev.phoneNumber)
+  const customerId = customer?.id ?? null
 
-  if (existing) {
-    customerId = existing.id
-  } else {
-    // Auto-create customer from caller
-    const { data: newCust } = await supabase
-      .from('customers')
-      .insert({
-        name: phoneNumber, // Will be updated when we learn their name
-        phone: phoneNumber,
-        source: 'manual',
-        notes: `Auto-created from ${status === 'missed' ? 'missed' : 'incoming'} call on ${new Date().toLocaleDateString()}`,
-      })
+  // Upsert by call id: OpenPhone redelivers webhooks, and the auto-text
+  // below must only fire for a call we haven't seen before.
+  let isNewRow = true
+  if (ev.openphoneCallId) {
+    const { data: existing } = await supabase
+      .from('call_log')
       .select('id')
-      .single()
-
-    if (newCust) customerId = newCust.id
+      .eq('openphone_call_id', ev.openphoneCallId)
+      .maybeSingle()
+    if (existing) {
+      isNewRow = false
+      const patch: Record<string, unknown> = {
+        direction: ev.direction,
+        status: ev.status,
+        duration: ev.duration,
+        recording_url: ev.recordingUrl,
+      }
+      // Never null-out an existing customer link on redelivery.
+      if (customerId) patch.customer_id = customerId
+      await supabase.from('call_log').update(patch).eq('id', existing.id)
+    }
   }
 
-  // Log the call
-  await supabase.from('call_log').insert({
-    customer_id: customerId,
-    phone_number: phoneNumber,
-    direction,
-    status,
-    duration,
-    recording_url: recordingUrl,
-    openphone_call_id: openphoneCallId,
-  })
+  if (isNewRow) {
+    await supabase.from('call_log').insert({
+      customer_id: customerId,
+      phone_number: ev.phoneNumber,
+      direction: ev.direction,
+      status: ev.status,
+      duration: ev.duration,
+      recording_url: ev.recordingUrl,
+      openphone_call_id: ev.openphoneCallId,
+    })
+  }
 
-  // Auto-text back on missed calls
-  if (status === 'missed' && direction === 'inbound') {
-    const smsResult = await sendSMS(phoneNumber, AUTO_MESSAGES.missed_call)
+  // A call in either direction is contact — clear staleness so the nurture
+  // cron doesn't nudge someone we just talked to.
+  if (customerId) {
+    await bumpLastContactForCustomer(supabase, customerId)
+  }
+
+  if (shouldSendMissedCallText(ev, isNewRow)) {
+    const smsResult = await sendSMS(ev.phoneNumber, AUTO_MESSAGES.missed_call)
 
     // Log the auto-text
     await supabase.from('message_log').insert({
       customer_id: customerId,
-      phone_number: phoneNumber,
+      phone_number: ev.phoneNumber,
       direction: 'outbound',
       message: AUTO_MESSAGES.missed_call,
       trigger_type: 'missed_call',
@@ -183,28 +192,29 @@ async function handleTranscriptReady(body: any) {
 
 async function handleIncomingMessage(body: any) {
   const supabase = getSupabaseAdmin()
-  const msgData = body.data?.object || body.data || body
+  const ev = parseMessageEvent(body)
+  if (!ev) return
 
-  const phoneNumber = msgData.from || msgData.participants?.[0]?.phoneNumber
-  const content = msgData.body || msgData.content || ''
+  const customer = await findCustomerByPhone(supabase, ev.phoneNumber)
+  const customerId = customer?.id ?? null
 
-  if (!phoneNumber) return
-
-  // Find customer
-  const { data: customer } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('phone', phoneNumber)
-    .limit(1)
-    .single()
+  // Attach the text to the customer's job only when it's unambiguous
+  // (exactly one active job) so job views and timelines stay coherent.
+  const jobId = customerId ? await findSingleActiveJobId(supabase, customerId) : null
 
   // Log incoming message
   await supabase.from('message_log').insert({
-    customer_id: customer?.id || null,
-    phone_number: phoneNumber,
+    customer_id: customerId,
+    job_id: jobId,
+    phone_number: ev.phoneNumber,
     direction: 'inbound',
-    message: content,
+    message: ev.content,
     trigger_type: 'customer_reply',
     status: 'delivered',
   })
+
+  // A reply is contact: stop the stale-lead countdown and estimate nudges.
+  if (customerId) {
+    await bumpLastContactForCustomer(supabase, customerId)
+  }
 }

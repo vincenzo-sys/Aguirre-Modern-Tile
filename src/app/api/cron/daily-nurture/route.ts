@@ -146,7 +146,10 @@ async function findStaleLeads(supabase: ReturnType<typeof getSupabase>): Promise
     .lt('created_at', fiveDaysAgo)
     .is('converted_job_id', null)
     .is('site_visit_at', null)
-    .not('status', 'eq', 'lost')
+    // 'lost' is not a quote_request_status value — comparing against it made
+    // Postgres reject the whole query, so stale-lead detection silently
+    // returned zero every day. Exclude the real terminal statuses instead.
+    .not('status', 'in', '(converted,archived)')
 
   if (!data) return []
   const now = Date.now()

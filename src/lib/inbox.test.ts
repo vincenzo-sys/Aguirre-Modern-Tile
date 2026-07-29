@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest'
 import {
   groupInboxThreads,
   threadKeyForPhone,
+  threadKeyForEmail,
   previewForCall,
   type MessageLogRow,
   type CallLogRow,
   type InboxCustomerRow,
   type InboxQuoteRequestRow,
   type InboxJobRow,
+  type EmailLogRow,
 } from './inbox'
 
 const msg = (over: Partial<MessageLogRow>): MessageLogRow => ({
@@ -50,12 +52,25 @@ const qr = (over: Partial<InboxQuoteRequestRow>): InboxQuoteRequestRow => ({
   ...over,
 })
 
+const email = (over: Partial<EmailLogRow>): EmailLogRow => ({
+  id: 'e1',
+  customer_id: null,
+  direction: 'inbound',
+  from_email: 'jane@example.com',
+  to_email: 'vince@reply.moderntile.pro',
+  subject: 'About my estimate',
+  read_at: null,
+  created_at: '2026-07-22T09:00:00.000Z',
+  ...over,
+})
+
 const group = (input: {
   messages?: MessageLogRow[]
   calls?: CallLogRow[]
   customers?: InboxCustomerRow[]
   quoteRequests?: InboxQuoteRequestRow[]
   jobs?: InboxJobRow[]
+  emails?: EmailLogRow[]
 }) =>
   groupInboxThreads({
     messages: input.messages ?? [],
@@ -63,6 +78,7 @@ const group = (input: {
     customers: input.customers ?? [],
     quoteRequests: input.quoteRequests ?? [],
     jobs: input.jobs ?? [],
+    emails: input.emails ?? [],
   })
 
 describe('threadKeyForPhone', () => {
@@ -143,7 +159,7 @@ describe('groupInboxThreads', () => {
   it('resolves display_name from the customers table by phone digits', () => {
     const threads = group({
       messages: [msg({})],
-      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '617-555-1234' }],
+      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '617-555-1234', email: null }],
     })
     expect(threads[0].customer_id).toBe('cust1')
     expect(threads[0].display_name).toBe('Bill Smith')
@@ -152,7 +168,7 @@ describe('groupInboxThreads', () => {
   it('merges a QR into an existing thread by customer_id when phones differ', () => {
     const threads = group({
       messages: [msg({ customer_id: 'cust1' })],
-      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '+16175551234' }],
+      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '+16175551234', email: null }],
       quoteRequests: [qr({ client_phone: '999-555-0000', customer_id: 'cust1' })],
     })
     // One thread: the QR joined Bill's SMS thread instead of forking its own.
@@ -163,7 +179,7 @@ describe('groupInboxThreads', () => {
   it('links an active job as the lead with a mapped stage', () => {
     const threads = group({
       messages: [msg({ customer_id: 'cust1' })],
-      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '+16175551234' }],
+      customers: [{ id: 'cust1', name: 'Bill Smith', phone: '+16175551234', email: null }],
       jobs: [
         {
           id: 'job1',
@@ -181,7 +197,7 @@ describe('groupInboxThreads', () => {
   it('an open QR outranks a job for the lead link', () => {
     const threads = group({
       messages: [msg({ customer_id: 'cust1' })],
-      customers: [{ id: 'cust1', name: 'Bill', phone: '+16175551234' }],
+      customers: [{ id: 'cust1', name: 'Bill', phone: '+16175551234', email: null }],
       quoteRequests: [qr({ customer_id: 'cust1' })],
       jobs: [
         {
@@ -212,6 +228,73 @@ describe('groupInboxThreads', () => {
     expect(threads[0].customer_id).toBeNull()
     expect(threads[0].display_name).toBeNull()
     expect(threads[0].lead).toBeNull()
+  })
+})
+
+describe('groupInboxThreads — email channel', () => {
+  it('an email from a customer with a phone joins their phone thread', () => {
+    const threads = group({
+      messages: [msg({})],
+      customers: [
+        { id: 'cust1', name: 'Jane Doe', phone: '+16175551234', email: 'jane@example.com' },
+      ],
+      emails: [email({ created_at: '2026-07-22T09:00:00.000Z' })],
+    })
+    expect(threads).toHaveLength(1)
+    expect(threads[0].key).toBe('6175551234')
+    expect(threads[0].channels.sort()).toEqual(['email', 'sms'])
+    expect(threads[0].unread).toBe(2) // unread SMS + unread email
+    expect(threads[0].preview).toEqual({
+      type: 'email',
+      direction: 'inbound',
+      text: 'About my estimate',
+    })
+  })
+
+  it('an email-only contact gets an em:-keyed thread', () => {
+    const threads = group({ emails: [email({})] })
+    expect(threads).toHaveLength(1)
+    expect(threads[0].key).toBe('em:jane@example.com')
+    expect(threads[0].email).toBe('jane@example.com')
+    expect(threads[0].channels).toEqual(['email'])
+    expect(threads[0].unread).toBe(1)
+  })
+
+  it('outbound emails thread by recipient and never count unread', () => {
+    const threads = group({
+      emails: [
+        email({ id: 'e1' }),
+        email({
+          id: 'e2',
+          direction: 'outbound',
+          from_email: 'vince@reply.moderntile.pro',
+          to_email: 'jane@example.com',
+          subject: 'Re: About my estimate',
+          created_at: '2026-07-22T10:00:00.000Z',
+        }),
+      ],
+    })
+    expect(threads).toHaveLength(1)
+    expect(threads[0].unread).toBe(1)
+    expect(threads[0].preview.direction).toBe('outbound')
+  })
+
+  it('matches the customer by email address when the row is unlinked', () => {
+    const threads = group({
+      customers: [{ id: 'cust1', name: 'Jane Doe', phone: null, email: 'Jane@Example.com' }],
+      emails: [email({})],
+    })
+    expect(threads[0].customer_id).toBe('cust1')
+    expect(threads[0].display_name).toBe('Jane Doe')
+    expect(threads[0].key).toBe('em:jane@example.com')
+  })
+})
+
+describe('threadKeyForEmail', () => {
+  it('normalizes to lowercase em: keys', () => {
+    expect(threadKeyForEmail(' Jane@Example.COM ')).toBe('em:jane@example.com')
+    expect(threadKeyForEmail(null)).toBeNull()
+    expect(threadKeyForEmail('')).toBeNull()
   })
 })
 

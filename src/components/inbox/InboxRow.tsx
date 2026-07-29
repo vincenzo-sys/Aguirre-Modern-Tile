@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Globe, Phone, UserPlus } from 'lucide-react'
+import { Globe, Phone, Mail, UserPlus } from 'lucide-react'
 import type { InboxThread } from '@/lib/inbox'
 import { STAGE_META, type PipelineStage } from '@/lib/leadStages'
 import { formatTimeAgo, formatPhoneDisplay } from '@/components/dashboard/leads/formatters'
@@ -35,14 +35,22 @@ function initials(name: string): string {
 
 export default function InboxRow({ thread }: { thread: InboxThread }) {
   const websiteOnly = thread.channels.length === 1 && thread.channels[0] === 'website'
-  const phoneForDisplay = thread.phone_e164 ?? thread.phone_raw ?? (websiteOnly ? null : thread.key)
-  const name = thread.display_name ?? formatPhoneDisplay(phoneForDisplay) ?? ''
+  const emailThread = thread.key.startsWith('em:')
+  const phoneForDisplay =
+    thread.phone_e164 ?? thread.phone_raw ?? (websiteOnly || emailThread ? null : thread.key)
+  const name =
+    thread.display_name ??
+    (phoneForDisplay ? formatPhoneDisplay(phoneForDisplay) : null) ??
+    thread.email ??
+    ''
   const unread = thread.unread > 0
-  // Unknown number with real phone history — offer the one-tap convert.
+  // Unknown contact with real message history — offer the one-tap convert.
   const isUnknown = !thread.customer_id && !thread.lead && !websiteOnly
 
   const href =
-    websiteOnly && thread.lead ? `/dashboard/leads/${thread.lead.id}` : `/dashboard/inbox/${thread.key}`
+    websiteOnly && thread.lead
+      ? `/dashboard/leads/${thread.lead.id}`
+      : `/dashboard/inbox/${encodeURIComponent(thread.key)}`
 
   // Website-only rows never hit the thread GET (which is what normally marks
   // things read), so stamp the lead reviewed on tap — fire-and-forget.
@@ -79,6 +87,8 @@ export default function InboxRow({ thread }: { thread: InboxThread }) {
           initials(thread.display_name)
         ) : websiteOnly ? (
           <Globe className="w-5 h-5" />
+        ) : emailThread ? (
+          <Mail className="w-5 h-5" />
         ) : (
           <Phone className="w-5 h-5" />
         )}
@@ -104,7 +114,10 @@ export default function InboxRow({ thread }: { thread: InboxThread }) {
             </span>
           )}
           <p className={`truncate text-sm ${unread ? 'text-gray-900' : 'text-gray-500'}`}>
-            {thread.preview.direction === 'outbound' && thread.preview.type === 'sms' ? 'You: ' : ''}
+            {thread.preview.direction === 'outbound' &&
+            (thread.preview.type === 'sms' || thread.preview.type === 'email')
+              ? 'You: '
+              : ''}
             {thread.preview.text}
           </p>
         </div>
@@ -116,7 +129,11 @@ export default function InboxRow({ thread }: { thread: InboxThread }) {
 
       {isUnknown && (
         <Link
-          href={`/dashboard/leads/new?phone=${encodeURIComponent(thread.phone_e164 ?? thread.key)}`}
+          href={
+            emailThread
+              ? `/dashboard/leads/new?email=${encodeURIComponent(thread.email ?? '')}`
+              : `/dashboard/leads/new?phone=${encodeURIComponent(thread.phone_e164 ?? thread.key)}`
+          }
           onClick={(e) => e.stopPropagation()}
           className="relative z-20 shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg border border-primary-200 bg-primary-50 text-primary-700 text-xs font-semibold active:scale-95 transition"
         >

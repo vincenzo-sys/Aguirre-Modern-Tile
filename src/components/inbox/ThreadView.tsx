@@ -9,6 +9,7 @@ import {
   PhoneOutgoing,
   PhoneMissed,
   Voicemail,
+  Mail,
   Play,
   ChevronDown,
   ChevronUp,
@@ -46,7 +47,16 @@ type CallItem = {
   at: string
 }
 
-type ThreadItem = SmsItem | CallItem
+type EmailItem = {
+  type: 'email'
+  id: string
+  direction: 'inbound' | 'outbound'
+  subject: string | null
+  body: string | null
+  at: string
+}
+
+type ThreadItem = SmsItem | CallItem | EmailItem
 
 const POLL_INTERVAL_MS = 30_000
 
@@ -63,9 +73,11 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
   const [sendError, setSendError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
+  const isEmailThread = threadKey.startsWith('em:')
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/inbox/${threadKey}`, { cache: 'no-store' })
+      const res = await fetch(`/api/inbox/${encodeURIComponent(threadKey)}`, { cache: 'no-store' })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         throw new Error(json.error || `HTTP ${res.status}`)
@@ -108,20 +120,29 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
     setSending(true)
     setSendError(null)
 
-    const optimistic: SmsItem = {
-      type: 'sms',
-      id: `optimistic-${Date.now()}`,
-      direction: 'outbound',
-      body,
-      trigger_type: 'inbox_reply',
-      status: 'sending',
-      at: new Date().toISOString(),
-    }
+    const optimistic: ThreadItem = isEmailThread
+      ? {
+          type: 'email',
+          id: `optimistic-${Date.now()}`,
+          direction: 'outbound',
+          subject: null,
+          body,
+          at: new Date().toISOString(),
+        }
+      : {
+          type: 'sms',
+          id: `optimistic-${Date.now()}`,
+          direction: 'outbound',
+          body,
+          trigger_type: 'inbox_reply',
+          status: 'sending',
+          at: new Date().toISOString(),
+        }
     setItems((prev) => [...(prev ?? []), optimistic])
     setDraft('')
 
     try {
-      const res = await fetch(`/api/inbox/${threadKey}`, {
+      const res = await fetch(`/api/inbox/${encodeURIComponent(threadKey)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
@@ -147,8 +168,13 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
     }
   }
 
-  const phone = contact?.phone_e164 ?? contact?.phone_raw ?? threadKey
-  const name = contact?.display_name ?? formatPhoneDisplay(phone)
+  const emailAddress = isEmailThread ? threadKey.slice(3) : (contact?.email ?? null)
+  const phone = contact?.phone_e164 ?? contact?.phone_raw ?? (isEmailThread ? null : threadKey)
+  const name =
+    contact?.display_name ??
+    (phone ? formatPhoneDisplay(phone) : null) ??
+    emailAddress ??
+    'Unknown'
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -162,18 +188,30 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-gray-900 truncate">{name || 'Unknown number'}</h1>
+          <h1 className="text-lg font-bold text-gray-900 truncate">{name}</h1>
           {contact?.display_name && (
-            <p className="text-xs text-gray-500">{formatPhoneDisplay(phone)}</p>
+            <p className="text-xs text-gray-500 truncate">
+              {phone ? formatPhoneDisplay(phone) : emailAddress}
+            </p>
           )}
         </div>
-        <a
-          href={`tel:${phone}`}
-          aria-label={`Call ${name}`}
-          className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gray-200 text-primary-700 active:scale-95 transition"
-        >
-          <Phone className="w-5 h-5" />
-        </a>
+        {phone ? (
+          <a
+            href={`tel:${phone}`}
+            aria-label={`Call ${name}`}
+            className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gray-200 text-primary-700 active:scale-95 transition"
+          >
+            <Phone className="w-5 h-5" />
+          </a>
+        ) : emailAddress ? (
+          <a
+            href={`mailto:${emailAddress}`}
+            aria-label={`Email ${name}`}
+            className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gray-200 text-primary-700 active:scale-95 transition"
+          >
+            <Mail className="w-5 h-5" />
+          </a>
+        ) : null}
         {contact?.lead ? (
           <Link
             href={`/dashboard/leads/${contact.lead.id}`}
@@ -190,7 +228,11 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
           </Link>
         ) : (
           <Link
-            href={`/dashboard/leads/new?phone=${encodeURIComponent(phone)}`}
+            href={
+              phone
+                ? `/dashboard/leads/new?phone=${encodeURIComponent(phone)}`
+                : `/dashboard/leads/new?email=${encodeURIComponent(emailAddress ?? '')}`
+            }
             className="shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-lg border border-primary-200 bg-primary-50 text-primary-700 text-sm font-semibold active:scale-95 transition"
           >
             <UserPlus className="w-4 h-4" />
@@ -229,14 +271,19 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           rows={2}
-          maxLength={1600}
-          placeholder={`Text ${contact?.display_name?.split(' ')[0] ?? 'this number'}…`}
+          maxLength={isEmailThread ? 4000 : 1600}
+          placeholder={
+            isEmailThread
+              ? `Email ${contact?.display_name?.split(' ')[0] ?? 'them'}…`
+              : `Text ${contact?.display_name?.split(' ')[0] ?? 'this number'}…`
+          }
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-y"
         />
         {sendError && <p className="text-xs text-red-600">{sendError}</p>}
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400">
-            {draft.length > 0 && `${draft.length}/1600 · sends as SMS`}
+            {draft.length > 0 &&
+              `${draft.length}/${isEmailThread ? 4000 : 1600} · sends as ${isEmailThread ? 'email' : 'SMS'}`}
           </span>
           <button
             type="button"
@@ -245,7 +292,7 @@ export default function ThreadView({ threadKey }: { threadKey: string }) {
             className="inline-flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {sending ? 'Sending…' : 'Send text'}
+            {sending ? 'Sending…' : isEmailThread ? 'Send email' : 'Send text'}
           </button>
         </div>
       </div>
@@ -278,7 +325,13 @@ function Timeline({ items }: { items: ThreadItem[] }) {
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
             )}
-            {item.type === 'sms' ? <SmsBubble item={item} /> : <CallRow item={item} />}
+            {item.type === 'sms' ? (
+              <SmsBubble item={item} />
+            ) : item.type === 'call' ? (
+              <CallRow item={item} />
+            ) : (
+              <EmailBubble item={item} />
+            )}
           </Fragment>
         )
       })}
@@ -308,6 +361,30 @@ function SmsBubble({ item }: { item: SmsItem }) {
           {timeOf(item.at)}
           {item.status === 'failed' && <span className="text-red-600 font-semibold"> · failed</span>}
           {item.status === 'sending' && ' · sending…'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function EmailBubble({ item }: { item: EmailItem }) {
+  const mine = item.direction === 'outbound'
+  return (
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] flex flex-col gap-0.5 ${mine ? 'items-end' : 'items-start'}`}>
+        <div
+          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed border ${
+            mine
+              ? 'bg-primary-50 border-primary-200 text-gray-900 rounded-br-sm'
+              : 'bg-white border-gray-200 text-gray-900 rounded-bl-sm'
+          }`}
+        >
+          {item.subject && <p className="font-semibold mb-1">{item.subject}</p>}
+          <p className="whitespace-pre-wrap">{item.body ?? '(no text body)'}</p>
+        </div>
+        <span className="text-[11px] text-gray-400 px-1 inline-flex items-center gap-1">
+          <Mail className="w-3 h-3" />
+          email · {timeOf(item.at)}
         </span>
       </div>
     </div>

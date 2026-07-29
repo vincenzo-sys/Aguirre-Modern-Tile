@@ -3,17 +3,18 @@ import type { PipelineStage } from '@/app/api/pipeline/route'
 import { last10 } from '@/lib/phoneMatch'
 import { ACTIVE_JOB_STATUSES } from '@/lib/lastContact'
 
-// The Inbox read model: one conversation per phone number, merged across
-// SMS (message_log), calls (call_log), and website leads (quote_requests),
-// answering exactly one question — who's waiting on me right now.
+// The Inbox read model: one conversation per contact, merged across SMS
+// (message_log), calls (call_log), email (email_log), and website leads
+// (quote_requests), answering exactly one question — who's waiting on me
+// right now.
 //
-// Thread identity is the last-10 digits of the phone number. No conversation
-// table exists; grouping happens here. `groupInboxThreads` is pure so the
-// merge/unread/sort logic is unit-testable; `buildInbox` wraps it with the
-// five queries. Channels are a union ('sms' | 'call' | 'website') so inbound
-// email can join later without reshaping the model.
+// Thread identity is the last-10 digits of the phone number; contacts with
+// no phone get `em:<address>` (email-only) or `qr:<id>` (phone-less website
+// lead) keys. No conversation table exists; grouping happens here.
+// `groupInboxThreads` is pure so the merge/unread/sort logic is
+// unit-testable; `buildInbox` wraps it with the queries.
 
-export type InboxChannel = 'sms' | 'call' | 'website'
+export type InboxChannel = 'sms' | 'call' | 'website' | 'email'
 
 export type MessageLogRow = {
   id: string
@@ -41,10 +42,22 @@ export type CallLogRow = {
   created_at: string
 }
 
+export type EmailLogRow = {
+  id: string
+  customer_id: string | null
+  direction: string
+  from_email: string
+  to_email: string | null
+  subject: string | null
+  read_at: string | null
+  created_at: string
+}
+
 export type InboxCustomerRow = {
   id: string
   name: string | null
   phone: string | null
+  email: string | null
 }
 
 export type InboxQuoteRequestRow = {
@@ -76,15 +89,18 @@ export type InboxLead = {
 }
 
 export type InboxPreview = {
-  type: 'sms' | 'call' | 'website'
+  type: 'sms' | 'call' | 'website' | 'email'
   direction: 'inbound' | 'outbound'
   text: string
 }
 
 export type InboxThread = {
-  key: string // last-10 digits, or `qr:<id>` for phone-less website leads
+  // last-10 digits, `em:<address>` for email-only contacts, or `qr:<id>`
+  // for phone-less website leads
+  key: string
   phone_e164: string | null
   phone_raw: string | null // display fallback when no E.164 was ever seen
+  email: string | null // counterpart address, when known
   display_name: string | null
   customer_id: string | null
   lead: InboxLead | null
@@ -123,12 +139,18 @@ const JOB_STATUS_TO_STAGE: Record<string, InboxLead['stage']> = {
 
 type WorkingThread = Omit<InboxThread, 'channels'> & { channels: Set<InboxChannel> }
 
+export function threadKeyForEmail(addr: string | null | undefined): string | null {
+  const a = addr?.trim().toLowerCase()
+  return a ? `em:${a}` : null
+}
+
 export function groupInboxThreads(input: {
   messages: MessageLogRow[]
   calls: CallLogRow[]
   customers: InboxCustomerRow[]
   quoteRequests: InboxQuoteRequestRow[]
   jobs: InboxJobRow[]
+  emails: EmailLogRow[]
 }): InboxThread[] {
   const threads = new Map<string, WorkingThread>()
 
@@ -139,6 +161,7 @@ export function groupInboxThreads(input: {
         key,
         phone_e164: null,
         phone_raw: null,
+        email: null,
         display_name: null,
         customer_id: null,
         lead: null,
@@ -209,9 +232,46 @@ export function groupInboxThreads(input: {
       if (c) t.customer_id = c.id
     }
     if (t.customer_id) {
-      t.display_name = customerById.get(t.customer_id)?.name ?? null
+      const c = customerById.get(t.customer_id)
+      t.display_name = c?.name ?? null
+      t.email = t.email ?? c?.email?.trim().toLowerCase() ?? null
       if (!threadByCustomerId.has(t.customer_id)) threadByCustomerId.set(t.customer_id, t)
     }
+  }
+
+  // Emails: attach to the customer's phone thread when they have one (a
+  // single person = a single conversation, whatever the channel); contacts
+  // with no phone get an em:<address>-keyed thread of their own.
+  const customerByEmail = new Map<string, InboxCustomerRow>()
+  for (const c of input.customers) {
+    const k = c.email?.trim().toLowerCase()
+    if (k && !customerByEmail.has(k)) customerByEmail.set(k, c)
+  }
+  for (const em of input.emails) {
+    const counterpartRaw = em.direction === 'outbound' ? em.to_email : em.from_email
+    const counterpart = counterpartRaw?.trim().toLowerCase() ?? null
+    const customer =
+      (em.customer_id ? customerById.get(em.customer_id) : null) ??
+      (counterpart ? customerByEmail.get(counterpart) : null) ??
+      null
+    const phoneKey = customer ? threadKeyForPhone(customer.phone) : null
+    const key = phoneKey ?? threadKeyForEmail(counterpart)
+    if (!key) continue
+    const t = getThread(key)
+    t.channels.add('email')
+    t.email = t.email ?? counterpart
+    if (customer) {
+      t.customer_id = t.customer_id ?? customer.id
+      t.display_name = t.display_name ?? customer.name ?? null
+      if (customer.phone) notePhone(t, customer.phone)
+      if (!threadByCustomerId.has(customer.id)) threadByCustomerId.set(customer.id, t)
+    }
+    if (em.direction === 'inbound' && !em.read_at) t.unread += 1
+    touch(t, em.created_at, {
+      type: 'email',
+      direction: em.direction === 'outbound' ? 'outbound' : 'inbound',
+      text: em.subject || '(no subject)',
+    })
   }
 
   // Merge open website leads. A QR that shares a phone (or customer) with an
@@ -274,7 +334,7 @@ export function groupInboxThreads(input: {
 export async function buildInbox(
   supabase: SupabaseClient
 ): Promise<{ threads: InboxThread[]; unread_threads: number }> {
-  const [messagesRes, callsRes, customersRes, qrRes, jobsRes] = await Promise.all([
+  const [messagesRes, callsRes, customersRes, qrRes, jobsRes, emailsRes] = await Promise.all([
     supabase
       .from('message_log')
       .select('id, customer_id, job_id, phone_number, direction, message, trigger_type, status, read_at, created_at')
@@ -285,7 +345,7 @@ export async function buildInbox(
       .select('id, customer_id, phone_number, direction, status, duration, recording_url, transcript, read_at, created_at')
       .order('created_at', { ascending: false })
       .limit(300),
-    supabase.from('customers').select('id, name, phone').not('phone', 'is', null),
+    supabase.from('customers').select('id, name, phone, email'),
     supabase
       .from('quote_requests')
       .select('id, status, client_name, client_phone, project_type, customer_id, site_visit_at, created_at')
@@ -295,10 +355,20 @@ export async function buildInbox(
       .from('jobs')
       .select('id, status, customer_id, client_phone, client_name, title')
       .in('status', [...ACTIVE_JOB_STATUSES, 'completed']),
+    supabase
+      .from('email_log')
+      .select('id, customer_id, direction, from_email, to_email, subject, read_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(300),
   ])
 
   const firstError =
-    messagesRes.error || callsRes.error || customersRes.error || qrRes.error || jobsRes.error
+    messagesRes.error ||
+    callsRes.error ||
+    customersRes.error ||
+    qrRes.error ||
+    jobsRes.error ||
+    emailsRes.error
   if (firstError) throw new Error(firstError.message)
 
   const threads = groupInboxThreads({
@@ -307,6 +377,7 @@ export async function buildInbox(
     customers: (customersRes.data ?? []) as InboxCustomerRow[],
     quoteRequests: (qrRes.data ?? []) as InboxQuoteRequestRow[],
     jobs: (jobsRes.data ?? []) as InboxJobRow[],
+    emails: (emailsRes.data ?? []) as EmailLogRow[],
   })
 
   return { threads, unread_threads: threads.filter((t) => t.unread > 0).length }

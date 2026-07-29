@@ -2,12 +2,13 @@ import ThreadView from '@/components/inbox/ThreadView'
 
 // Thread detail as a real route (not a slide-over) so the phone's back
 // button works and threads are linkable. The key is the thread key from
-// /api/inbox — a phone's last-10 digits.
+// /api/inbox — a phone's last-10 digits, or em:<address> for email-only
+// contacts (arrives percent-encoded in the URL).
 export default async function InboxThreadPage({
   params,
 }: {
   params: Promise<{ key: string }>
 }) {
   const { key } = await params
-  return <ThreadView threadKey={key} />
+  return <ThreadView threadKey={decodeURIComponent(key)} />
 }

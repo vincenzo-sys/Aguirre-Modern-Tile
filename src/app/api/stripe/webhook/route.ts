@@ -3,7 +3,7 @@ import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { createServiceClient } from '@/lib/supabase/service'
 import { updateNotionJobPayment } from '@/lib/notion'
 import { sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
-import { sendCustomerEmail } from '@/lib/email'
+import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 import { buildIcs } from '@/lib/ics'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
@@ -350,7 +350,7 @@ async function sendDepositConfirmation({
       to: email,
       subject: `Deposit received — $${amountStr} for ${title}`,
       html,
-      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+      replyTo: ownerReplyTo(),
       attachments,
     }).catch((err) => console.error('deposit_received email failed:', err))
   }

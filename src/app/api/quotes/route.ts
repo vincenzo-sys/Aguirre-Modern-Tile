@@ -4,7 +4,7 @@ import { validateContact, sanitize, rateLimit } from '@/lib/validation'
 import { decideReferralAttribution, leadSourceFor } from '@/lib/referral'
 import { createNotionJob } from '@/lib/notion'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
-import { sendCustomerEmail } from '@/lib/email'
+import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 import { findCustomerByPhone } from '@/lib/phoneMatch'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -276,7 +276,7 @@ async function sendQuoteConfirmation({
       to: email,
       subject: 'Got your tile project request — Aguirre Modern Tile',
       html,
-      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+      replyTo: ownerReplyTo(),
     }).catch((err) => console.error('quote_received email failed:', err))
   }
 }

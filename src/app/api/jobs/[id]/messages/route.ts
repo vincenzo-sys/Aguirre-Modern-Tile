@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sanitize } from '@/lib/validation'
 import { requireApiAuth } from '@/lib/apiAuth'
 import { sendSMS, toE164 } from '@/lib/openphone'
-import { sendCustomerEmail } from '@/lib/email'
+import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 
 // Dashboard endpoints for the Aguirre side of the estimate conversation.
 //   GET  /api/jobs/[id]/messages → fetch thread + stamp customer messages as read
@@ -148,7 +148,7 @@ async function notifyCustomer(
       to: job.client_email,
       subject: 'Reply on your Aguirre Modern Tile estimate',
       html,
-      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+      replyTo: ownerReplyTo(),
     }).catch((err) => console.error('[messages] email to customer failed:', err))
   }
 }

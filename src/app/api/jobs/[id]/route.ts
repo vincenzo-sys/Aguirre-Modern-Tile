@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
-import { sendCustomerEmail } from '@/lib/email'
+import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 import { requireApiAuth } from '@/lib/apiAuth'
 import { recomputeJobFinancials } from '@/lib/jobPayments'
 
@@ -288,7 +288,7 @@ async function sendCompletionEmail({
     to: email,
     subject: `${title} — all done. Thanks!`,
     html,
-    replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+    replyTo: ownerReplyTo(),
   })
 }
 

@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
-import { sendCustomerEmail } from '@/lib/email'
+import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 import { findCustomerByPhone } from '@/lib/phoneMatch'
 
 const RESEND_KEY = process.env.RESEND_API_KEY
@@ -251,7 +251,7 @@ async function sendContactConfirmation({
       to: email,
       subject: 'Got your tile project request — Aguirre Modern Tile',
       html,
-      replyTo: process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro',
+      replyTo: ownerReplyTo(),
     }).catch((err) => console.error('quote_received email failed:', err))
   }
 }

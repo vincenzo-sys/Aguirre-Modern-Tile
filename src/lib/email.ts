@@ -15,6 +15,17 @@ const CONFIGURED_FROM =
   process.env.RESEND_FROM_EMAIL || 'Aguirre Modern Tile <onboarding@resend.dev>'
 const RESEND_FALLBACK_FROM = 'Aguirre Modern Tile <onboarding@resend.dev>'
 
+// Reply-to for customer-facing emails. When INBOUND_REPLY_EMAIL is set (the
+// Resend receiving address, e.g. vince@reply.moderntile.pro), customer
+// replies land in the dashboard Inbox — and the inbound webhook forwards a
+// copy to the owner's mailbox, so nothing is lost. Unset → replies go
+// straight to the owner's mailbox as before.
+export function ownerReplyTo(): string {
+  return (
+    process.env.INBOUND_REPLY_EMAIL || process.env.CONTACT_FORM_TO_EMAIL || 'vin@moderntile.pro'
+  )
+}
+
 export type CustomerEmailResult = {
   success: boolean
   id?: string

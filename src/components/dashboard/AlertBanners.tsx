@@ -21,7 +21,9 @@ export default function AlertBanners({
 
   const overdueInvoices = invoices.filter((inv) => inv.status === 'overdue' || inv.status === 'sent')
 
-  const newLeads = leads.filter((l) => l.status === 'new')
+  // 'reviewed' still counts as a fresh lead — the Inbox flips new→reviewed
+  // on first look, which shouldn't make the banner miss it.
+  const newLeads = leads.filter((l) => l.status === 'new' || l.status === 'reviewed')
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)

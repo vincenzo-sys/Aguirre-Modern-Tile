@@ -136,9 +136,12 @@ function OwnerHome({
     .filter((j) => j.status === 'in_progress' || j.status === 'scheduled')
     .slice(0, 5)
 
+  // 'reviewed' counts too: the Inbox flips new→reviewed when a lead is seen,
+  // and "new this week" means "arrived this week", not "still unseen".
+  const isFreshLead = (l: { status: string }) => l.status === 'new' || l.status === 'reviewed'
   const newThisWeek = weekAgoIso
-    ? leads.filter((l) => l.created_at >= weekAgoIso && l.status === 'new').length
-    : leads.filter((l) => l.status === 'new').length
+    ? leads.filter((l) => l.created_at >= weekAgoIso && isFreshLead(l)).length
+    : leads.filter(isFreshLead).length
 
   const firstName = profile.full_name?.split(' ')[0] || ''
 

@@ -16,6 +16,7 @@ import {
   type NavItem,
 } from '@/lib/dashboardNav'
 import { useLocalStorageState } from '@/lib/useLocalStorageState'
+import { useInboxBadge } from '@/components/inbox/useInboxBadge'
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
@@ -29,6 +30,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     (v): v is boolean => typeof v === 'boolean',
   )
   const isOwner = profile.role === 'owner'
+  const inboxCount = useInboxBadge(isOwner)
 
   // Bottom tab bar's "More" tab triggers the drawer via window event so the
   // shared layout doesn't need to lift drawer state. Listener mounted once
@@ -58,6 +60,11 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       >
         <item.icon className="w-5 h-5" />
         {item.label}
+        {item.href === '/dashboard/inbox' && inboxCount > 0 && (
+          <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
+            {inboxCount > 9 ? '9+' : inboxCount}
+          </span>
+        )}
       </Link>
     )
   }

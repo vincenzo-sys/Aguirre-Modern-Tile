@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Menu } from 'lucide-react'
 import type { Profile } from '@/lib/supabase/types'
 import { getTabBarItems, isNavActive } from '@/lib/dashboardNav'
+import { useInboxBadge } from '@/components/inbox/useInboxBadge'
 
 // Native-style bottom tab bar for the dashboard, mobile only. The "More"
 // tab fires a window event the Sidebar listens for, so the existing
@@ -13,6 +14,8 @@ export default function MobileTabBar({ profile }: { profile: Profile }) {
   const pathname = usePathname() || ''
   const role = profile.role === 'owner' ? 'owner' : 'crew'
   const tabs = getTabBarItems(role)
+  // Special-cased on the Inbox href rather than growing NavItem for one badge.
+  const inboxCount = useInboxBadge(role === 'owner')
 
   function openSidebar() {
     if (typeof window !== 'undefined') {
@@ -37,7 +40,14 @@ export default function MobileTabBar({ profile }: { profile: Profile }) {
                 active ? 'text-primary-600' : 'text-gray-500'
               }`}
             >
-              <Icon className={`w-7 h-7 ${active ? 'text-primary-600' : 'text-gray-500'}`} />
+              <span className="relative">
+                <Icon className={`w-7 h-7 ${active ? 'text-primary-600' : 'text-gray-500'}`} />
+                {tab.href === '/dashboard/inbox' && inboxCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {inboxCount > 9 ? '9+' : inboxCount}
+                  </span>
+                )}
+              </span>
               <span className={`text-xs font-medium ${active ? 'text-primary-700' : 'text-gray-600'}`}>
                 {tab.label}
               </span>

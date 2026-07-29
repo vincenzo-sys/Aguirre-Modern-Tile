@@ -6,6 +6,7 @@
 import {
   Home,
   Inbox,
+  Target,
   ClipboardList,
   CalendarDays,
   Package,
@@ -44,10 +45,12 @@ export const ownerHome: NavItem = {
   pinnedToTabBar: true,
 }
 
-// Always-visible primary items. Both pinned, so the tab bar = Home / Leads
-// / Schedule / More.
+// Always-visible primary items. All pinned, so the tab bar = Home / Inbox
+// / Leads / Schedule / More. Inbox is first: it's the "what came in"
+// surface; Leads is the "work the deals" surface.
 export const ownerPrimary: NavItem[] = [
-  { label: 'Leads', href: '/dashboard/leads', icon: Inbox, pinnedToTabBar: true },
+  { label: 'Inbox', href: '/dashboard/inbox', icon: Inbox, pinnedToTabBar: true },
+  { label: 'Leads', href: '/dashboard/leads', icon: Target, pinnedToTabBar: true },
   { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarDays, pinnedToTabBar: true },
 ]
 

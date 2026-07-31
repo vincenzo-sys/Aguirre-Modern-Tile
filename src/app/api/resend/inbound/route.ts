@@ -130,7 +130,11 @@ type ReceivedEmail = {
 }
 
 async function fetchReceivedEmail(id: string): Promise<ReceivedEmail | null> {
-  const apiKey = process.env.RESEND_API_KEY
+  // The sending key is deliberately restricted to sending, and Resend answers
+  // "restricted_api_key" (401) on the receiving endpoint — so bodies need a
+  // full-access key. Falls back to RESEND_API_KEY for local/dev setups where
+  // one key does everything.
+  const apiKey = process.env.RESEND_RECEIVING_API_KEY || process.env.RESEND_API_KEY
   if (!apiKey) return null
   try {
     const res = await fetch(`https://api.resend.com/emails/receiving/${id}`, {

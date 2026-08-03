@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
-import { verifyOpenPhoneSignature } from './openphoneSignature'
+import { verifyOpenPhoneSignature, verifyOpenPhoneSignatureAny } from './openphoneSignature'
 
 // The signing secret is base64 (as OpenPhone provides it).
 const secret = Buffer.from('super-secret-signing-key').toString('base64')
@@ -51,5 +51,40 @@ describe('verifyOpenPhoneSignature', () => {
     const sig = parts[3]
     parts[3] = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1)
     expect(verifyOpenPhoneSignature(body, parts.join(';'), secret)).toBe(false)
+  })
+})
+
+describe('verifyOpenPhoneSignatureAny', () => {
+  // Real setup: OpenPhone issues a separate key per webhook, and the app
+  // registers two (messages + calls) pointing at one endpoint.
+  const messagesKey = Buffer.from('messages-webhook-key').toString('base64')
+  const callsKey = Buffer.from('calls-webhook-key').toString('base64')
+  const both = `${messagesKey},${callsKey}`
+  const body = JSON.stringify({ type: 'message.received', data: { id: 'm1' } })
+  const ts = '1700000000'
+
+  it('accepts an event signed with the first key', () => {
+    expect(verifyOpenPhoneSignatureAny(body, sign(body, ts, messagesKey), both)).toBe(true)
+  })
+
+  it('accepts an event signed with the second key', () => {
+    expect(verifyOpenPhoneSignatureAny(body, sign(body, ts, callsKey), both)).toBe(true)
+  })
+
+  it('rejects an event signed with a key that is not listed', () => {
+    const rogue = Buffer.from('not-our-key').toString('base64')
+    expect(verifyOpenPhoneSignatureAny(body, sign(body, ts, rogue), both)).toBe(false)
+  })
+
+  it('still rejects a tampered body signed with a valid key', () => {
+    expect(verifyOpenPhoneSignatureAny(body + ' ', sign(body, ts, callsKey), both)).toBe(false)
+  })
+
+  it('tolerates whitespace and empty entries in the list', () => {
+    expect(verifyOpenPhoneSignatureAny(body, sign(body, ts, callsKey), ` ,${callsKey} , `)).toBe(true)
+  })
+
+  it('rejects everything when the list is empty', () => {
+    expect(verifyOpenPhoneSignatureAny(body, sign(body, ts, callsKey), '')).toBe(false)
   })
 })

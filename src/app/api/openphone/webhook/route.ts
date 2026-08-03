@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
 import { fetchOpenPhoneTranscript } from '@/lib/openphoneTranscripts'
-import { verifyOpenPhoneSignature } from '@/lib/openphoneSignature'
+import { verifyOpenPhoneSignatureAny } from '@/lib/openphoneSignature'
 import { findCustomerByPhone } from '@/lib/phoneMatch'
 import {
   parseCallEvent,
@@ -33,9 +33,11 @@ export async function POST(req: NextRequest) {
     // configured. Gated on OPENPHONE_WEBHOOK_SECRET for a safe rollout: once
     // the secret is set, forged/unsigned events are rejected; until then we log
     // loudly and continue so real events aren't dropped before the secret ships.
+    // Comma-separated: OpenPhone issues one key per webhook and we register
+    // two (messages + calls) against this single endpoint.
     const secret = process.env.OPENPHONE_WEBHOOK_SECRET
     if (secret) {
-      const ok = verifyOpenPhoneSignature(
+      const ok = verifyOpenPhoneSignatureAny(
         rawBody,
         req.headers.get('openphone-signature'),
         secret

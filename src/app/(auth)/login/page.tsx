@@ -23,6 +23,12 @@ export default function LoginPage() {
       setError(
         "Your password was correct, but this account isn't set up for the dashboard yet. Ask Vince to activate it."
       )
+      // Drop the half-authenticated session. It can never reach the dashboard,
+      // and leaving it in place means every later visit bounces through this
+      // same denial instead of showing a clean login form.
+      createClient()
+        .auth.signOut()
+        .catch(() => {})
     }
   }, [])
 

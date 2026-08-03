@@ -56,8 +56,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from login page
-  if (request.nextUrl.pathname === '/login' && user) {
+  // Redirect logged-in users away from login page — EXCEPT when the
+  // dashboard just bounced them here with a reason.
+  //
+  // Without that exception this is an infinite loop: a signed-in user whose
+  // account has no profiles row is denied by (dashboard)/layout.tsx, sent to
+  // /login, sent straight back to /dashboard by this rule, denied again...
+  // The browser hangs rather than showing anything, which is impossible to
+  // diagnose from the outside. The ?error= param breaks the cycle so the
+  // login page can explain what's wrong and clear the dead session.
+  if (
+    request.nextUrl.pathname === '/login' &&
+    user &&
+    !request.nextUrl.searchParams.has('error')
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

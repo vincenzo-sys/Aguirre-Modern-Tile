@@ -74,7 +74,35 @@ const plan = [
       status: 'enabled',
     },
   },
+  {
+    // Without this, transcripts only land via the once-daily
+    // /api/cron/fetch-transcripts catch-up — so a voicemail could sit
+    // unreadable in the Inbox for up to a day.
+    what: 'call-transcripts',
+    path: '/v1/webhooks/call-transcripts',
+    body: {
+      url: WEBHOOK_URL,
+      events: ['call.transcript.completed'],
+      resourceIds: [tile.id],
+      label: 'Aguirre dashboard Inbox - call transcripts',
+      status: 'enabled',
+    },
+  },
 ]
+
+// Skip webhooks that already exist for this URL+event, so re-running is safe.
+const existing = await (await fetch('https://api.openphone.com/v1/webhooks', { headers: H }))
+  .json()
+  .catch(() => ({ data: [] }))
+const already = new Set(
+  (existing.data ?? []).flatMap((w) => (w.events ?? []).map((e) => `${w.url}|${e}`))
+)
+for (let i = plan.length - 1; i >= 0; i--) {
+  if (plan[i].body.events.every((e) => already.has(`${WEBHOOK_URL}|${e}`))) {
+    console.log(`  (skip ${plan[i].what} — already registered)`)
+    plan.splice(i, 1)
+  }
+}
 
 if (!CREATE) {
   console.log('\n--- DRY RUN (pass --create to apply) ---')

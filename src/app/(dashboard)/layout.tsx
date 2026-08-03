@@ -33,7 +33,12 @@ export default async function DashboardLayout({
     .single()
 
   if (!profile) {
-    redirect('/login')
+    // The credentials were valid — this account just has no profiles row, so
+    // it has no role and can't be authorized. Without the reason on the query
+    // string this looks identical to a wrong password, and the user retypes
+    // it forever. Surfaced on the login page.
+    console.error(`[auth] no profiles row for auth user ${user.id} (${user.email}) — denying dashboard access`)
+    redirect('/login?error=no_profile')
   }
 
   return <DashboardShell profile={profile as Profile}>{children}</DashboardShell>

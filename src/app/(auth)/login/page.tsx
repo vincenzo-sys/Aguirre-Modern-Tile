@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -10,6 +10,21 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // The dashboard bounces back here with ?error=no_profile when the sign-in
+  // itself succeeded but the account has no profile (so no role). Saying so
+  // beats an unexplained bounce that looks like a bad password.
+  //
+  // Read from window rather than useSearchParams: the latter opts this page
+  // out of static prerendering unless it's wrapped in Suspense, and this
+  // page is otherwise fully static.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'no_profile') {
+      setError(
+        "Your password was correct, but this account isn't set up for the dashboard yet. Ask Vince to activate it."
+      )
+    }
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()

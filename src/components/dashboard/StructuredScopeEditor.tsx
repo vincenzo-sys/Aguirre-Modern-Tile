@@ -17,10 +17,24 @@ import {
 // serializes back to the canonical text format (SCOPE OF WORK / WARRANTY /
 // WHAT'S INCLUDED / WHAT'S NOT INCLUDED / PAYMENT) and PATCHes the job.
 // Backward compatible — legacy hand-typed scopes still parse cleanly.
+//
+// With quote options (migration 048) the scope belongs to the OPTION, not the
+// job: "Option A — porcelain" and "Option B — marble" describe different work,
+// and the customer reads each option's scope under that option's price. Pass
+// optionId so the save lands on the option being edited. Callers must also key
+// this component by option, since the editor seeds its state once on mount.
 
 interface Props {
   jobId: string
   initialScopeNotes: string | null | undefined
+  /**
+   * Quote option this scope belongs to. When set, the save targets that option
+   * (which mirrors onto the job only if it is the one jobs.* tracks). Omit for
+   * single-option jobs and the post-acceptance ops screens.
+   */
+  optionId?: string | null
+  /** Shown above the editor so it's never ambiguous which option is open. */
+  optionLabel?: string | null
   onSaved?: (newNotes: string) => void
 }
 
@@ -42,7 +56,13 @@ function toEditorState(parsed: StructuredScope): EditorState {
   }
 }
 
-export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSaved }: Props) {
+export default function StructuredScopeEditor({
+  jobId,
+  initialScopeNotes,
+  optionId,
+  optionLabel,
+  onSaved,
+}: Props) {
   const initialParsed = useMemo(() => parseScopeNotes(initialScopeNotes), [initialScopeNotes])
   const [state, setState] = useState<EditorState>(() => toEditorState(initialParsed))
   const [saving, setSaving] = useState(false)
@@ -65,7 +85,13 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
   async function handleSave() {
     setSaving(true)
     try {
-      const res = await fetch(`/api/jobs/${jobId}`, {
+      // Editing a named option writes to that option, so the scope stays with
+      // the price it describes. Without an optionId this is the original
+      // job-level save, unchanged.
+      const url = optionId
+        ? `/api/jobs/${jobId}/estimate-options/${optionId}`
+        : `/api/jobs/${jobId}`
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scope_notes: serialized }),
@@ -74,7 +100,12 @@ export default function StructuredScopeEditor({ jobId, initialScopeNotes, onSave
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Failed to save')
       }
-      toast('Scope saved · live on customer estimate', 'success')
+      toast(
+        optionLabel
+          ? `${optionLabel} scope saved · live on customer estimate`
+          : 'Scope saved · live on customer estimate',
+        'success'
+      )
       onSaved?.(serialized)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Save failed', 'error')

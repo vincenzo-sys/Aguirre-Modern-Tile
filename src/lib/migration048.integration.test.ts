@@ -384,6 +384,40 @@ describe('migration 048 — job_estimates options + version history (real Postgr
     expect(Number(j.estimated_cost)).toBe(3200)
   })
 
+  it('keeps each option\'s SCOPE TEXT separate — editing B never rewrites A', async () => {
+    // The question this answers: "when I switch to Option B and change the
+    // customer scope, does it clobber Option A?" Scope belongs to the option
+    // it describes — porcelain and marble are different work — so the two must
+    // not share a single string.
+    await recordWithPayload(JOB_OPTIONS, 'a', { scope_notes: 'A: full retile in porcelain' })
+    await recordWithPayload(JOB_OPTIONS, 'b', { scope_notes: 'B: marble, large format, new niche' })
+
+    const { rows: scopes } = await db.query<{ option_key: string; scope_notes: string }>(
+      `SELECT option_key, scope_notes FROM job_estimates
+        WHERE job_id = $1 AND is_current ORDER BY option_key`,
+      [JOB_OPTIONS]
+    )
+    expect(scopes.find((s) => s.option_key === 'a')?.scope_notes).toBe('A: full retile in porcelain')
+    expect(scopes.find((s) => s.option_key === 'b')?.scope_notes).toBe(
+      'B: marble, large format, new niche'
+    )
+
+    // And the job still carries the mirrored option's scope, not B's.
+    const j = await job(JOB_OPTIONS)
+    expect(j.scope_notes).toBe('A: full retile in porcelain')
+
+    // Editing B again leaves A's text alone (the real regression risk).
+    await recordWithPayload(JOB_OPTIONS, 'b', { scope_notes: 'B: revised marble scope' })
+    const { rows: after } = await db.query<{ option_key: string; scope_notes: string }>(
+      `SELECT option_key, scope_notes FROM job_estimates
+        WHERE job_id = $1 AND is_current ORDER BY option_key`,
+      [JOB_OPTIONS]
+    )
+    expect(after.find((s) => s.option_key === 'a')?.scope_notes).toBe('A: full retile in porcelain')
+    expect(after.find((s) => s.option_key === 'b')?.scope_notes).toBe('B: revised marble scope')
+    expect((await job(JOB_OPTIONS)).scope_notes).toBe('A: full retile in porcelain')
+  })
+
   it('applies only the keys present, so a one-field edit does not blank the quote', async () => {
     await recordWithPayload(JOB_OPTIONS, 'a', { scope_notes: 'Updated scope text' })
 

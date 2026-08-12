@@ -925,9 +925,21 @@ export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: bo
                 onSaved={() => setEstimateRev((n) => n + 1)}
               />
 
+              {/* Scope belongs to the option it describes — "porcelain" and
+                  "marble" are different work, and the customer reads each
+                  option's scope under that option's price.
+
+                  The key is load-bearing: this editor seeds its state once on
+                  mount, so without remounting per option, switching tabs would
+                  leave the previous option's text in the fields and save it
+                  over the one now selected. */}
               <StructuredScopeEditor
+                key={activeOption?.id ?? job.id}
                 jobId={job.id}
-                initialScopeNotes={job.scope_notes}
+                initialScopeNotes={activeOption?.scope_notes ?? job.scope_notes}
+                optionId={options.length > 1 ? (activeOption?.id ?? null) : null}
+                optionLabel={options.length > 1 ? (activeOption?.label ?? null) : null}
+                onSaved={() => setEstimateRev((n) => n + 1)}
               />
 
               {/* Quote history — every revision of this estimate. Renders

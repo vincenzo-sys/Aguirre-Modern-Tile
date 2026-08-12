@@ -152,18 +152,29 @@ export async function DELETE(
       )
     }
 
-    if (option.is_primary) {
-      return NextResponse.json(
-        { error: 'Make another option active first, then delete this one.' },
-        { status: 409 }
-      )
-    }
-
     if (option.selected_at) {
       return NextResponse.json(
         { error: 'The customer already chose this option — it can\'t be deleted.' },
         { status: 409 }
       )
+    }
+
+    // Which option jobs.* mirrors is plumbing, not a decision the owner should
+    // have to make — so deleting the mirrored one hands that role to a survivor
+    // instead of refusing. Otherwise "make another option active first" would
+    // be a rule about a concept the UI deliberately hides.
+    if (option.is_primary) {
+      const successor = (current ?? []).find((o) => o.option_key !== option.option_key)
+      if (successor) {
+        const { error: promoteErr } = await supabase.rpc('set_primary_estimate_option', {
+          p_job_id: id,
+          p_option_key: successor.option_key,
+          p_selected: false,
+        })
+        if (promoteErr) {
+          return NextResponse.json({ error: promoteErr.message }, { status: 500 })
+        }
+      }
     }
 
     const { error } = await supabase

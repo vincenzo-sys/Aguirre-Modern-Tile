@@ -2,6 +2,13 @@ import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
 import OptionComparison, { type PublicOption } from './OptionComparison'
+import OptionBreakdown from './OptionBreakdown'
+import PricingBreakdown, {
+  formatCurrency,
+  isFlatEstimate,
+  orderSections,
+  PROJECTWIDE_LABEL,
+} from './PricingBreakdown'
 import ShareEstimateButton from './ShareEstimateButton'
 import PrintButton from '@/components/PrintButton'
 import EstimateMessages from '@/components/EstimateMessages'
@@ -37,121 +44,6 @@ type EstimateResponse = {
 
 const COMPANY_PHONE = '(617) 766-1259'
 const COMPANY_PHONE_TEL = '+16177661259'
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(amount)
-}
-
-// Customer-facing line items collapse into 6 buckets so the estimate reads
-// like a homeowner's mental model — they don't care about 2 bags of thinset
-// vs 1 bag, they care about "what am I paying for materials." The internal
-// dashboard still shows every line; this is presentation-only.
-type CustomerGroup =
-  | 'materials'
-  | 'addons'
-  | 'install_labor'
-  | 'demo_labor'
-  | 'trash'
-  | 'transport'
-
-const GROUP_ORDER: CustomerGroup[] = [
-  'materials',
-  'addons',
-  'install_labor',
-  'demo_labor',
-  'trash',
-  'transport',
-]
-
-const GROUP_LABEL: Record<CustomerGroup, string> = {
-  materials: 'Materials',
-  addons: 'Add-ons',
-  install_labor: 'Install labor',
-  demo_labor: 'Demo labor',
-  trash: 'Trash & debris removal',
-  transport: 'Travel & delivery',
-}
-
-// Add-ons in the customer's mental model = optional upgrades they choose
-// (niches, benches, heated floors, decorative accents). The shower tray,
-// drain, and curb are required components of a walk-in shower — they're
-// materials. Match against keywords specific to upgrade-style items so
-// only those land in add-ons; everything else material-category goes to
-// Materials.
-const ADDON_KEYWORDS = ['bench', 'niche', 'corner shelf', 'cornershelf', 'ditra-heat', 'heated floor']
-
-function classifyLineItem(item: JobLineItem): CustomerGroup {
-  if (item.category === 'materials') {
-    const lower = item.description.toLowerCase()
-    if (ADDON_KEYWORDS.some((k) => lower.includes(k))) return 'addons'
-    return 'materials'
-  }
-  const desc = item.description.toLowerCase()
-  if (desc.startsWith('demolition') || desc.startsWith('demo')) return 'demo_labor'
-  // Trash labels have varied across engine versions: "Jobsite cleanup ...",
-  // "Trash and debris removal", "Trash & debris ...". The "debris" substring
-  // catches all of them.
-  if (desc.startsWith('trash') || desc.startsWith('jobsite cleanup') || desc.includes('debris')) {
-    return 'trash'
-  }
-  // Transport labels likewise: "Travel: 8 trips...", "Delivery & materials
-  // transport", "Transportation (Revere base...)". Match all three prefixes.
-  if (desc.startsWith('travel') || desc.startsWith('delivery') || desc.startsWith('transport')) {
-    return 'transport'
-  }
-  return 'install_labor'
-}
-
-// Flat rendering for hand-built bundled estimates (Erwin's PDF format —
-// every line is "Area Description: $Amount" with no inner category split).
-// We detect this when every line item is unit='ea' and category='labor' —
-// the template estimator never produces that shape (it always emits day-
-// unit labor + sheet/bag/tube materials), so the heuristic uniquely
-// identifies bundled hand-built quotes.
-function isFlatEstimate(items: JobLineItem[]): boolean {
-  if (items.length === 0) return false
-  return items.every((i) => i.unit === 'ea' && i.category === 'labor')
-}
-
-function renderCustomerGroup(
-  group: CustomerGroup,
-  items: JobLineItem[],
-  total: number,
-) {
-  if (items.length === 0) return null
-  // Materials + add-ons render as a single category row with bullets of the
-  // included items underneath. Labor / trash / transport don't list items
-  // (one labor line means one description anyway).
-  const showBullets = group === 'materials' || group === 'addons'
-  return (
-    <div className="px-6 py-3 border-b border-gray-100 last:border-b-0">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-sm font-medium text-gray-900">{GROUP_LABEL[group]}</span>
-        <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-          {formatCurrency(total)}
-        </span>
-      </div>
-      {showBullets && (
-        <ul className="mt-1.5 ml-1 space-y-0.5 text-[11px] text-gray-400">
-          {items.map((item, i) => (
-            <li key={i} className="leading-tight">
-              <span className="text-gray-300">•</span>{' '}
-              {item.quantity > 1 ? `${item.quantity} × ` : ''}
-              {item.description}
-              {/* No source/retail "(view)" link on the customer-facing estimate —
-                  it exposes our sourcing. The internal dashboard line-item editor
-                  keeps source_url for the team. */}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
 
 // Map job_type strings (e.g. "Bathroom Tile") to gallery_projects category
 // values ("Bathroom"). Returns null when the job type doesn't have a clean
@@ -266,27 +158,11 @@ export default async function EstimatePage({
   const depositSuccess = deposit === 'success' || estimate.accepted
   const depositCancelled = deposit === 'cancelled'
 
-  // Must match PROJECTWIDE_LABEL in generate_dashboard_estimate.py.
-  const PROJECTWIDE_LABEL = 'Project-wide'
-
-  // Group items by section in the order sections first appear, then float
-  // the implicit "Project-wide" bucket (unsectioned items, trash, transport)
-  // to the end so per-room costs come first. Single-section legacy jobs
-  // land entirely in Project-wide and render without a section header.
-  const sectionMap = new Map<string, JobLineItem[]>()
-  for (const item of estimate.line_items) {
-    const key = item.section || PROJECTWIDE_LABEL
-    if (!sectionMap.has(key)) sectionMap.set(key, [])
-    sectionMap.get(key)!.push(item)
-  }
-  const orderedSections = [
-    ...Array.from(sectionMap.entries()).filter(([k]) => k !== PROJECTWIDE_LABEL),
-    ...(sectionMap.has(PROJECTWIDE_LABEL)
-      ? [[PROJECTWIDE_LABEL, sectionMap.get(PROJECTWIDE_LABEL)!] as const]
-      : []),
-  ]
-  const showSectionHeaders =
-    orderedSections.length > 1 || orderedSections[0]?.[0] !== PROJECTWIDE_LABEL
+  // More than one option means the customer is choosing, so every option is
+  // written out IN FULL below rather than one being rendered and the rest
+  // summarised. A single-option job takes the original path unchanged.
+  const hasOptions = options.length > 1
+  const optionCosts = options.map((o) => Number(o.estimated_cost ?? 0))
 
   const total =
     estimate.estimated_cost ??
@@ -494,78 +370,31 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* Good/Better/Best comparison — renders only when there really are
-            multiple options, so a single-price estimate is unchanged. */}
-        <OptionComparison
-          token={token}
-          options={options}
-          activeKey={chosen?.key ?? ''}
-          accepted={depositSuccess}
-        />
+        {/* At-a-glance summary, then every option written out in full. */}
+        <OptionComparison options={options} accepted={depositSuccess} />
 
-        {/* Line items */}
-        {estimate.line_items.length > 0 && (
-          <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <div className="px-6 py-3 bg-gray-100 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                Pricing breakdown
-              </h3>
-            </div>
-
-            {isFlatEstimate(estimate.line_items) ? (
-              // Flat table — Description + Amount, like the PDF format Vince
-              // hands customers for bundled quotes.
-              <div className="divide-y divide-gray-100">
-                {estimate.line_items.map((item, idx) => (
-                  <div key={idx} className="px-6 py-3 flex items-start justify-between gap-4">
-                    <p className="text-sm text-gray-900 flex-1">{item.description}</p>
-                    <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : orderedSections.map(([sectionKey, sectionItems], sIdx) => {
-              // Bucket each line item into one of the six customer-facing
-              // groups, then render any non-empty group as a single row.
-              const groups: Record<CustomerGroup, { items: JobLineItem[]; total: number }> = {
-                materials: { items: [], total: 0 },
-                addons: { items: [], total: 0 },
-                install_labor: { items: [], total: 0 },
-                demo_labor: { items: [], total: 0 },
-                trash: { items: [], total: 0 },
-                transport: { items: [], total: 0 },
-              }
-              for (const item of sectionItems) {
-                const g = classifyLineItem(item)
-                groups[g].items.push(item)
-                groups[g].total += item.amount ?? 0
-              }
-              const subtotal = sectionItems.reduce((s, i) => s + (i.amount ?? 0), 0)
-              return (
-                <div key={sectionKey}>
-                  {showSectionHeaders && (
-                    <div
-                      className={`px-6 py-3 bg-primary-50 border-b border-primary-100 flex items-center justify-between ${
-                        sIdx > 0 ? 'border-t-4 border-t-gray-100' : ''
-                      }`}
-                    >
-                      <span className="text-sm font-semibold text-primary-900 uppercase tracking-wider">
-                        {sectionKey}
-                      </span>
-                      <span className="text-sm font-semibold text-primary-900">
-                        {formatCurrency(subtotal)}
-                      </span>
-                    </div>
-                  )}
-                  {GROUP_ORDER.map((g) =>
-                    renderCustomerGroup(g, groups[g].items, groups[g].total)
-                  )}
+        {hasOptions
+          ? options.map((option, i) => (
+              <OptionBreakdown
+                key={option.key}
+                token={token}
+                option={option}
+                index={i}
+                total={options.length}
+                accepted={depositSuccess}
+                validThrough={validThrough}
+              />
+            ))
+          : estimate.line_items.length > 0 && (
+              <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+                <div className="px-6 py-3 bg-gray-100 border-b border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                    Pricing breakdown
+                  </h3>
                 </div>
-              )
-            })}
-          </section>
-        )}
+                <PricingBreakdown lineItems={estimate.line_items} />
+              </section>
+            )}
 
         {/* Similar work gallery — social proof right before the price.
             Renders only when CMS returns matching photos. */}
@@ -591,32 +420,40 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* Total + deposit */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-baseline justify-between mb-3">
-            <span className="text-gray-500">Total estimate</span>
-            <span className="text-3xl font-bold text-gray-900">{formatCurrency(total)}</span>
-          </div>
-          <div className="flex items-baseline justify-between pt-3 border-t border-gray-100">
-            <span className="text-gray-700 font-medium">
-              10% deposit to reserve your install date
-            </span>
-            <span className="text-xl font-semibold text-primary-700">
-              {formatCurrency(estimate.deposit_amount)}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 mt-3">
-            The remainder is due on completion of the project.
-          </p>
-          {parsed.validThrough && (
-            <p className="text-xs text-gray-400 mt-2">
-              Estimate valid through {parsed.validThrough}
-            </p>
-          )}
-          <div className="mt-4 no-print">
+        {/* Total + deposit. Suppressed when there are options, because each
+            option block carries its own total and deposit — a single "Total
+            estimate" here would contradict them. */}
+        {hasOptions ? (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 no-print">
             <PrintButton label="Download PDF" />
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-baseline justify-between mb-3">
+              <span className="text-gray-500">Total estimate</span>
+              <span className="text-3xl font-bold text-gray-900">{formatCurrency(total)}</span>
+            </div>
+            <div className="flex items-baseline justify-between pt-3 border-t border-gray-100">
+              <span className="text-gray-700 font-medium">
+                10% deposit to reserve your install date
+              </span>
+              <span className="text-xl font-semibold text-primary-700">
+                {formatCurrency(estimate.deposit_amount)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              The remainder is due on completion of the project.
+            </p>
+            {parsed.validThrough && (
+              <p className="text-xs text-gray-400 mt-2">
+                Estimate valid through {parsed.validThrough}
+              </p>
+            )}
+            <div className="mt-4 no-print">
+              <PrintButton label="Download PDF" />
+            </div>
+          </section>
+        )}
 
         {/* Payment terms — sourced from job.payment_terms_text (snapshotted
             from estimate_defaults at generate time, editable per-job). Falls
@@ -735,23 +572,22 @@ export default async function EstimatePage({
           </section>
         )}
 
-        {/* Accept / pay — desktop */}
+        {/* Accept / pay — desktop. With options, the Accept button lives on
+            each option instead; a single one here would have to silently pick
+            for the customer, which is the one thing it must not do. */}
         {!depositSuccess && (
           <section className="hidden md:block bg-primary-50 rounded-xl border border-primary-200 p-6 text-center no-print">
             <h3 className="text-lg font-semibold text-primary-900 mb-1">
-              Ready to move forward?
+              {hasOptions ? 'Ready to pick one?' : 'Ready to move forward?'}
             </h3>
             <p className="text-sm text-primary-800 mb-5">
-              {options.length > 1
-                ? `You're looking at ${chosen?.label ?? 'this option'}. Accept it and pay the deposit in one step — secured by Stripe.`
+              {hasOptions
+                ? 'Each option above has its own “Choose” button — whichever you pick becomes the job, and the deposit is 10% of that option. Nothing else is charged.'
                 : 'Accept the estimate and pay the deposit in one step — secured by Stripe.'}
             </p>
-            <AcceptAndPayButton
-              token={token}
-              depositAmount={estimate.deposit_amount}
-              optionKey={options.length > 1 ? (chosen?.key ?? null) : null}
-              optionLabel={options.length > 1 ? (chosen?.label ?? null) : null}
-            />
+            {!hasOptions && (
+              <AcceptAndPayButton token={token} depositAmount={estimate.deposit_amount} />
+            )}
           </section>
         )}
 
@@ -804,24 +640,43 @@ export default async function EstimatePage({
         </div>
       </main>
 
-      {/* Sticky mobile CTA */}
+      {/* Sticky mobile CTA. Most customers read this on a phone, so the bar
+          has to stay honest: with two options there is no single deposit to
+          show and no button that could accept without choosing for them, so
+          it becomes a price range that points at the option blocks. */}
       {!depositSuccess && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20 no-print">
           <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto">
-            <div className="flex-shrink-0">
-              <div className="text-[11px] text-gray-500 leading-tight">
-                {options.length > 1 && chosen ? `${chosen.label} · 10% deposit` : '10% deposit'}
-              </div>
-              <div className="text-lg font-semibold text-gray-900 leading-tight">
-                {formatCurrency(estimate.deposit_amount)}
-              </div>
-            </div>
-            <AcceptAndPayButton
-              token={token}
-              depositAmount={estimate.deposit_amount}
-              optionKey={options.length > 1 ? (chosen?.key ?? null) : null}
-              compact
-            />
+            {hasOptions ? (
+              <>
+                <div className="min-w-0">
+                  <div className="text-[11px] text-gray-500 leading-tight">
+                    {options.length} options
+                  </div>
+                  <div className="text-lg font-semibold text-gray-900 leading-tight">
+                    {formatCurrency(Math.min(...optionCosts))} –{' '}
+                    {formatCurrency(Math.max(...optionCosts))}
+                  </div>
+                </div>
+                <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">
+                  Choose one above ↑
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="flex-shrink-0">
+                  <div className="text-[11px] text-gray-500 leading-tight">10% deposit</div>
+                  <div className="text-lg font-semibold text-gray-900 leading-tight">
+                    {formatCurrency(estimate.deposit_amount)}
+                  </div>
+                </div>
+                <AcceptAndPayButton
+                  token={token}
+                  depositAmount={estimate.deposit_amount}
+                  compact
+                />
+              </>
+            )}
           </div>
         </div>
       )}

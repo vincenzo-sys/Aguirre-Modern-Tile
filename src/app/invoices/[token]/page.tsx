@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { InvoiceLineItem } from '@/lib/supabase/types'
-import { ShieldCheck, BadgeCheck, Phone, CheckCircle2 } from 'lucide-react'
+import { ShieldCheck, BadgeCheck, Phone, CheckCircle2, Check } from 'lucide-react'
 import PrintButton from '@/components/PrintButton'
 
 type InvoiceResponse = {
@@ -8,6 +8,9 @@ type InvoiceResponse = {
   job_title: string | null
   client_name: string | null
   client_address: string | null
+  // Set only when the job was quoted with several options — names the one the
+  // customer chose, so the single price here is traceable to their decision.
+  chosen_option?: string | null
   line_items: InvoiceLineItem[]
   amount: number
   status: string
@@ -120,6 +123,12 @@ export default async function PublicInvoicePage({
               <h2 className="text-xl font-bold text-gray-900">
                 {invoice.job_title || 'Tile project'}
               </h2>
+              {invoice.chosen_option && (
+                <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded px-2 py-1">
+                  <Check className="w-3.5 h-3.5" />
+                  Billing the option you chose: <strong>{invoice.chosen_option}</strong>
+                </p>
+              )}
               <dl className="mt-3 space-y-1 text-sm">
                 {invoice.client_name && (
                   <div className="flex gap-2">

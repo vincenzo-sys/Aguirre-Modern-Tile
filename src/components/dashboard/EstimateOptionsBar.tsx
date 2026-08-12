@@ -6,13 +6,17 @@
 // question from "yes or no?" to "which one?". The Premium column doesn't have
 // to sell often — it makes the middle option feel reasonable.
 //
-// Mechanically, exactly ONE option is "active" (is_primary) at a time. That is
-// the one mirrored onto jobs.*, which the Stripe deposit, invoicing and the
-// crew work order all read. Editing a non-active option is therefore safe: it
-// changes nothing downstream until it's made active or the customer picks it.
+// Options are PEERS. There is no "active" one to manage: every option is sent
+// to the customer, written out in full on their estimate, and the only thing
+// that settles it is which one they choose.
+//
+// Under the hood one option is still mirrored onto jobs.* so the invoice and
+// crew work order always have a number — but that is plumbing, deliberately
+// invisible here. Making the owner pick a "live" option was cognitive load in
+// exchange for nothing: the customer's choice overwrites it anyway.
 
 import { useState } from 'react'
-import { Plus, Star, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import type { JobEstimateVersion } from '@/lib/estimateVersions'
@@ -105,30 +109,6 @@ export default function EstimateOptionsBar({
       setRenaming(null)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Rename failed', 'error')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function handleMakePrimary(o: JobEstimateVersion) {
-    if (
-      !(await confirmDialog({
-        title: `Make "${o.label}" the active option?`,
-        message: `The job's price becomes ${money(o.estimated_cost)}. This is what the invoice, the deposit, and the crew work order will use.`,
-        confirmLabel: 'Make active',
-      }))
-    )
-      return
-
-    setBusy(o.id)
-    try {
-      await call(
-        `/api/jobs/${jobId}/estimate-options/${o.id}`,
-        { method: 'PATCH', body: JSON.stringify({ make_primary: true }) },
-        `"${o.label}" is now the active option`
-      )
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not switch option', 'error')
     } finally {
       setBusy(null)
     }
@@ -245,12 +225,9 @@ export default function EstimateOptionsBar({
                   >
                     {o.label}
                   </span>
-                  {o.is_primary && (
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" aria-label="Active option" />
-                  )}
                   {o.selected_at && (
                     <span className="text-[10px] font-semibold text-green-700 bg-green-100 px-1 rounded">
-                      PICKED
+                      CHOSE THIS
                     </span>
                   )}
                 </div>
@@ -301,23 +278,10 @@ export default function EstimateOptionsBar({
                 Rename
               </button>
 
-              {!active.is_primary && (
-                <button
-                  type="button"
-                  onClick={() => handleMakePrimary(active)}
-                  disabled={busy === active.id}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 hover:text-amber-800 pt-1.5 disabled:opacity-50"
-                >
-                  {busy === active.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Star className="w-3 h-3" />
-                  )}
-                  Make active
-                </button>
-              )}
-
-              {!active.is_primary && !active.selected_at && (
+              {/* Deleting the mirrored option is fine — the API hands that
+                  role to a survivor. Only a customer's actual choice is
+                  protected. */}
+              {!active.selected_at && (
                 <button
                   type="button"
                   onClick={() => handleDelete(active)}
@@ -333,11 +297,10 @@ export default function EstimateOptionsBar({
         </div>
       )}
 
-      {active && !active.is_primary && (
-        <p className="text-[11px] text-gray-500 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          You&apos;re editing <strong>{active.label}</strong>, which isn&apos;t the active option. The
-          job total, invoice and crew work order still use{' '}
-          <strong>{options.find((o) => o.is_primary)?.label ?? 'the active option'}</strong>.
+      {!isSingle && (
+        <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+          Both options are sent to the customer and written out in full on their
+          estimate. Whichever they choose becomes the job.
         </p>
       )}
     </div>

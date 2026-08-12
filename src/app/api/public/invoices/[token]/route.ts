@@ -29,6 +29,11 @@ export async function GET(
     let client_name: string | null = null
     let client_address: string | null = null
     let job_title: string | null = null
+    // When the job was quoted as several options, name the one the customer
+    // actually chose. An invoice bills agreed work, so it shows ONE price —
+    // but a customer who compared two should be able to see, without asking,
+    // that this is the number they picked rather than the other one.
+    let chosen_option: string | null = null
     if (invoice.job_id) {
       const { data: job } = await supabase
         .from('jobs')
@@ -40,6 +45,16 @@ export async function GET(
         client_address = job.client_address ?? null
         job_title = job.title ?? null
       }
+
+      const { data: options } = await supabase
+        .from('job_estimates')
+        .select('label, selected_at')
+        .eq('job_id', invoice.job_id)
+        .eq('is_current', true)
+      // Only worth saying when there was genuinely a choice to make.
+      if ((options ?? []).length > 1) {
+        chosen_option = (options ?? []).find((o) => o.selected_at)?.label ?? null
+      }
     }
 
     return NextResponse.json({
@@ -47,6 +62,7 @@ export async function GET(
       job_title,
       client_name,
       client_address,
+      chosen_option,
       line_items: invoice.line_items ?? [],
       amount: Number(invoice.amount) || 0,
       status: invoice.status,

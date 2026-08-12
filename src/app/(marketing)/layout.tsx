@@ -11,6 +11,7 @@ export default async function MarketingLayout({
   let navItems = [
     { label: 'Home', href: '/' },
     { label: 'Services', href: '/services' },
+    { label: 'Tile Samples', href: '/tile-samples' },
     { label: 'Our Process', href: '/process' },
     { label: 'Gallery', href: '/gallery' },
     { label: 'About', href: '/about' },

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import type { JobLineItem } from '@/lib/supabase/types'
 import AcceptAndPayButton from './AcceptAndPayButton'
+import OptionComparison, { type PublicOption } from './OptionComparison'
 import ShareEstimateButton from './ShareEstimateButton'
 import PrintButton from '@/components/PrintButton'
 import EstimateMessages from '@/components/EstimateMessages'
@@ -29,6 +30,9 @@ type EstimateResponse = {
   already_viewed: boolean
   scheduled_start: string | null
   estimated_days: number | null
+  // Quote options (migration 048). Length 1 for the vast majority of jobs, in
+  // which case the page renders exactly as it always has.
+  options?: PublicOption[]
 }
 
 const COMPANY_PHONE = '(617) 766-1259'
@@ -222,13 +226,42 @@ export default async function EstimatePage({
   searchParams,
 }: {
   params: Promise<{ token: string }>
-  searchParams: Promise<{ deposit?: string; session_id?: string }>
+  searchParams: Promise<{ deposit?: string; session_id?: string; option?: string }>
 }) {
   const { token } = await params
-  const { deposit } = await searchParams
+  const { deposit, option: optionParam } = await searchParams
 
-  const estimate = await fetchEstimate(token)
-  if (!estimate) notFound()
+  const raw = await fetchEstimate(token)
+  if (!raw) notFound()
+
+  // Which option's full breakdown is open? The ?option= link from the
+  // comparison cards wins; otherwise the active one. Selection lives in the
+  // URL so it survives a refresh and can be texted to a spouse.
+  const options = raw.options ?? []
+  const chosen =
+    options.find((o) => o.key === optionParam) ??
+    options.find((o) => o.is_primary) ??
+    null
+
+  // Overlay the chosen option's payload onto the response. Every piece of JSX
+  // below already reads `estimate.*`, so this keeps the entire existing render
+  // path — sections, flat-quote detection, warranty, payment terms — working
+  // untouched whether the job has one option or five.
+  const estimate: EstimateResponse = chosen
+    ? {
+        ...raw,
+        line_items: chosen.line_items,
+        estimated_cost:
+          chosen.estimated_cost === null ? null : Number(chosen.estimated_cost),
+        estimated_days: chosen.estimated_days,
+        deposit_amount: chosen.deposit_amount,
+        scope_notes: chosen.scope_notes,
+        customer_provides: chosen.customer_provides,
+        warranty_text: chosen.warranty_text,
+        payment_terms_text: chosen.payment_terms_text,
+        payment_methods: chosen.payment_methods,
+      }
+    : raw
 
   const depositSuccess = deposit === 'success' || estimate.accepted
   const depositCancelled = deposit === 'cancelled'
@@ -460,6 +493,15 @@ export default async function EstimatePage({
             </div>
           </section>
         )}
+
+        {/* Good/Better/Best comparison — renders only when there really are
+            multiple options, so a single-price estimate is unchanged. */}
+        <OptionComparison
+          token={token}
+          options={options}
+          activeKey={chosen?.key ?? ''}
+          accepted={depositSuccess}
+        />
 
         {/* Line items */}
         {estimate.line_items.length > 0 && (
@@ -700,11 +742,15 @@ export default async function EstimatePage({
               Ready to move forward?
             </h3>
             <p className="text-sm text-primary-800 mb-5">
-              Accept the estimate and pay the deposit in one step — secured by Stripe.
+              {options.length > 1
+                ? `You're looking at ${chosen?.label ?? 'this option'}. Accept it and pay the deposit in one step — secured by Stripe.`
+                : 'Accept the estimate and pay the deposit in one step — secured by Stripe.'}
             </p>
             <AcceptAndPayButton
               token={token}
               depositAmount={estimate.deposit_amount}
+              optionKey={options.length > 1 ? (chosen?.key ?? null) : null}
+              optionLabel={options.length > 1 ? (chosen?.label ?? null) : null}
             />
           </section>
         )}
@@ -763,7 +809,9 @@ export default async function EstimatePage({
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] z-20 no-print">
           <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto">
             <div className="flex-shrink-0">
-              <div className="text-[11px] text-gray-500 leading-tight">10% deposit</div>
+              <div className="text-[11px] text-gray-500 leading-tight">
+                {options.length > 1 && chosen ? `${chosen.label} · 10% deposit` : '10% deposit'}
+              </div>
               <div className="text-lg font-semibold text-gray-900 leading-tight">
                 {formatCurrency(estimate.deposit_amount)}
               </div>
@@ -771,6 +819,7 @@ export default async function EstimatePage({
             <AcceptAndPayButton
               token={token}
               depositAmount={estimate.deposit_amount}
+              optionKey={options.length > 1 ? (chosen?.key ?? null) : null}
               compact
             />
           </div>

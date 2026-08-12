@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendSMS, AUTO_MESSAGES } from '@/lib/openphone'
+import { sendSMS, AUTO_MESSAGES, toE164 } from '@/lib/openphone'
 import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
-import { requireApiAuth } from '@/lib/apiAuth'
+import { requireApiAuth, currentActorId } from '@/lib/apiAuth'
 import { recomputeJobFinancials } from '@/lib/jobPayments'
+import {
+  recordEstimateVersion,
+  touchesEstimate,
+  estimateMeaningfullyChanged,
+} from '@/lib/estimateVersions'
+import { getReviewUrl } from '@/lib/googleReview'
 
 // Admin client — auth is already enforced upstream by requireApiAuth (which
 // accepts either a session cookie or X-API-Key). Using the service-role client
@@ -100,10 +106,14 @@ export async function PATCH(
       updates.estimated_cost = Math.round(sum * 100) / 100
     }
 
-    // Get the old status before updating
+    // Get the old status before updating. The estimate columns come along so a
+    // quote revision can be compared against what was actually there before —
+    // see the versioning block below.
     const { data: oldJob } = await supabase
       .from('jobs')
-      .select('status, client_phone, client_address, scheduled_start, customer_id')
+      // One literal, not concatenated — supabase-js infers the row type from
+      // this string, and splitting it degrades every field to unknown.
+      .select('status, client_phone, client_address, scheduled_start, customer_id, line_items, estimated_cost, estimated_days, scope_notes, customer_provides, warranty_text, payment_terms_text, payment_methods')
       .eq('id', id)
       .single()
 
@@ -116,6 +126,26 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Capture a quote revision when this PATCH changed the estimate itself
+    // (migration 048). This one hook covers JobLineItems, EstimateTextEditor
+    // and StructuredScopeEditor, since all three save through this route.
+    //
+    // Two filters keep the history worth reading:
+    //   - touchesEstimate: a status or assignment change is not a quote edit.
+    //   - estimateMeaningfullyChanged: line_items is ALSO where material
+    //     purchasing status lives, so the crew marking a bag of thinset as
+    //     'ordered' PATCHes this route with no price change at all. Versioning
+    //     that would bury real revisions under empty ones.
+    // Coalescing (default 10 min, same actor) then folds a burst of small
+    // tweaks into one revision — but never across estimate_sent_at, so
+    // anything the customer has actually seen is preserved on its own.
+    if (touchesEstimate(updates) && oldJob && estimateMeaningfullyChanged(oldJob, job)) {
+      await recordEstimateVersion(supabase, id, {
+        userId: await currentActorId(req),
+        changeNote: 'Edited in the dashboard',
+      })
     }
 
     // If this PATCH touched a payment channel (a manually recorded deposit),
@@ -150,12 +180,20 @@ export async function PATCH(
           triggerType = 'status_completed'
         }
 
-        if (message && triggerType) {
-          sendSMS(phone, message).then(async (result) => {
+        // OpenPhone requires E.164. This path passed the raw DB value straight
+        // through — "(617) 663-8772", "8066831911" — and every one of the 10
+        // status-change texts in message_log failed as a result. Normalize.
+        const e164Phone = toE164(phone)
+        if (message && triggerType && !e164Phone) {
+          console.error('Status-change SMS skipped — cannot normalize phone:', phone)
+        }
+
+        if (message && triggerType && e164Phone) {
+          sendSMS(e164Phone, message).then(async (result) => {
             await supabaseAdmin.from('message_log').insert({
               customer_id: (job as any).customer_id || oldJob.customer_id,
               job_id: id,
-              phone_number: phone,
+              phone_number: e164Phone,
               direction: 'outbound',
               message,
               trigger_type: triggerType,
@@ -224,9 +262,12 @@ async function sendCompletionEmail({
   const balance = Math.max(0, estimatedCost - amountPaid)
   const balanceStr = balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const greeting = firstName ? `Hi ${firstName},` : 'Hi there,'
-  const reviewUrl =
-    process.env.GOOGLE_REVIEW_URL ||
-    'https://www.google.com/maps/place/Aguirre+Modern+Tile'
+  // Validated deep link, or null. The old fallback here was a maps *listing*
+  // URL, which drops the customer on the profile instead of opening the review
+  // box — so the ask converted far worse than it looked like it should. Now an
+  // unconfigured/bad URL omits the CTA entirely rather than shipping a dud link;
+  // /api/cron/review-requests is the automation that actually chases the review.
+  const reviewUrl = getReviewUrl()
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
   const estimateUrl = estimateToken ? `${baseUrl}/estimates/${estimateToken}` : null
   const referralUrl = referralCode ? `${baseUrl}/refer/${referralCode}` : null
@@ -250,11 +291,15 @@ async function sendCompletionEmail({
             </div>`
       }
 
-      <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:18px; margin: 0 0 20px 0; text-align: center;">
-        <p style="font-size: 15px; color:#075985; margin: 0 0 12px 0;">Would you take 30 seconds to leave us a Google review?</p>
-        <p style="font-size: 13px; color:#0c4a6e; margin: 0 0 14px 0;">Five-star reviews are the single biggest reason new customers choose us — it really makes a difference for a small team like ours.</p>
-        <a href="${reviewUrl}" target="_blank" style="display:inline-block; padding:10px 20px; background:#0284c7; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;">Leave a Google review →</a>
-      </div>
+      ${
+        reviewUrl
+          ? `<div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:18px; margin: 0 0 20px 0; text-align: center;">
+              <p style="font-size: 15px; color:#075985; margin: 0 0 12px 0;">Would you take 30 seconds to leave us a Google review?</p>
+              <p style="font-size: 13px; color:#0c4a6e; margin: 0 0 14px 0;">Five-star reviews are the single biggest reason new customers choose us — it really makes a difference for a small team like ours.</p>
+              <a href="${reviewUrl}" target="_blank" style="display:inline-block; padding:10px 20px; background:#0284c7; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; font-size:14px;">Leave a Google review →</a>
+            </div>`
+          : ''
+      }
 
       ${
         referralUrl

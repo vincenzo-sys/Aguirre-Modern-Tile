@@ -139,10 +139,15 @@ export default function GenerateEstimateModal({
   initialTemplate,
   initialAddons,
   initialScopes,
+  optionKey,
   onGenerated,
 }: {
   jobId: string
   hasExistingItems: boolean
+  // Which quote option to price (migration 048). Omit for a single-option job:
+  // the primary option is targeted and jobs.* is written exactly as before.
+  // Naming a secondary option re-prices only that variant.
+  optionKey?: string | null
   // True when this job's estimate has already been sent to the customer.
   // Regenerating then re-prices a live estimate, so we gate it behind an
   // explicit confirm (see confirmReprice below).
@@ -363,6 +368,7 @@ export default function GenerateEstimateModal({
     try {
       const body = {
         job_id: jobId,
+        option_key: optionKey ?? undefined,
         overwrite: hasExistingItems,
         scopes: scopes.map((s, i) => {
           const tmpl = templates.find((t) => t.template_name === s.template_name)

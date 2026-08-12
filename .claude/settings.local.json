@@ -168,7 +168,14 @@
       "Bash(npx eslint *)",
       "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 30)",
       "PowerShell(npx eslint \"src/app/\\(dashboard\\)/dashboard/invoices/[id]/page.tsx\" \"src/app/api/invoices/[id]/route.ts\" 2>&1 | Select-Object -First 40)",
-      "PowerShell(npx next lint --file \"src/app/\\(dashboard\\)/dashboard/invoices/[id]/page.tsx\" --file \"src/app/api/invoices/[id]/route.ts\" 2>&1 | Select-Object -First 40)"
+      "PowerShell(npx next lint --file \"src/app/\\(dashboard\\)/dashboard/invoices/[id]/page.tsx\" --file \"src/app/api/invoices/[id]/route.ts\" 2>&1 | Select-Object -First 40)",
+      "Bash(mkdir -p \"src/components/dashboard/jobs\")",
+      "Bash(mkdir -p \"src/app/\\(dashboard\\)/dashboard/leads/board/new\")",
+      "Bash(mkdir -p \"src/app/\\(dashboard\\)/dashboard/leads/[id]/estimate\")",
+      "Bash(cp \"src/app/\\(dashboard\\)/dashboard/leads/[id]/page.tsx\" \"src/components/dashboard/leads/LeadWorkspace.tsx\")",
+      "Bash(cp \"src/app/\\(dashboard\\)/dashboard/jobs/[id]/page.tsx\" \"src/components/dashboard/jobs/JobOperationsDetail.tsx\")",
+      "Bash(git checkout *)",
+      "Bash(git reset *)"
     ]
   }
 }

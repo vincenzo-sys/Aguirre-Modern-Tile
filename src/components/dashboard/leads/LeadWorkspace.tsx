@@ -15,6 +15,9 @@ import CopyContextButton from '@/components/dashboard/CopyContextButton'
 import GenerateEstimateModal from '@/components/dashboard/GenerateEstimateModal'
 import JobLineItems from '@/components/dashboard/JobLineItems'
 import StructuredScopeEditor from '@/components/dashboard/StructuredScopeEditor'
+import EstimateVersionHistory from '@/components/dashboard/EstimateVersionHistory'
+import EstimateOptionsBar from '@/components/dashboard/EstimateOptionsBar'
+import type { JobEstimateVersion } from '@/lib/estimateVersions'
 import WorkOrderShareLink from '@/components/dashboard/WorkOrderShareLink'
 import { deriveQuoteHints } from '@/lib/quoteHints'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
@@ -177,6 +180,15 @@ export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: bo
   // GenerateEstimateModal's router.refresh() alone can't update our state.
   // Deliberately scoped to the job (not the whole deal) so unsaved edits in
   // the notes / sales-tracking fields survive a regenerate.
+  // Bumped whenever the estimate is re-priced, so EstimateVersionHistory
+  // re-fetches without this component owning its data.
+  const [estimateRev, setEstimateRev] = useState(0)
+
+  // Quote options (migration 048). Most jobs have exactly one, backfilled as
+  // "Standard" — the switcher only renders once a second one exists.
+  const [options, setOptions] = useState<JobEstimateVersion[]>([])
+  const [activeOptionKey, setActiveOptionKey] = useState('')
+
   const reloadJob = useCallback(async () => {
     const jobId = job?.id ?? lead?.converted_job_id
     if (!jobId) return
@@ -184,11 +196,37 @@ export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: bo
     if (!res.ok) return
     const data = (await res.json()) as Job
     setJob(data)
+    // Nudge the quote-history card to re-fetch — a regenerate just wrote a
+    // new revision it can't know about otherwise.
+    setEstimateRev((n) => n + 1)
     if ((data as Job & { estimate_token?: string }).estimate_token) {
       const baseUrl = window.location.origin.replace(/^http:\/\/localhost.*/, 'https://aguirremoderntile.com')
       setEstimateUrl(`${baseUrl}/estimates/${(data as Job & { estimate_token: string }).estimate_token}`)
     }
   }, [job?.id, lead?.converted_job_id])
+
+  const loadOptions = useCallback(async () => {
+    const jobId = job?.id ?? lead?.converted_job_id
+    if (!jobId) return
+    const res = await fetch(`/api/jobs/${jobId}/estimate-options`, { cache: 'no-store' })
+    if (!res.ok) return
+    const data = await res.json()
+    const opts: JobEstimateVersion[] = data.options ?? []
+    setOptions(opts)
+    // Keep the current selection if it survived; otherwise fall back to the
+    // active option so the editors below never point at nothing.
+    setActiveOptionKey((prev) =>
+      opts.some((o) => o.option_key === prev)
+        ? prev
+        : (opts.find((o) => o.is_primary)?.option_key ?? opts[0]?.option_key ?? '')
+    )
+  }, [job?.id, lead?.converted_job_id])
+
+  useEffect(() => {
+    loadOptions()
+  }, [loadOptions, estimateRev])
+
+  const activeOption = options.find((o) => o.option_key === activeOptionKey) ?? null
 
   // Once we know the customer_id, fetch their job history so the contact
   // card can show "Repeat customer — N prior jobs". Exclude the current
@@ -822,9 +860,32 @@ export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: bo
                   generator re-prices the job (a price-edit control), so crew
                   don't get it. JobLineItems below still renders for crew, but
                   with isOwner=false it hides cost/margin and the editor. */}
+              {/* Good/Better/Best switcher. Renders a bare "offer a second
+                  option" control until there actually are two, so a normal
+                  single-price job looks exactly as it did before. */}
+              {isOwner && options.length > 0 && (
+                <EstimateOptionsBar
+                  jobId={job.id}
+                  options={options}
+                  activeKey={activeOptionKey}
+                  onSelect={setActiveOptionKey}
+                  onChanged={async () => {
+                    await loadOptions()
+                    await reloadJob()
+                  }}
+                />
+              )}
+
               {isOwner && (
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-900">Line items</h2>
+                  <h2 className="text-sm font-semibold text-gray-900">
+                    Line items
+                    {activeOption && options.length > 1 && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        · {activeOption.label}
+                      </span>
+                    )}
+                  </h2>
                   {/* Hints derived from the originating quote_request answers
                       (template + sqft) so Vince doesn't re-type what the
                       customer already told us. The modal still shows them as
@@ -836,22 +897,47 @@ export default function LeadWorkspace({ id, isOwner }: { id: string; isOwner: bo
                     initialSqft={job.square_footage ?? quoteHints.initialSqft}
                     initialTemplate={quoteHints.initialTemplate ?? undefined}
                     initialAddons={quoteHints.initialAddons}
-                    initialScopes={Array.isArray(job.scopes) ? job.scopes : null}
+                    initialScopes={
+                      (activeOption?.scopes as Job['scopes']) ??
+                      (Array.isArray(job.scopes) ? job.scopes : null)
+                    }
+                    optionKey={options.length > 1 ? activeOptionKey : null}
                     onGenerated={reloadJob}
                   />
                 </div>
               )}
 
+              {/* Show the ACTIVE option's items. For a single-option job (and
+                  for the primary option generally) these are the same array as
+                  job.line_items, since the primary option mirrors the job. */}
               <JobLineItems
-                items={(job.line_items ?? []) as Job['line_items']}
+                items={
+                  (activeOption?.line_items ?? job.line_items ?? []) as Job['line_items']
+                }
                 jobId={job.id}
                 isOwner={isOwner}
-                marginPercent={isOwner ? job.margin_percent : null}
+                marginPercent={
+                  isOwner
+                    ? (Number(activeOption?.margin_percent ?? job.margin_percent) || null)
+                    : null
+                }
+                optionId={options.length > 1 ? (activeOption?.id ?? null) : null}
+                onSaved={() => setEstimateRev((n) => n + 1)}
               />
 
               <StructuredScopeEditor
                 jobId={job.id}
                 initialScopeNotes={job.scope_notes}
+              />
+
+              {/* Quote history — every revision of this estimate. Renders
+                  nothing until the job has been priced at least once, so a
+                  fresh lead doesn't get an empty card. */}
+              <EstimateVersionHistory
+                jobId={job.id}
+                isOwner={isOwner}
+                refreshKey={estimateRev}
+                onRestored={reloadJob}
               />
             </>
           )}

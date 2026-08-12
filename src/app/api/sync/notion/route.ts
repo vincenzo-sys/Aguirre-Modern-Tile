@@ -24,6 +24,80 @@ function secretsMatch(provided: string, expected: string): boolean {
 
 export const maxDuration = 60
 
+// ── Customer de-duplication ────────────────────────────────────────────
+//
+// customers only has PARTIAL unique indexes (migration 001):
+//     UNIQUE (LOWER(email)) WHERE email IS NOT NULL
+//     UNIQUE (phone)        WHERE phone IS NOT NULL
+// A row with BOTH null is invisible to the database's own dedupe. A Notion page
+// with no Phone and no Email therefore used to fall through to a bare INSERT on
+// every job and every run — that is how "Aaron" collected three customer rows.
+//
+// Matching rules, strongest first:
+//   1. phone, compared digits-only on the right-most 10 (so "(978) 423-4275"
+//      matches "9784234275"). The old code used .eq() on the raw string and
+//      missed every reformatted number.
+//   2. email, case-insensitive exact.
+//   3. name — ONLY when the page has no phone AND no email, and ONLY when
+//      exactly one existing customer matches. Two different "John Smith"s must
+//      never be fused: a duplicate is annoying, a wrong merge is unrecoverable.
+
+type CustomerLite = {
+  id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  address: string | null
+}
+
+const last10 = (p: string | null | undefined): string | null => {
+  const d = (p || '').replace(/\D/g, '')
+  return d.length >= 10 ? d.slice(-10) : null
+}
+
+// Collapse "Aaron", "Aaron ", "Aaron (GC)", "Aaron (gc)" onto one key.
+const normName = (n: string | null | undefined): string =>
+  (n || '')
+    .toLowerCase()
+    .replace(/\((?:gc|g\.c\.|general contractor)\)/g, ' ')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+// Names too generic to ever be a dedupe key.
+const UNMATCHABLE_NAMES = new Set(['', 'unknown', 'n a', 'customer', 'client'])
+
+function matchCustomer(
+  cache: CustomerLite[],
+  name: string | null,
+  email: string | null,
+  phone: string | null
+): { id: string | null; how: string } {
+  const p10 = last10(phone)
+  if (p10) {
+    const hit = cache.find((c) => last10(c.phone) === p10)
+    if (hit) return { id: hit.id, how: 'phone' }
+  }
+
+  if (email) {
+    const target = email.trim().toLowerCase()
+    const hit = cache.find((c) => (c.email || '').trim().toLowerCase() === target)
+    if (hit) return { id: hit.id, how: 'email' }
+  }
+
+  // Name fallback only for records with nothing stronger to match on.
+  if (!p10 && !email && name) {
+    const key = normName(name)
+    if (key && !UNMATCHABLE_NAMES.has(key)) {
+      const hits = cache.filter((c) => normName(c.name) === key)
+      if (hits.length === 1) return { id: hits[0].id, how: 'name' }
+      if (hits.length > 1) return { id: null, how: `ambiguous-name:${hits.length}` }
+    }
+  }
+
+  return { id: null, how: 'no-match' }
+}
+
 // POST /api/sync/notion — Pull all jobs from Notion, upsert into Supabase
 export async function POST(req: NextRequest) {
   // Verify authorization
@@ -49,9 +123,20 @@ export async function POST(req: NextRequest) {
     // 1. Fetch all jobs from Notion
     const notionJobs = await fetchAllNotionJobs()
 
+    // Read every customer ONCE. Newly created customers get pushed onto this
+    // cache, so two Notion jobs for the same brand-new customer inside a single
+    // run reuse the first row instead of inserting a second one. (That is
+    // literally what happened to "Aaron": two rows, 62 seconds apart, one run.)
+    const { data: customerRows } = await supabaseAdmin
+      .from('customers')
+      .select('id, name, email, phone, address')
+      .limit(5000)
+    const customerCache: CustomerLite[] = customerRows ?? []
+
     let synced = 0
     let customersCreated = 0
     let errors: string[] = []
+    let ambiguous: string[] = []
 
     for (const nj of notionJobs) {
       try {
@@ -59,29 +144,34 @@ export async function POST(req: NextRequest) {
         let customerId: string | null = null
 
         if (nj.client_name && nj.client_name !== 'Unknown') {
-          // Try to find existing customer by email or phone
-          if (nj.client_email) {
-            const { data: existing } = await supabaseAdmin
-              .from('customers')
-              .select('id')
-              .ilike('email', nj.client_email)
-              .limit(1)
-              .single()
-            if (existing) customerId = existing.id
-          }
+          const { id, how } = matchCustomer(
+            customerCache,
+            nj.client_name,
+            nj.client_email,
+            nj.client_phone
+          )
+          customerId = id
 
-          if (!customerId && nj.client_phone) {
-            const { data: existing } = await supabaseAdmin
-              .from('customers')
-              .select('id')
-              .eq('phone', nj.client_phone)
-              .limit(1)
-              .single()
-            if (existing) customerId = existing.id
-          }
-
-          // Create new customer if not found
-          if (!customerId) {
+          if (customerId) {
+            // Backfill contact details the existing row is missing, so next run
+            // this customer matches on a strong key instead of on name. Safe
+            // against the unique indexes: we only reach here after failing to
+            // find anyone by this email/phone, so nobody else holds them.
+            const existing = customerCache.find((c) => c.id === customerId)!
+            const patch: Partial<CustomerLite> = {}
+            if (!existing.email && nj.client_email) patch.email = nj.client_email
+            if (!existing.phone && nj.client_phone) patch.phone = nj.client_phone
+            if (!existing.address && nj.client_address) patch.address = nj.client_address
+            if (Object.keys(patch).length > 0) {
+              await supabaseAdmin.from('customers').update(patch).eq('id', customerId)
+              Object.assign(existing, patch)
+            }
+          } else if (how.startsWith('ambiguous-name')) {
+            // Several customers share this name and the page has no phone or
+            // email to break the tie. Creating another row is the exact bug this
+            // guard exists to stop — leave the job unlinked and report it.
+            ambiguous.push(`${nj.title} (client "${nj.client_name}", ${how})`)
+          } else {
             const { data: newCust } = await supabaseAdmin
               .from('customers')
               .insert({
@@ -93,13 +183,17 @@ export async function POST(req: NextRequest) {
                   : nj.lead_source === 'Repeat Customer' ? 'repeat'
                   : nj.lead_source === 'Google' || nj.lead_source === 'Instagram' || nj.lead_source === 'Facebook' ? 'website'
                   : 'manual',
-                notion_page_id: nj.notion_page_id,
+                // NOTE: deliberately NOT setting notion_page_id here. It holds
+                // the JOB page's id, not a customer page's — stamping it on the
+                // customer row is wrong, and it made a customer look "linked" to
+                // Notion when nothing could ever match it back.
               })
-              .select('id')
+              .select('id, name, email, phone, address')
               .single()
 
             if (newCust) {
               customerId = newCust.id
+              customerCache.push(newCust)
               customersCreated++
             }
           }
@@ -174,6 +268,10 @@ export async function POST(req: NextRequest) {
       total_notion_jobs: notionJobs.length,
       synced,
       customers_created: customersCreated,
+      // Jobs left without a customer because the name matched more than one
+      // record and the Notion page had no phone/email to disambiguate. Add a
+      // Phone or Email to those pages, or link the job by hand.
+      unlinked_ambiguous: ambiguous.length > 0 ? ambiguous : undefined,
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (err) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { sendSMS, AUTO_MESSAGES, toE164 } from '@/lib/openphone'
+import { sendSMS, AUTO_MESSAGES, toE164, smsConfigError } from '@/lib/openphone'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 
 // Daily nurture cron. Runs at 8 AM ET (13:00 UTC) via vercel.json.
@@ -53,10 +53,21 @@ interface NudgeResult {
   error?: string
 }
 
+// Everything the run needs to explain itself. The old signature returned a
+// bare NudgeResult[], so "the query blew up", "SMS isn't configured" and
+// "nothing to do today" all came back as the same empty array.
+interface NudgeRun {
+  nudges: NudgeResult[]
+  candidates: number
+  blocked: number
+  queryError?: string
+  configError?: string
+}
+
 async function processNudges(
   supabase: ReturnType<typeof getSupabase>,
   dryRun: boolean
-): Promise<NudgeResult[]> {
+): Promise<NudgeRun> {
   const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
   const lastNudgeBefore = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString()
 
@@ -72,7 +83,20 @@ async function processNudges(
     .not('client_phone', 'is', null)
     .not('estimate_token', 'is', null)
 
-  if (error || !jobs) return []
+  // Surface the query error instead of swallowing it. findStaleLeads below
+  // already lost months of stale-lead detection to exactly this pattern (a bad
+  // enum value made Postgres reject the whole query and `return []` hid it).
+  if (error) {
+    return { nudges: [], candidates: 0, blocked: 0, queryError: error.message }
+  }
+  if (!jobs) return { nudges: [], candidates: 0, blocked: 0 }
+
+  // Don't attempt sends that cannot succeed — say so once, loudly, and leave
+  // the jobs untouched so they're still eligible tomorrow.
+  const configError = smsConfigError()
+  if (configError && !dryRun) {
+    return { nudges: [], candidates: jobs.length, blocked: jobs.length, configError }
+  }
 
   const results: NudgeResult[] = []
 
@@ -94,20 +118,19 @@ async function processNudges(
     const estimateUrl = `${SITE_URL}/estimates/${job.estimate_token}`
     const message = AUTO_MESSAGES.estimate_viewed_nudge(estimateUrl, nudgeNumber)
 
-    const sms = dryRun
-      ? { success: true as const, messageId: 'dry-run' }
+    const sms: { success: boolean; messageId?: string; error?: string } = dryRun
+      ? { success: true, messageId: 'dry-run' }
       : await sendSMS(phone, message)
 
-    if (sms.success && !dryRun) {
-      await supabase
-        .from('jobs')
-        .update({
-          follow_up_count: nudgeNumber,
-          last_contact_at: new Date().toISOString(),
-        })
-        .eq('id', job.id)
+    const problems: string[] = []
+    if (!sms.success) problems.push(sms.error || 'send failed')
 
-      await supabase.from('message_log').insert({
+    if (!dryRun) {
+      // Log EVERY attempt, win or lose. The old code inserted only on success,
+      // so a failing send wrote no message_log row AND left follow_up_count at
+      // 0 — the cron was indistinguishable from one that had never run. That's
+      // how this went unnoticed since April with 25 people queued up.
+      const { error: insErr } = await supabase.from('message_log').insert({
         customer_id: job.customer_id,
         job_id: job.id,
         phone_number: phone,
@@ -115,8 +138,22 @@ async function processNudges(
         message,
         trigger_type: 'estimate_viewed_nudge',
         openphone_message_id: sms.messageId ?? null,
-        status: 'sent',
+        status: sms.success ? 'sent' : 'failed',
       })
+      if (insErr) problems.push(`message_log insert failed: ${insErr.message}`)
+
+      // Only burn a nudge when the text actually went out. A failed send should
+      // be retried tomorrow, not counted against the 3-nudge cap.
+      if (sms.success) {
+        const { error: updErr } = await supabase
+          .from('jobs')
+          .update({
+            follow_up_count: nudgeNumber,
+            last_contact_at: new Date().toISOString(),
+          })
+          .eq('id', job.id)
+        if (updErr) problems.push(`jobs update failed: ${updErr.message}`)
+      }
     }
 
     results.push({
@@ -124,12 +161,12 @@ async function processNudges(
       client_name: job.client_name,
       phone,
       nudge_number: nudgeNumber,
-      sms_ok: sms.success,
-      error: sms.success ? undefined : sms.error,
+      sms_ok: sms.success && problems.length === 0,
+      error: problems.length ? problems.join('; ') : undefined,
     })
   }
 
-  return results
+  return { nudges: results, candidates: jobs.length, blocked: 0 }
 }
 
 async function findStaleLeads(supabase: ReturnType<typeof getSupabase>): Promise<Array<{
@@ -198,17 +235,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const dryRun = new URL(req.url).searchParams.get('dry') === '1'
+  const params = new URL(req.url).searchParams
+  const dryRun = params.get('dry') === '1'
   const supabase = getSupabase()
 
-  const [nudges, staleLeads, morningQueue] = await Promise.all([
+  // ?diag=1 — answer "is this thing wired up?" without sending anything or
+  // posting to Discord. Sends nothing even if SMS is configured.
+  if (params.get('diag') === '1') {
+    const diagRun = await processNudges(supabase, true)
+    return NextResponse.json({
+      ok: true,
+      diag: true,
+      sms_config: smsConfigError() ?? 'ok',
+      discord_config: process.env.DISCORD_OPS_WEBHOOK ? 'ok' : 'DISCORD_OPS_WEBHOOK not set',
+      nudge_candidates: diagRun.candidates,
+      nudge_query_error: diagRun.queryError ?? null,
+      would_text: diagRun.nudges.map((n) => ({ client_name: n.client_name, nudge: n.nudge_number })),
+    })
+  }
+
+  const [nudgeRun, staleLeads, morningQueue] = await Promise.all([
     processNudges(supabase, dryRun),
     findStaleLeads(supabase),
     findMorningQueue(supabase),
   ])
 
+  const nudges = nudgeRun.nudges
   const nudgesSent = nudges.filter((n) => n.sms_ok).length
   const nudgesFailed = nudges.filter((n) => !n.sms_ok).length
+  // Anything that stopped the run before a send even happened.
+  const blockers = [nudgeRun.configError, nudgeRun.queryError].filter(Boolean) as string[]
 
   // Post daily summary to Discord (if webhook configured)
   const today = new Date().toLocaleDateString('en-US', {
@@ -219,11 +275,27 @@ export async function GET(req: NextRequest) {
   const discordFields: { name: string; value: string; inline?: boolean }[] = [
     {
       name: 'Estimate nudges',
-      value: nudges.length === 0
-        ? 'No follow-ups needed today'
-        : `${nudgesSent} sent${nudgesFailed ? ` · ${nudgesFailed} failed` : ''}`,
+      value: blockers.length
+        // Never again report "no follow-ups needed" when the truth is "N people
+        // were queued and the send path is broken".
+        ? `⚠️ ${nudgeRun.blocked} queued, 0 sent — ${blockers.join(' | ')}`
+        : nudges.length === 0
+          ? 'No follow-ups needed today'
+          : `${nudgesSent} sent${nudgesFailed ? ` · ${nudgesFailed} failed` : ''}`,
       inline: true,
     },
+    ...(nudgesFailed > 0
+      ? [{
+          name: 'Why nudges failed',
+          value: nudges
+            .filter((n) => !n.sms_ok)
+            .slice(0, 5)
+            .map((n) => `${n.client_name}: ${n.error ?? 'unknown'}`)
+            .join('\n')
+            .slice(0, 1000),
+          inline: false,
+        }]
+      : []),
     {
       name: 'Stale leads (5d+)',
       value: staleLeads.length === 0
@@ -245,7 +317,7 @@ export async function GET(req: NextRequest) {
       {
         title: `☕ Daily briefing — ${today}`,
         color:
-          nudgesFailed > 0
+          nudgesFailed > 0 || blockers.length
             ? DISCORD_COLORS.amber
             : staleLeads.length > 0 || morningQueue.length > 0
               ? DISCORD_COLORS.blue
@@ -258,10 +330,17 @@ export async function GET(req: NextRequest) {
   })
 
   return NextResponse.json({
-    ok: true,
+    ok: blockers.length === 0,
     dry_run: dryRun,
     ran_at: new Date().toISOString(),
-    nudges: { sent: nudgesSent, failed: nudgesFailed, details: nudges },
+    blockers,
+    nudges: {
+      candidates: nudgeRun.candidates,
+      sent: nudgesSent,
+      failed: nudgesFailed,
+      blocked: nudgeRun.blocked,
+      details: nudges,
+    },
     stale_leads: staleLeads,
     morning_queue: morningQueue,
     discord: discordResult,

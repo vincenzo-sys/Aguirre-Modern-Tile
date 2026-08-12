@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { requireApiAuth } from '@/lib/apiAuth'
+import { requireApiAuth, currentActorId } from '@/lib/apiAuth'
+import { recordEstimateVersion } from '@/lib/estimateVersions'
 import { generateEstimate } from '@/lib/estimator'
 import type {
   MaterialCatalogRow,
@@ -49,6 +50,11 @@ interface GenerateBody {
   customer_provides?: string[]
   warranty_years?: number
   overwrite?: boolean
+  // Which quote option to price (migration 048). Omit for the normal
+  // single-option job — the primary option is targeted and jobs.* is written
+  // exactly as before. Naming a NON-primary option re-prices that variant
+  // only, leaving the job (and therefore the Stripe deposit) untouched.
+  option_key?: string | null
   // Optional manual override of miles from Revere base to the jobsite.
   // When omitted, the route geocodes the customer/job address and falls
   // back to the operating_costs minimum if that fails.
@@ -131,12 +137,39 @@ export async function POST(req: NextRequest) {
   }
 
   const job = jobRes.data
-  const hasExistingItems = Array.isArray(job.line_items) && job.line_items.length > 0
+
+  // Which option is being priced? Absent (or naming the primary one) keeps the
+  // original behaviour: write jobs.* and record a version from it. Naming a
+  // secondary option switches to the payload path, which writes only that
+  // option — so pricing "Premium" can't move the number Stripe reads.
+  let targetOption: { option_key: string; is_primary: boolean; line_items: unknown } | null = null
+  if (body.option_key) {
+    const { data: opt } = await supabase
+      .from('job_estimates')
+      .select('option_key, is_primary, line_items')
+      .eq('job_id', body.job_id)
+      .eq('option_key', body.option_key)
+      .eq('is_current', true)
+      .maybeSingle()
+    if (!opt) {
+      return NextResponse.json(
+        { error: `Option "${body.option_key}" not found on this job.` },
+        { status: 404 }
+      )
+    }
+    targetOption = opt
+  }
+  const writesToJob = !targetOption || targetOption.is_primary
+
+  const existingItems = targetOption
+    ? (targetOption.line_items as unknown[] | null)
+    : (job.line_items as unknown[] | null)
+  const hasExistingItems = Array.isArray(existingItems) && existingItems.length > 0
   if (hasExistingItems && !body.overwrite) {
     return NextResponse.json(
       {
         error: 'Job already has line items. Pass overwrite: true to replace.',
-        existing_line_item_count: job.line_items.length,
+        existing_line_item_count: (existingItems as unknown[]).length,
       },
       { status: 409 }
     )
@@ -219,9 +252,9 @@ export async function POST(req: NextRequest) {
   // 'needed' just because the estimate was re-priced (the regenerate would
   // otherwise wipe two weeks of purchasing progress). Match on section +
   // description; only carry forward a non-default status.
-  if (hasExistingItems && Array.isArray(job.line_items)) {
+  if (hasExistingItems && Array.isArray(existingItems)) {
     const prevStatus = new Map<string, string>()
-    for (const li of job.line_items as Array<Record<string, unknown>>) {
+    for (const li of existingItems as Array<Record<string, unknown>>) {
       const status = li?.status as string | undefined
       if (li?.category === 'materials' && status && status !== 'needed') {
         const section = typeof li.section === 'string' ? li.section : ''
@@ -262,30 +295,60 @@ export async function POST(req: NextRequest) {
   const paymentTermsText = job.payment_terms_text ?? defaults?.payment_terms_text ?? null
   const paymentMethods = job.payment_methods ?? defaults?.payment_methods ?? null
 
-  const { data: updated, error: updateError } = await supabase
-    .from('jobs')
-    .update({
-      line_items: result.line_items,
-      scope_notes: result.scope_notes,
-      scopes: scopes,
-      estimated_cost: result.total,
-      estimated_days: Math.max(1, Math.round(result.labor_days)),
-      margin_percent: result.margin_percent,
-      customer_provides: customerProvidesText,
-      warranty_text: warrantyText,
-      payment_terms_text: paymentTermsText,
-      payment_methods: paymentMethods,
-    })
-    .eq('id', body.job_id)
-    .select()
-    .single()
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
+  const estimatePayload = {
+    line_items: result.line_items,
+    scope_notes: result.scope_notes,
+    scopes: scopes,
+    estimated_cost: result.total,
+    estimated_days: Math.max(1, Math.round(result.labor_days)),
+    margin_percent: result.margin_percent,
+    customer_provides: customerProvidesText,
+    warranty_text: warrantyText,
+    payment_terms_text: paymentTermsText,
+    payment_methods: paymentMethods,
   }
+
+  // The primary option (and every single-option job) writes straight to jobs.*
+  // as it always has. A secondary option skips this entirely and is written
+  // through the RPC payload path below, so re-pricing "Premium" never disturbs
+  // the job the Stripe deposit and work order read from.
+  let updated = job
+  if (writesToJob) {
+    const { data, error: updateError } = await supabase
+      .from('jobs')
+      .update(estimatePayload)
+      .eq('id', body.job_id)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+    updated = data
+  }
+
+  // Capture the revision (migration 048). Until this existed, the write above
+  // destroyed the prior estimate outright — a re-price left no record of what
+  // the customer had previously been quoted.
+  //
+  // coalesce_seconds: 0 — a re-generate is a deliberate act, not a nudge, so it
+  // always earns its own version even if the last one was minutes ago.
+  const version = await recordEstimateVersion(supabase, body.job_id, {
+    optionKey: targetOption?.option_key ?? null,
+    userId: await currentActorId(req),
+    coalesceSeconds: 0,
+    // When jobs.* was just written, the RPC reads it back (payload omitted).
+    // Otherwise the freshly computed payload IS the source of truth.
+    payload: writesToJob ? null : estimatePayload,
+    changeNote: hasExistingItems
+      ? `Re-priced — ${scopes.length} scope${scopes.length === 1 ? '' : 's'}, ${result.line_items.length} line items`
+      : `Estimate generated — ${scopes.length} scope${scopes.length === 1 ? '' : 's'}`,
+  })
 
   return NextResponse.json({
     job: updated,
+    option_key: targetOption?.option_key ?? null,
+    estimate_version: version?.version ?? null,
     summary: {
       total: result.total,
       deposit: result.deposit,

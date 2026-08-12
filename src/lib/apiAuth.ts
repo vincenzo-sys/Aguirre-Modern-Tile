@@ -30,6 +30,35 @@ export async function requireApiAuth(req: NextRequest): Promise<NextResponse | n
 }
 
 /**
+ * The profiles.id of the human behind this request, or null.
+ *
+ * requireApiAuth deliberately returns only a response-or-null, so it can't tell
+ * a caller WHO authenticated — fine for gating, useless for attribution. This
+ * sibling exists so writes can record authorship (e.g. job_estimates.created_by,
+ * which drives both the "who changed this quote" column in version history and
+ * the coalescing rule that refuses to merge two people's edits into one
+ * revision).
+ *
+ * Returns null for X-API-Key callers: they are a trusted server, not a person,
+ * and inventing a profile id for them would misattribute the change.
+ */
+export async function currentActorId(req: NextRequest): Promise<string | null> {
+  const provided = req.headers.get('x-api-key') ?? req.headers.get('X-API-Key')
+  const expected = process.env.TILE_API_KEY
+  if (provided && expected && provided === expected) return null
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Like requireApiAuth, but additionally requires OWNER privileges for the
  * mutation to proceed. Needed because route handlers use the service-role
  * Supabase client, which bypasses the "owner manage" RLS policy — so the

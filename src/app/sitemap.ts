@@ -15,6 +15,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/blog`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.7 },
     { url: `${baseUrl}/process`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },
     { url: `${baseUrl}/book-online`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },
+    // Tile Match Kit — top-of-funnel offer page, ranked high on purpose since
+    // "tile samples" searches are how shoppers enter before they hire.
+    { url: `${baseUrl}/tile-samples`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
   ]
 
   // Service detail pages

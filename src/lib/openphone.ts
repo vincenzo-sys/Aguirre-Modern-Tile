@@ -12,6 +12,22 @@ function getPhoneNumberId(): string {
   return process.env.OPENPHONE_PHONE_NUMBER_ID || ''
 }
 
+// Preflight for anything that sends SMS in bulk.
+//
+// sendSMS() fails one message at a time and hands the reason back to a caller
+// that has historically thrown it away, so a missing env var was
+// indistinguishable from "nobody needed a text today". Every outbound SMS this
+// app has ever attempted failed (0 of 11 in message_log) and nothing noticed.
+// Crons call this FIRST and report the misconfiguration instead of silently
+// attempting N sends that cannot possibly succeed.
+export function smsConfigError(): string | null {
+  const missing: string[] = []
+  if (!process.env.OPENPHONE_API_KEY) missing.push('OPENPHONE_API_KEY')
+  if (!process.env.OPENPHONE_PHONE_NUMBER_ID) missing.push('OPENPHONE_PHONE_NUMBER_ID')
+  if (!missing.length) return null
+  return `SMS disabled — missing env var(s): ${missing.join(', ')}`
+}
+
 async function openphoneFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${OPENPHONE_API_BASE}${path}`, {
     ...options,

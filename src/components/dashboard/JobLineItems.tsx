@@ -84,10 +84,18 @@ export default function JobLineItems({
   jobId,
   isOwner = false,
   marginPercent = null,
+  optionId,
+  onSaved,
 }: {
   items: JobLineItem[]
   jobId?: string
   isOwner?: boolean
+  // Which quote option these items belong to (migration 048). Omitted on the
+  // ops screens, where the job has already been won and options are moot —
+  // those keep saving straight to the job exactly as before.
+  optionId?: string | null
+  // Fired after a successful save so the parent can refresh options/history.
+  onSaved?: () => void
   // Last-generated profit margin (jobs.margin_percent). Shown in the footer
   // next to the total. Hand edits to line items don't update this until the
   // next regenerate — we surface a "stale" hint when items have been
@@ -207,12 +215,19 @@ export default function JobLineItems({
     setLiveItems(next)
     setUpdating(true)
     try {
-      const res = await fetch(`/api/jobs/${jobId}`, {
+      // Editing a named option writes to that option (which mirrors onto the
+      // job only when it's the active one). Without an optionId this is the
+      // original job-level save, unchanged.
+      const url = optionId
+        ? `/api/jobs/${jobId}/estimate-options/${optionId}`
+        : `/api/jobs/${jobId}`
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ line_items: next }),
       })
       if (!res.ok) throw new Error('Failed to save')
+      onSaved?.()
     } catch (err) {
       console.error(err)
       setLiveItems(original)

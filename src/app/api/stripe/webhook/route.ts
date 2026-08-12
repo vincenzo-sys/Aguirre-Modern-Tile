@@ -8,6 +8,7 @@ import { buildIcs } from '@/lib/ics'
 import { postToDiscord, DISCORD_COLORS } from '@/lib/discord'
 import { deriveScheduledEnd } from '@/lib/jobScheduling'
 import { recomputeJobFinancials } from '@/lib/jobPayments'
+import { confirmKitPayment } from '@/lib/tileKit'
 import { Resend } from 'resend'
 import type Stripe from 'stripe'
 
@@ -107,6 +108,15 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // Tile Match Kit purchases. The /tile-samples/thanks page already confirms
+  // these from the browser, so this only catches customers who close the tab
+  // before the redirect lands. confirmKitPayment is idempotent, so running
+  // both is harmless.
+  if (session.metadata?.type === 'tile_kit') {
+    await confirmKitPayment(session)
+    return
+  }
+
   // Only handle estimate-deposit checkout sessions
   if (session.metadata?.type !== 'estimate_deposit') return
   if (session.payment_status !== 'paid') return

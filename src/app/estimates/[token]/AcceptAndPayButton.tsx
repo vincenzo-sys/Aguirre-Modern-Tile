@@ -15,10 +15,16 @@ export default function AcceptAndPayButton({
   token,
   depositAmount,
   compact = false,
+  optionKey = null,
+  optionLabel = null,
 }: {
   token: string
   depositAmount: number
   compact?: boolean
+  // Which quote option this button accepts. Null for a single-option estimate,
+  // where the server just uses whatever the job already holds.
+  optionKey?: string | null
+  optionLabel?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,6 +35,8 @@ export default function AcceptAndPayButton({
     try {
       const res = await fetch(`/api/public/estimates/${token}/checkout`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(optionKey ? { option_key: optionKey } : {}),
       })
       const data = await res.json()
       if (!res.ok || !data.url) {
@@ -62,7 +70,11 @@ export default function AcceptAndPayButton({
         ) : (
           <>
             <CheckCircle2 className={icon} />
-            {compact ? 'Accept & Pay' : `Accept & Pay ${formatCurrency(depositAmount)} Deposit`}
+            {compact
+              ? 'Accept & Pay'
+              : optionLabel
+                ? `Choose ${optionLabel} — Pay ${formatCurrency(depositAmount)} Deposit`
+                : `Accept & Pay ${formatCurrency(depositAmount)} Deposit`}
           </>
         )}
       </button>

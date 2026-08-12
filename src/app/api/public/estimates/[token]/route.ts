@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { publicLineItems, toPublicOption, depositFor } from '@/lib/publicEstimate'
 
 // GET /api/public/estimates/[token]
 // Public — no auth. Returns sanitized estimate data for a shareable URL.
+//
+// Everything served here is world-readable to anyone holding the token, so the
+// allow-listing lives in @/lib/publicEstimate where it is unit-tested rather
+// than inline where it would be a judgement call. See that file for what must
+// never escape and why.
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -31,6 +38,22 @@ export async function GET(
         .eq('id', job.id)
     }
 
+    // Quote options (migration 048). A job with a single option renders exactly
+    // as it always has — the comparison UI only appears once there are two.
+    // Note the select list: margin_percent is deliberately absent.
+    const { data: optionRows } = await supabase
+      .from('job_estimates')
+      .select(
+        'option_key, label, blurb, sort_order, is_primary, selected_at, line_items, scope_notes, estimated_cost, estimated_days, customer_provides, warranty_text, payment_terms_text, payment_methods'
+      )
+      .eq('job_id', job.id)
+      .eq('is_current', true)
+      .order('sort_order', { ascending: true })
+
+    const options = (optionRows ?? []).map((o) =>
+      toPublicOption(o as unknown as Record<string, unknown>)
+    )
+
     return NextResponse.json({
       title: job.title,
       client_name: job.client_name,
@@ -42,17 +65,16 @@ export async function GET(
       warranty_text: job.warranty_text ?? null,
       payment_terms_text: job.payment_terms_text ?? null,
       payment_methods: job.payment_methods ?? null,
-      line_items: job.line_items ?? [],
+      line_items: publicLineItems(job.line_items),
       estimated_cost: job.estimated_cost,
-      deposit_amount: job.estimated_cost
-        ? Math.round(Number(job.estimated_cost) * 0.1 * 100) / 100
-        : 0,
+      deposit_amount: depositFor(job.estimated_cost),
       amount_paid: job.amount_paid ?? 0,
       accepted: !!job.estimate_accepted_at,
       accepted_at: job.estimate_accepted_at ?? null,
       already_viewed: !!job.estimate_viewed_at,
       scheduled_start: job.scheduled_start ?? null,
       estimated_days: job.estimated_days ?? null,
+      options,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

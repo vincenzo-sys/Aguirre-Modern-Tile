@@ -5,6 +5,7 @@ import { Upload, X, Camera, Check, Loader2 } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { validateContact } from '@/lib/validation'
 import { uploadQuotePhotos } from '@/lib/uploadQuotePhotos'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 export default function PhotoUploadForm() {
   const [files, setFiles] = useState<File[]>([])
@@ -33,6 +34,14 @@ export default function PhotoUploadForm() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Invisible spam signals. This is the form the Aug 2026 bot campaign was
+  // actually hitting — every one of those leads came through with
+  // projectType 'other' and a junk answers.description, which is this form's
+  // exact payload shape. Neither signal is visible to a real customer.
+  const [honeypot, setHoneypot] = useState('')
+  const mountedAt = useRef<number>(Date.now())
+  const [turnstileToken, setTurnstileToken] = useState('')
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || [])
@@ -95,6 +104,9 @@ export default function PhotoUploadForm() {
         projectType: 'other',
         source: 'quote',
         answers: formData.description ? { description: formData.description } : {},
+        website: honeypot,
+        elapsedMs: Date.now() - mountedAt.current,
+        turnstileToken,
       }
 
       const [emailRes, quoteRes] = await Promise.all([
@@ -185,6 +197,23 @@ export default function PhotoUploadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        Honeypot — off-screen rather than display:none, since bots skip hidden
+        inputs far more often than they skip laid-out ones. aria-hidden and
+        tabIndex=-1 keep it out of screen readers and the tab order.
+      */}
+      <div aria-hidden="true" className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden">
+        <label htmlFor="website-pu">Website (leave blank)</label>
+        <input
+          type="text"
+          id="website-pu"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
+      </div>
       {/* Photo Upload Area */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -302,6 +331,9 @@ export default function PhotoUploadForm() {
           <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
+
+      {/* Renders nothing until the Turnstile site key is configured. */}
+      <TurnstileWidget onToken={setTurnstileToken} />
 
       <button
         type="submit"

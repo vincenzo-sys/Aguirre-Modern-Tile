@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
+import { checkSpam, verifyTurnstile } from '@/lib/spamCheck'
 import { decideReferralAttribution, leadSourceFor } from '@/lib/referral'
 import { createNotionJob } from '@/lib/notion'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
@@ -53,14 +54,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Spam gate ────────────────────────────────────────────────────────
+    // A bot campaign in Aug 2026 pushed 15 fake leads through the validation
+    // above, and each one fired the whole automation chain — including a
+    // confirmation email to whatever address the bot supplied, several of
+    // which belonged to real strangers. The gate below decides whether those
+    // side effects are allowed to run.
+    //
+    // It QUARANTINES rather than rejects: the lead row is still written, so a
+    // false positive costs one click in the dashboard instead of a customer.
+    // And the response is identical either way, so a bot gets no feedback to
+    // tune against.
+    const verdict = checkSpam({
+      name,
+      email,
+      phone,
+      text: [answers.description, answers.additionalNotes, answers.notes]
+        .filter(Boolean)
+        .join(' '),
+      honeypot: typeof body.website === 'string' ? body.website : '',
+      elapsedMs: typeof body.elapsedMs === 'number' ? body.elapsedMs : null,
+      turnstile: await verifyTurnstile(body.turnstileToken, ip),
+    })
+    if (verdict.isSpam) {
+      console.warn(
+        `[spam] quarantined quote from "${name}" <${email}> ${phone} — score ${verdict.score}: ${verdict.reasons.join(', ')}`
+      )
+    }
+
     // Save to Supabase if configured
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-      // Find or create customer record
+      // Find or create customer record. Skipped entirely for a quarantined
+      // lead — this is what kept putting junk in the CRM and creating
+      // OpenPhone contacts for numbers that don't exist.
       let customerId: string | null = null
       let existingOpenPhoneId: string | null = null
-      try {
+      // A quarantined lead never becomes a customer: customerId stays null, so
+      // the quote row below saves unattached and the CRM stays clean.
+      if (!verdict.isSpam) try {
         // Try email match first
         if (email) {
           const { data: existing } = await supabase
@@ -174,8 +207,14 @@ export async function POST(req: NextRequest) {
           client_phone: phone,
           project_type: projectType,
           answers,
-          status: 'new',
+          // Quarantined leads land straight in 'archived' so they never reach
+          // the leads board or the daily-nurture cron, which picks up
+          // unconverted leads at the 5-day mark and would SMS them.
+          status: verdict.isSpam ? 'archived' : 'new',
           customer_id: customerId,
+          is_spam: verdict.isSpam,
+          spam_score: verdict.score,
+          spam_reasons: verdict.reasons.length > 0 ? verdict.reasons : null,
         })
         .select('id')
         .single()
@@ -185,7 +224,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Create a page in Notion's Tile Jobs Dashboard (non-blocking)
-      if (process.env.NOTION_API_TOKEN) {
+      if (process.env.NOTION_API_TOKEN && !verdict.isSpam) {
         const notionJobType: Record<string, string> = {
           bathroom: 'Bathroom',
           shower: 'Bathroom',
@@ -214,11 +253,20 @@ export async function POST(req: NextRequest) {
       // Customer confirmation — fire-and-forget so a Resend or OpenPhone
       // outage doesn't fail the form. Closes the silence between submit and
       // Vince's first reply, which is the biggest single drop-off point.
-      const firstName = name.split(' ')[0] || ''
-      sendQuoteConfirmation({ email, phone, firstName, projectType }).catch((err) => {
-        console.error('quote confirmation send failed:', err)
-      })
+      // Never for a quarantined lead. This is the line that mattered most: the
+      // Aug campaign supplied real third-party addresses and real-looking
+      // numbers, so every bot submission sent a stranger an unsolicited email
+      // from the same Resend domain that carries estimates and invoices — and
+      // an unsolicited SMS on top of it.
+      if (!verdict.isSpam) {
+        const firstName = name.split(' ')[0] || ''
+        sendQuoteConfirmation({ email, phone, firstName, projectType }).catch((err) => {
+          console.error('quote confirmation send failed:', err)
+        })
+      }
 
+      // Identical response either way — a bot that can tell it was caught is a
+      // bot that can tune around the gate.
       return NextResponse.json({ success: true, id: data?.id })
     }
 

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { toast } from '@/components/Toast'
 import { validateContact } from '@/lib/validation'
 import { uploadQuotePhotos } from '@/lib/uploadQuotePhotos'
+import TurnstileWidget from '@/components/TurnstileWidget'
 
 interface Question {
   id: string
@@ -30,6 +31,20 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Invisible spam signals ────────────────────────────────────────────
+  // Neither of these asks the customer to do anything — no checkbox, no
+  // puzzle. `website` is a decoy input that is off-screen and skipped by the
+  // tab order, so a person never sees or focuses it while a form-filling bot
+  // populates every field it finds. `mountedAt` lets the server see how long
+  // the form was actually open; a genuine submission takes far longer than
+  // the 3s floor, but a script posts almost instantly.
+  const [honeypot, setHoneypot] = useState('')
+  const mountedAt = useRef<number>(Date.now())
+  // Empty until Turnstile solves, and stays empty forever if the keys aren't
+  // configured or the script is blocked. The server scores a missing token as
+  // a weak signal, never a rejection, so neither case can block a customer.
+  const [turnstileToken, setTurnstileToken] = useState('')
 
   useEffect(() => {
     const stored = localStorage.getItem('leadContact')
@@ -97,6 +112,10 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
         projectType,
         answers,
         source: 'quote',
+        // Invisible spam signals — see the honeypot/mountedAt refs above.
+        website: honeypot,
+        elapsedMs: Date.now() - mountedAt.current,
+        turnstileToken,
         ...(referralCode ? { referralCode } : {}),
       }
 
@@ -197,6 +216,24 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/*
+        Honeypot. Positioned off-screen rather than display:none — some bots
+        skip hidden inputs but almost none compute layout. aria-hidden and
+        tabIndex=-1 keep it away from screen readers and the tab order, so it
+        is genuinely invisible to a real customer using any input method.
+      */}
+      <div aria-hidden="true" className="absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden">
+        <label htmlFor="website">Website (leave blank)</label>
+        <input
+          type="text"
+          id="website"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
+      </div>
       <Link
         href="/"
         className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-4"
@@ -358,6 +395,9 @@ export default function ProjectQuoteForm({ projectType, projectTitle, questions 
           <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
+
+      {/* Renders nothing at all until the Turnstile site key is configured. */}
+      <TurnstileWidget onToken={setTurnstileToken} />
 
       <button
         type="submit"

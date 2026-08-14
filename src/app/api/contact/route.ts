@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { validateContact, sanitize, rateLimit } from '@/lib/validation'
+import { checkSpam, verifyTurnstile } from '@/lib/spamCheck'
 import { createOpenPhoneContact, sendSMS, toE164, AUTO_MESSAGES } from '@/lib/openphone'
 import { sendCustomerEmail, ownerReplyTo } from '@/lib/email'
 import { findCustomerByPhone } from '@/lib/phoneMatch'
@@ -49,6 +50,30 @@ export async function POST(req: NextRequest) {
           answers[sanitize(k).slice(0, 100)] = sanitize(v)
         }
       }
+    }
+
+    // ── Spam gate ────────────────────────────────────────────────────────
+    // Same gate as /api/quotes. This route is the one that actually produced
+    // most of the junk: the standalone contact form writes customers and
+    // quote_requests directly (source='contact'), which is where the ~110
+    // bogus CRM rows came from against only 15 bogus quote leads.
+    const verdict = checkSpam({
+      name,
+      email,
+      phone,
+      text: [description, answers.description, answers.additionalNotes].filter(Boolean).join(' '),
+      honeypot: typeof body.website === 'string' ? body.website : '',
+      elapsedMs: typeof body.elapsedMs === 'number' ? body.elapsedMs : null,
+      turnstile: await verifyTurnstile(body.turnstileToken, ip),
+    })
+    if (verdict.isSpam) {
+      console.warn(
+        `[spam] quarantined contact from "${name}" <${email}> ${phone} — score ${verdict.score}: ${verdict.reasons.join(', ')}`
+      )
+      // Nothing is written and nothing is sent — not even the owner
+      // notification, which is the inbox noise Vince actually sees. The
+      // response is the same shape a real submission gets.
+      return NextResponse.json({ success: true })
     }
 
     // Save to Supabase — unless /api/quotes already handled this submission

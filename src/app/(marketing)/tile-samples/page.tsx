@@ -4,6 +4,7 @@ import { Check, Truck, Ruler, Palette, Star, ShieldCheck } from 'lucide-react'
 import TileKitForm from '@/components/TileKitForm'
 import JsonLd, { faqJsonLd, breadcrumbJsonLd } from '@/components/JsonLd'
 import { TILE_KIT, KIT_SERVICE_TOWNS } from '@/data/tileKit'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: `Tile Match Kit — ${TILE_KIT.sampleCount} Samples for $${TILE_KIT.price} | Aguirre Modern Tile`,
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: `Tile Match Kit — ${TILE_KIT.sampleCount} real samples, $${TILE_KIT.price}`,
     description: `Hand-picked tile samples delivered across Greater Boston. Credited back toward your install.`,
-    url: 'https://aguirremoderntile.com/tile-samples',
+    url: `${SITE_URL}/tile-samples`,
     type: 'website',
   },
 }
@@ -68,8 +69,8 @@ export default function TileSamplesPage() {
       <JsonLd data={faqJsonLd(faqs)} />
       <JsonLd
         data={breadcrumbJsonLd([
-          { name: 'Home', url: 'https://aguirremoderntile.com' },
-          { name: 'Tile Match Kit', url: 'https://aguirremoderntile.com/tile-samples' },
+          { name: 'Home', url: SITE_URL },
+          { name: 'Tile Match Kit', url: `${SITE_URL}/tile-samples` },
         ])}
       />
       <JsonLd
@@ -84,7 +85,7 @@ export default function TileSamplesPage() {
             price: String(TILE_KIT.price),
             priceCurrency: 'USD',
             availability: 'https://schema.org/InStock',
-            url: 'https://aguirremoderntile.com/tile-samples',
+            url: `${SITE_URL}/tile-samples`,
           },
         }}
       />

@@ -3,21 +3,29 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import ToastContainer from '@/components/Toast'
 import ConfirmDialogHost from '@/components/ui/ConfirmDialog'
+import { SITE_URL } from '@/lib/site'
 import './globals.css'
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
+// Search Console HTML-tag verification. Optional: if the property is verified
+// by DNS or via the GA4 tag above, leave this unset and no tag is emitted.
+const GSC_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://aguirremoderntile.com'),
+  // Every page's `alternates.canonical` is relative ('/blog', '/blog/[slug]',
+  // ...) and resolves against this. Getting this host right is what makes the
+  // canonical tags agree with the host Vercel actually serves.
+  metadataBase: new URL(SITE_URL),
   title: 'Aguirre Modern Tile | Expert Tile Installation in Greater Boston',
   description: 'Professional tile installation in Greater Boston. 15+ years experience, 5-star rated on Google. Bathroom, shower, floor & backsplash tile experts.',
   keywords: 'tile installation, bathroom tile, shower tile, Boston tile contractor, Revere tile, tile repair',
   openGraph: {
     title: 'Aguirre Modern Tile | Expert Tile Installation in Greater Boston',
     description: 'Professional tile installation with 15+ years experience. 150+ five-star Google reviews.',
-    url: 'https://aguirremoderntile.com',
+    url: SITE_URL,
     siteName: 'Aguirre Modern Tile',
     locale: 'en_US',
     type: 'website',
@@ -26,6 +34,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  ...(GSC_VERIFICATION && {
+    verification: { google: GSC_VERIFICATION },
+  }),
 }
 
 export default function RootLayout({

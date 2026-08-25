@@ -1,9 +1,12 @@
 import type { MetadataRoute } from 'next'
 import { locationSlugs } from '@/data/locations'
 import { getPublishedPosts } from '@/lib/cms'
+import { SITE_URL } from '@/lib/site'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://aguirremoderntile.com'
+  // Must be the host we actually serve. Submitting apex URLs that 307 to www
+  // made Search Console classify all 3,444 of them as "Page with redirect".
+  const baseUrl = SITE_URL
 
   // Core marketing pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -18,6 +21,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Tile Match Kit — top-of-funnel offer page, ranked high on purpose since
     // "tile samples" searches are how shoppers enter before they hire.
     { url: `${baseUrl}/tile-samples`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
+    // NOTE: /boston-tile-ideas (the Pinterest landing page) is deliberately NOT
+    // listed yet. The page exists in the working tree but is not deployed —
+    // https://www.aguirremoderntile.com/boston-tile-ideas returns 404 today.
+    // Listing a 404 in the sitemap is the same class of mistake this file is
+    // being fixed for: handing Google a URL that does not resolve. Add the line
+    // back in the same deploy that ships (marketing)/boston-tile-ideas/,
+    // src/components/PinterestLeadForm.tsx and src/data/bostonIdeas.ts.
   ]
 
   // Service detail pages

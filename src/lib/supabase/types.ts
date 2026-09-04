@@ -1,7 +1,8 @@
 import type { JobScope } from '@/lib/estimator/scopes'
+import type { PublishStatus, PhotoConsent } from '@/lib/photoLibrary'
 
 export type UserRole = 'owner' | 'lead'
-export type JobStatus = 'lead' | 'quoted' | 'estimate_revised' | 'accepted_not_scheduled' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
+export type JobStatus = 'lead' | 'quoted' | 'estimate_revised' | 'awaiting_response' | 'accepted_not_scheduled' | 'scheduled' | 'in_progress' | 'waiting_for_materials' | 'completed' | 'paid' | 'cancelled'
 
 export type JobPriority = 'high' | 'medium' | 'low'
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
@@ -74,6 +75,17 @@ export interface Job {
   client_phone: string | null
   client_email: string | null
   client_address: string | null
+  // The homeowner / tenant / building owner on a GC job (migration 057).
+  // client_* above is whoever PAYS — on a GC job that is the contractor. These
+  // are the person the work was actually done for, and therefore the only person
+  // with a reason to leave a Google review. end_customer_review_ok is the GC's
+  // permission to contact them; without it the review cron skips the job rather
+  // than falling back to the contractor. Optional in TS because 057 is additive
+  // and legacy rows/fixtures pre-date it.
+  end_customer_name?: string | null
+  end_customer_phone?: string | null
+  end_customer_email?: string | null
+  end_customer_review_ok?: boolean | null
   job_type: string | null
   square_footage: number | null
   scope_notes: string | null
@@ -91,7 +103,14 @@ export interface Job {
   actual_labor_cost?: number | null
   actual_materials_cost?: number | null
   amount_invoiced: number | null
+  // amount_paid is a ROLLUP, not a column anyone should write directly. As of
+  // migration 053 it is projected from the job_payments ledger plus paid
+  // invoices by the job_payments_project trigger; deposit_paid and
+  // final_payment_amount are projections of the same ledger, split by kind.
+  // Write payments through POST /api/jobs/[id]/payments, never by PATCHing
+  // these three. Optional in TS because legacy rows/fixtures pre-date 045.
   amount_paid: number | null
+  deposit_paid?: number | null
   line_items: JobLineItem[]
   // Per-scope inputs snapshotted by the estimate generator (template_name,
   // sqft/sub_sqft, addons, customer_provides). Lets a regenerate reload the
@@ -105,6 +124,14 @@ export interface Job {
   crew_instructions: string | null
   crew_log: string | null
   customer_provides: string | null
+  // Migration 058 — may we show photos of this customer's home in marketing.
+  // Per-household, asked once on the completion sheet. Defaults to 'unasked':
+  // silence is not consent. On a GC job the person to ask is the homeowner
+  // (end_customer_name, migration 057), not the contractor.
+  photo_consent?: PhotoConsent | null
+  // When the completion photo sheet was submitted. NULL on a completed job
+  // means the crew skipped the ask — that is the capture-rate metric.
+  completion_photos_at?: string | null
   // Why a quoted deal was lost. Written by the leads page "Mark as lost"
   // action alongside status -> 'cancelled'. Mirrors quote_requests.lost_reason
   // so win/loss reporting works whether the deal died as an inquiry or a quote.
@@ -128,6 +155,23 @@ export interface Job {
   follow_up_count: number
   last_contact_at: string | null
   next_contact_date: string | null
+  /**
+   * When the work actually finished (migration 059). The completion anchor for
+   * the review-request and reseal crons — never derive it from updated_at,
+   * which any row edit moves forward. Stamped by a DB trigger on the status
+   * transition into completed/paid, and cleared if the job is reopened.
+   * Optional: 059 is applied by hand and may not be there yet.
+   */
+  completed_at?: string | null
+  /** Provenance of completed_at. 'status_log'/'scheduled_derived' are inferred. */
+  completed_at_source?:
+    | 'status_change'
+    | 'final_payment'
+    | 'scheduled_end'
+    | 'status_log'
+    | 'scheduled_derived'
+    | 'manual'
+    | null
   final_payment_at: string | null
   final_payment_amount: number | null
   final_payment_method: 'cash' | 'check' | 'stripe' | 'zelle' | 'venmo' | 'other' | null
@@ -223,6 +267,17 @@ export interface JobPhoto {
   caption: string | null
   uploaded_by: string | null
   created_at: string
+  // Migration 058 — project library tags. Denormalized onto the photo on
+  // purpose: a published caption must not drift when the job record is
+  // corrected. Prefilled at capture from job_type / client_address, editable.
+  // Optional in TS because the 10 rows that predate 058 have them NULL.
+  room_type?: string | null
+  town?: string | null
+  // Per-FRAME privacy/quality gate. Publishing ALSO requires the job's
+  // photo_consent = 'granted' — see isPublishable() in @/lib/photoLibrary,
+  // which is the single definition and mirrors the publishable_job_photos view.
+  publish_status?: PublishStatus | null
+  publish_reviewed_at?: string | null
 }
 
 export interface InvoiceLineItem {
@@ -271,7 +326,23 @@ export interface QuoteRequestPhoto {
 
 export type QuoteRequestStatus = 'new' | 'reviewed' | 'converted' | 'archived'
 
-export type QuoteRequestSource = 'website' | 'phone' | 'referral' | 'walk-in' | 'repeat' | 'other'
+// 'tile-match-kit' and 'partner' are written by /api/tile-kit and
+// /api/partners/lead respectively. The column is free text (migration 011), so
+// the union is documentation rather than enforcement — but it was already out
+// of date with what the app writes, which made it misleading to read.
+// 'partner' is the bucket; WHICH showroom is in answers->>'partner'.
+export type QuoteRequestSource =
+  | 'website'
+  | 'phone'
+  | 'referral'
+  | 'walk-in'
+  | 'repeat'
+  | 'tile-match-kit'
+  | 'partner'
+  // Reseal & regrout win-back to past customers. Booked work is counted as
+  // quote_requests with this source and a non-null converted_job_id.
+  | 'reseal-winback'
+  | 'other'
 
 export interface QuoteRequest {
   id: string

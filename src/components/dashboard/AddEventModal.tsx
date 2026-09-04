@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
+import type { CalendarEvent } from '@/lib/supabase/types'
+import type { JobPickerOption } from '@/lib/jobPicker'
+import JobPicker from './JobPicker'
+import DurationPicker from './DurationPicker'
+import { spanDays } from '@/lib/scheduleDates'
 
 // Inputs are kept as separate `date` + `time` strings while the modal is open
 // (matching the native <input type="date"> / <input type="time"> contract),
@@ -36,7 +40,7 @@ type Props = {
   // When the user clicks an empty day, we pre-fill the date.
   defaultDate: string | null
   // Optional list of jobs to offer as a "Link to job" picker.
-  jobs?: JobWithAssignee[]
+  jobs?: JobPickerOption[]
   onSaved: (event: CalendarEvent) => void
   onDeleted: (id: string) => void
 }
@@ -104,9 +108,16 @@ export default function AddEventModal({
     setSaving(true)
     try {
       const start_at = combineLocal(date, allDay ? '00:00' : time)
-      const end_at = endDate
-        ? combineLocal(endDate, allDay ? '23:59' : (endTime || time || '23:59'))
-        : null
+      const effectiveEnd = endDate || date
+      const span = spanDays(date, effectiveEnd)
+      let end_at: string | null = null
+      if (span > 1) {
+        // Multi-day: close it out at the end of the final day so the calendar
+        // spans every cell in between.
+        end_at = combineLocal(effectiveEnd, allDay ? '23:59' : (endTime || time || '23:59'))
+      } else if (!allDay && endTime) {
+        end_at = combineLocal(date, endTime)
+      }
 
       const payload = {
         title: title.trim(),
@@ -225,55 +236,35 @@ export default function AddEventModal({
             )}
           </div>
 
-          <details className="text-sm">
-            <summary className="cursor-pointer text-primary-600 font-medium select-none">
-              Add end date / time (optional)
-            </summary>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">End date</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              {!allDay && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">End time</label>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              )}
-            </div>
-          </details>
+          <DurationPicker
+            startYmd={date}
+            endYmd={endDate || date}
+            onChangeEnd={(ymd) => setEndDate(ymd)}
+          />
 
-          {jobs.length > 0 && (
+          {!allDay && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Link to job (optional)
+                End time (optional)
               </label>
-              <select
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-              >
-                <option value="">— None —</option>
-                {jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    #{j.job_number} {j.title} — {j.client_name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-gray-500 mt-1">
-                Linking pulls the customer&apos;s address and phone so the crew can tap through.
-              </p>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
             </div>
+          )}
+
+          {jobs.length > 0 && (
+            <JobPicker
+              jobs={jobs}
+              value={jobId}
+              onChange={(id) => setJobId(id)}
+              label="Link to job (optional)"
+              allowNone
+              hint="Linking pulls the customer's address and phone so the crew can tap through."
+            />
           )}
 
           {/* Customer details panel — appears the moment a job is linked.

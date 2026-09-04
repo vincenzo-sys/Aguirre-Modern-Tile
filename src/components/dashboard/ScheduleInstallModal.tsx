@@ -19,10 +19,23 @@
 // job detail page.
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink } from 'lucide-react'
+import { Loader2, X, Trash2, MapPin, Phone, Mail, ExternalLink, AlertTriangle } from 'lucide-react'
 import { toast } from '@/components/Toast'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import type { JobWithAssignee } from '@/lib/supabase/types'
+import type { JobPickerOption } from '@/lib/jobPicker'
+import JobPicker from './JobPicker'
+import DurationPicker from './DurationPicker'
+import { deriveScheduledEnd } from '@/lib/jobScheduling'
+import { endFromSpan, spanDays } from '@/lib/scheduleDates'
+import {
+  GC_DEPOSIT_PCT,
+  RETAIL_DEPOSIT_PCT,
+  depositRateLabel,
+  looksLikeGc,
+  money,
+  recordedDeposit,
+  requiredDeposit,
+} from '@/lib/depositGate'
 
 type ExistingInstall = {
   id: string
@@ -35,12 +48,16 @@ type ExistingInstall = {
 type Props = {
   open: boolean
   onClose: () => void
-  jobs: JobWithAssignee[]
+  jobs: JobPickerOption[]
   // When set, the modal opens in re-schedule mode (job locked, dates pre-filled).
   // Omit/null to open in "schedule a new install" mode.
   install?: ExistingInstall | null
   // Default start date for new scheduling (e.g. cell the user clicked).
   defaultStart?: string | null
+  // Pre-loaded deposit-gate refusal, set when a drag-to-move on the calendar
+  // came back 409. A gesture cannot render the override panel itself, so it
+  // hands the user this modal with the block already showing.
+  initialGateBlock?: string | null
   // Called after a successful save or delete — calendar uses this to refetch.
   onSaved: () => void
 }
@@ -51,6 +68,7 @@ export default function ScheduleInstallModal({
   jobs,
   install = null,
   defaultStart = null,
+  initialGateBlock = null,
   onSaved,
 }: Props) {
   const isReschedule = Boolean(install)
@@ -59,7 +77,14 @@ export default function ScheduleInstallModal({
   const [endDate, setEndDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [clearing, setClearing] = useState(false)
-  const firstFieldRef = useRef<HTMLSelectElement | HTMLInputElement | null>(null)
+  // Deposit gate. A toast is the wrong surface for a refusal — it disappears
+  // before you've read the number. Both of these render as a persistent panel.
+  const [gateBlock, setGateBlock] = useState<string | null>(null)
+  const [overrideReason, setOverrideReason] = useState('')
+  const firstFieldRef = useRef<HTMLInputElement | null>(null)
+  // Once Vince sets a duration himself, stop deriving one from estimated_days.
+  // Mirrors deriveScheduledEnd's own "never overwrite Vince's manual choice".
+  const spanTouchedRef = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -73,20 +98,40 @@ export default function ScheduleInstallModal({
       setStartDate(initialStart)
       setEndDate(initialStart)
     }
+    setGateBlock(initialGateBlock ?? null)
+    setOverrideReason('')
+    spanTouchedRef.current = false
     const t = setTimeout(() => firstFieldRef.current?.focus(), 50)
     return () => clearTimeout(t)
-  }, [open, install, defaultStart])
+  }, [open, install, defaultStart, initialGateBlock])
 
   // Selected job (for the customer-detail panel + linking validation).
   const selectedJob = jobs.find((j) => j.id === jobId) ?? null
 
+  // Picking a job pre-fills the duration from its estimated_days, so the
+  // calendar already reads "Mon → Wed · 3 days" before Vince touches anything.
+  // Passing currentEnd: null is deliberate — the guard against overwriting a
+  // manual choice is spanTouchedRef, which is more precise here than "is an
+  // end date already set" (one is always set, from the reset effect).
+  useEffect(() => {
+    if (isReschedule || spanTouchedRef.current) return
+    if (!jobId || !startDate) return
+    const job = jobs.find((j) => j.id === jobId)
+    const derived = deriveScheduledEnd(startDate, job?.estimated_days, null)
+    setEndDate(derived ?? startDate)
+  }, [jobId, startDate, isReschedule, jobs])
+
   if (!open) return null
 
-  // Keep end-date >= start-date as the user edits. If they push start past
-  // end, auto-bump end to match (instead of throwing a validation toast).
+  // Moving the start moves the whole block. The previous version only
+  // bumped the end when it fell behind the start, which silently turned a
+  // 5-day install into a 1-day one whenever the start was pushed forward.
+  // Same rule as drag-to-move on the calendar: length is preserved.
   function onStartChange(v: string) {
+    if (!v) { setStartDate(v); return }
+    const span = spanDays(startDate || v, endDate || startDate || v)
     setStartDate(v)
-    if (endDate < v) setEndDate(v)
+    setEndDate(endFromSpan(v, span))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -98,6 +143,7 @@ export default function ScheduleInstallModal({
     }
 
     setSaving(true)
+    setGateBlock(null)
     try {
       const res = await fetch(`/api/jobs/${jobId}`, {
         method: 'PATCH',
@@ -105,11 +151,22 @@ export default function ScheduleInstallModal({
         body: JSON.stringify({
           scheduled_start: startDate,
           scheduled_end: endDate || startDate,
+          ...(overrideReason.trim()
+            ? { override_deposit_gate: true, override_deposit_reason: overrideReason.trim() }
+            : {}),
         }),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Save failed')
+      const data = await res.json().catch(() => ({}))
+      // 409 is the deposit gate, not a failure — the job is untouched and the
+      // fix is a specific dollar amount, so it stays on screen instead of
+      // flashing past in a toast.
+      if (res.status === 409) {
+        setGateBlock(data.error || 'This job needs its deposit recorded before it can be scheduled.')
+        return
+      }
+      if (!res.ok) throw new Error(data.error || 'Save failed')
+      if (data.deposit_warning?.message) {
+        toast(data.deposit_warning.message, 'error')
       }
       toast(isReschedule ? 'Install re-scheduled' : 'Install scheduled', 'success')
       onSaved()
@@ -175,57 +232,64 @@ export default function ScheduleInstallModal({
               {install.title}
             </div>
           ) : (
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Job</label>
-              <select
-                ref={firstFieldRef as React.RefObject<HTMLSelectElement>}
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-                required
-              >
-                <option value="">— Pick a job —</option>
-                {jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    #{j.job_number} {j.title} — {j.client_name}
-                  </option>
-                ))}
-              </select>
-              {jobs.length === 0 && (
-                <p className="text-[11px] text-gray-500 mt-1">
-                  No active jobs available. Accept an estimate first.
-                </p>
-              )}
-            </div>
+            <JobPicker
+              jobs={jobs}
+              value={jobId}
+              onChange={(id) => setJobId(id)}
+              label="Job"
+              emptyHint="No jobs available. Accept an estimate first."
+            />
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Start date</label>
-              <input
-                ref={(!isReschedule ? null : firstFieldRef) as React.RefObject<HTMLInputElement> | null}
-                type="date"
-                value={startDate}
-                onChange={(e) => onStartChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">End date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Start date</label>
+            <input
+              ref={isReschedule ? firstFieldRef : null}
+              type="date"
+              value={startDate}
+              onChange={(e) => onStartChange(e.target.value)}
+              className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              required
+            />
           </div>
-          <p className="text-[11px] text-gray-500 -mt-1">
-            Single-day install? Leave end date the same as start.
-            Multi-day spans render as one bar across cells on the calendar.
-          </p>
+
+          <DurationPicker
+            startYmd={startDate}
+            endYmd={endDate || startDate}
+            onChangeEnd={(ymd) => {
+              spanTouchedRef.current = true
+              setEndDate(ymd)
+            }}
+            suggestedDays={selectedJob?.estimated_days ?? null}
+          />
+
+          {/* Deposit status for the job being scheduled. Shown BEFORE saving so
+              the ask happens while the customer is still on the phone, rather
+              than after the date is already promised. */}
+          {selectedJob && <DepositStatus job={selectedJob} />}
+
+          {gateBlock && (
+            <div className="rounded-md border border-red-300 bg-red-50 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-800">{gateBlock}</p>
+              </div>
+              <label className="block text-[11px] font-medium text-red-800">
+                Schedule anyway — why?
+                <input
+                  type="text"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="e.g. Aaron pays on completion, 6 jobs, never missed"
+                  className="mt-1 w-full px-3 py-2 border border-red-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+              </label>
+              <p className="text-[11px] text-red-700">
+                An override is logged to the job&apos;s crew log with your name. Leave it
+                blank and record the deposit instead.
+              </p>
+            </div>
+          )}
 
           {/* Customer details panel — same pattern as AddEventModal. Lets
               Christian see "where am I going / who do I call" without
@@ -273,7 +337,48 @@ export default function ScheduleInstallModal({
   )
 }
 
-function CustomerDetails({ job }: { job: JobWithAssignee }) {
+// Client-side preview of the same rule the API enforces. It uses the display-name
+// heuristic for "is this a GC?" because the jobs list doesn't carry the customer
+// row; the server re-checks against customers.is_gc and is the authority. Worst
+// case this panel is optimistic and the save comes back 409 — never the reverse,
+// since the server's rule is the stricter one.
+function DepositStatus({ job }: { job: JobPickerOption }) {
+  const isGc = looksLikeGc(job.client_name)
+  const required = requiredDeposit({ ...job, is_gc: isGc })
+  const recorded = recordedDeposit(job)
+  if (required <= 0) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+        No estimate total on this job, so no deposit can be calculated. Price it before
+        it holds a date.
+      </div>
+    )
+  }
+  const short = Math.max(0, Math.round((required - recorded) * 100) / 100)
+
+  if (short <= 1) {
+    return (
+      <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-[11px] text-green-800">
+        Deposit on file: {money(recorded)}. Good to schedule.
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-1">
+      <p className="text-[11px] font-semibold text-amber-900">
+        {isGc ? `GC job — ${depositRateLabel(GC_DEPOSIT_PCT)}` : depositRateLabel(RETAIL_DEPOSIT_PCT)}{' '}
+        deposit due: {money(required)} · recorded {money(recorded)} · {money(short)} short
+      </p>
+      <p className="text-[11px] text-amber-800">
+        If they already paid through the estimate link, record it on the job first —
+        the Stripe deposit webhook has not written to the CRM since March, so{' '}
+        <span className="font-medium">$0.00 here does not mean unpaid</span>.
+      </p>
+    </div>
+  )
+}
+
+function CustomerDetails({ job }: { job: JobPickerOption }) {
   const mapsUrl = job.client_address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.client_address)}`
     : null

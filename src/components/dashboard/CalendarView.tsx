@@ -4,21 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { toast } from '@/components/Toast'
-import type { CalendarEvent, JobWithAssignee, JobStatus } from '@/lib/supabase/types'
+import type { CalendarEvent, JobWithAssignee } from '@/lib/supabase/types'
+import { jobStatusMeta } from '@/lib/jobStatus'
 import AddEventModal from './AddEventModal'
-
-const statusColors: Record<JobStatus, string> = {
-  lead: 'bg-yellow-200 text-yellow-900',
-  quoted: 'bg-blue-200 text-blue-900',
-  estimate_revised: 'bg-indigo-200 text-indigo-900',
-  accepted_not_scheduled: 'bg-teal-200 text-teal-900',
-  scheduled: 'bg-purple-200 text-purple-900',
-  in_progress: 'bg-orange-200 text-orange-900',
-  waiting_for_materials: 'bg-amber-200 text-amber-900',
-  completed: 'bg-green-200 text-green-900',
-  paid: 'bg-emerald-200 text-emerald-900',
-  cancelled: 'bg-gray-200 text-gray-900',
-}
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -318,7 +306,7 @@ export default function CalendarView({ jobs: initialJobs }: { jobs: JobWithAssig
                           e.stopPropagation()
                           router.push(`/dashboard/leads/${j.id}`)
                         }}
-                        className={`block w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight cursor-grab active:cursor-grabbing ${statusColors[j.status]} hover:opacity-80 ${
+                        className={`block w-full text-left truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight cursor-grab active:cursor-grabbing ${jobStatusMeta(j.status).chip} hover:opacity-80 ${
                           draggingId === j.id ? 'opacity-40' : ''
                         }`}
                       >

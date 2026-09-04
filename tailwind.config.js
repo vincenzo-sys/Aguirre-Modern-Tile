@@ -4,6 +4,12 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // src/lib holds shared class tables — jobStatus.ts maps every job status to
+    // its badge/chip/bar classes. Those are the ONLY place those colours are
+    // written, so leaving lib out of the scan silently drops the rules and the
+    // calendar bars render transparent. Nothing else catches this: the classes
+    // are still on the elements, tsc is happy, and the build succeeds.
+    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {

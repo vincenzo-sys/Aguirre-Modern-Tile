@@ -2,10 +2,11 @@ import { headers } from 'next/headers'
 import ScheduleCalendar from '@/components/dashboard/ScheduleCalendar'
 import IcsSubscribeButton from '@/components/dashboard/IcsSubscribeButton'
 import { createClient } from '@/lib/supabase/server'
-import type { JobWithAssignee, Job } from '@/lib/supabase/types'
+import { BRAND } from '@/brand.config'
+import type { JobPickerOption } from '@/lib/jobPicker'
 
 export const metadata = {
-  title: 'Schedule — Aguirre Modern Tile',
+  title: `Schedule — ${BRAND.company.name}`,
 }
 
 export default async function SchedulePage() {
@@ -18,21 +19,31 @@ export default async function SchedulePage() {
   const proto = hdrs.get('x-forwarded-proto') ?? (host.includes('localhost') ? 'http' : 'https')
   const icsUrl = apiKey ? `${proto}://${host}/api/schedule.ics?key=${apiKey}` : ''
 
-  // Active jobs feed the AddEventModal's "Link to job" dropdown so a custom
-  // event can pull address/phone from the linked job. Filtered to non-archived
-  // statuses so the dropdown isn't drowned in old completed work.
-  let jobs: JobWithAssignee[] = []
+  // Jobs feed the "link to job" picker in both modals.
+  //
+  // No status filter: Vince asked to be able to link ANY job, and the previous
+  // filter made paid/lead/quoted/cancelled work unreachable. Relevance is the
+  // picker's job now (see lib/jobPicker.ts), which groups jobs-needing-a-date
+  // first and collapses finished work — the old ORDER BY scheduled_start DESC
+  // NULLS LAST did the exact opposite, sinking every unscheduled job below
+  // every completed one and then cutting them off at LIMIT 100.
+  //
+  // Ordering by job_number is a stable, never-null proxy for recency.
+  // The column list is explicit because '*' would ship line_items (large
+  // JSONB) for every job into the RSC payload for nothing.
+  let jobs: JobPickerOption[] = []
   try {
     const supabase = await createClient()
     const { data } = await supabase
       .from('jobs')
-      .select('*')
-      .in('status', ['accepted_not_scheduled', 'scheduled', 'in_progress', 'waiting_for_materials', 'completed'])
-      .order('scheduled_start', { ascending: false, nullsFirst: false })
-      .limit(100)
-    jobs = ((data ?? []) as Job[]).map((j) => ({ ...j, line_items: j.line_items ?? [], assignee: null }))
+      .select(
+        'id, job_number, title, status, client_name, client_address, client_phone, client_email, scheduled_start, scheduled_end, estimated_days, estimated_cost, deposit_paid, amount_paid',
+      )
+      .order('job_number', { ascending: false })
+      .limit(500)
+    jobs = (data ?? []) as JobPickerOption[]
   } catch {
-    // Schedule still works without the dropdown.
+    // Schedule still works without the picker.
   }
 
   return (

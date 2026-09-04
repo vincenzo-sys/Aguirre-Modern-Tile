@@ -128,6 +128,39 @@ export function matchCatalog(
   return candidates[0] ?? null
 }
 
+// ── Who buys the tile ──────────────────────────────────────────────────
+//
+// `customer_provides` is the single source of truth for who supplies the
+// tile. Materials formulas can't read it — `applies_when` only sees
+// `scope.addons` — so we project it into derived addon flags before the
+// formula walk. Deriving here rather than in the modal means every caller
+// (dashboard, MCP, tile-estimate skill, raw API) inherits the same default
+// without a client-side change.
+//
+// DEFAULT FLIPPED 2026-08-24: an empty / absent `customer_provides` now means
+// WE supply the tile, so the tile SKU seeded by migration 056 lands on the
+// estimate. Before that migration the flags simply matched nothing in the
+// catalog and the behaviour was identical to the old default.
+//
+// Grade follows the template's existing `large_format` toggle rather than a
+// new checkbox: 12"+ tile really does cost more per sq ft, and applies_when
+// has no AND, so the conjunction is precomputed into two mutually-exclusive
+// flags instead of expanding the predicate language.
+export function deriveTileFlags(scope: JobScope): Record<string, number> {
+  const customerSupplies = (scope.customer_provides ?? []).some((cp) =>
+    /\btiles?\b/i.test(String(cp))
+  )
+  const rawLargeFormat = scope.addons?.large_format
+  const largeFormat =
+    rawLargeFormat === true || (typeof rawLargeFormat === 'number' && rawLargeFormat !== 0)
+  const weSupply = !customerSupplies
+  return {
+    supply_tile: weSupply ? 1 : 0,
+    supply_tile_standard: weSupply && !largeFormat ? 1 : 0,
+    supply_tile_large_format: weSupply && largeFormat ? 1 : 0,
+  }
+}
+
 // When a scope's sqft is not provided, fall back to the template's typical
 // midpoint so formulas have something reasonable to compute against. Without
 // this, sqft=0 + min floors would always produce the smallest possible bill,
@@ -215,10 +248,16 @@ function buildScope(
   // their sum (sqft_input might be 0 because the user only filled sub-areas).
   // Otherwise fall back to the user's single sqft input.
   const sqft = total_from_sub ?? sqft_input
+  // Engine-owned flags win over anything a caller stored under the same key —
+  // who supplies the tile is decided by customer_provides, not by an addon.
+  const addons: Record<string, boolean | number> = {
+    ...(scope.addons ?? {}),
+    ...deriveTileFlags(scope),
+  }
   const formulaVars = {
     sqft,
     sub_sqft,
-    addons: scope.addons ?? {},
+    addons,
   }
 
   // ── Labor ────────────────────────────────────────────────────────────
@@ -275,7 +314,7 @@ function buildScope(
   }
 
   for (const entry of formulas) {
-    if (!appliesWhen(entry.applies_when, scope.addons ?? {})) continue
+    if (!appliesWhen(entry.applies_when, addons)) continue
     // Match the catalog first so the material's coverage can feed the formula
     // (coverage-as-source-of-truth). No row = catalog gap; skip — the owner
     // adds the line manually after. We skip before computing to avoid a
@@ -477,7 +516,37 @@ export function generateFromScopes(
   for (const s of scopes) {
     for (const cp of s.customer_provides ?? []) allCustomerProvides.add(cp)
   }
-  if (allCustomerProvides.size === 0) allCustomerProvides.add('tile')
+  // Supplied-tile is now the default (see deriveTileFlags). A mixed job — one
+  // scope customer-supplied, one not — reads as customer-supplied so the
+  // estimate never promises tile we didn't price into every scope.
+  const weSupplyTile = scopes.every((s) => deriveTileFlags(s).supply_tile === 1)
+  // Non-tile owner-furnished items (glass door, fixtures, ...) still belong in
+  // the exclusions list even when we're buying the tile.
+  const otherProvided = Array.from(allCustomerProvides).filter(
+    (cp) => !/\btiles?\b/i.test(String(cp))
+  )
+
+  const included = [
+    '- Demo, waterproofing, tile installation',
+    '- All setting materials (thinset, grout, caulk, sealant)',
+    '- Trash haul-off and transportation',
+  ]
+  const notIncluded: string[] = []
+  if (weSupplyTile) {
+    included.splice(
+      1,
+      0,
+      '- Tile — we source, purchase, and deliver it. Priced in the line items above at the grade shown, including 15% overage for cuts and future repairs. Swap the line item if you choose a different tile.'
+    )
+    if (otherProvided.length > 0) notIncluded.push(`- You provide: ${otherProvided.join(', ')}`)
+  } else {
+    notIncluded.push(`- Tile (you provide: ${Array.from(allCustomerProvides).join(', ')})`)
+  }
+  notIncluded.push(
+    '- Plumbing fixtures, vanity, toilet, door, electrical',
+    '- Paint, drywall repair above tile line, glass enclosure',
+    '- Self-leveling compound (if floor requires it — assessed on-site)'
+  )
   const today = new Date().toISOString().slice(0, 10)
 
   const scopeNotes = [
@@ -491,15 +560,10 @@ export function generateFromScopes(
     `${warrantyYears}-year warranty on all installation labor. If tile cracks, loosens, or grout fails due to installation defects within ${warrantyYears} years of completion, we repair at no cost.`,
     '',
     "WHAT'S INCLUDED",
-    '- Demo, waterproofing, tile installation',
-    '- All setting materials (thinset, grout, caulk, sealant)',
-    '- Trash haul-off and transportation',
+    ...included,
     '',
     "WHAT'S NOT INCLUDED",
-    `- Tile (you provide: ${Array.from(allCustomerProvides).join(', ')})`,
-    '- Plumbing fixtures, vanity, toilet, door, electrical',
-    '- Paint, drywall repair above tile line, glass enclosure',
-    '- Self-leveling compound (if floor requires it — assessed on-site)',
+    ...notIncluded,
     '',
     'PAYMENT',
     `10% deposit ($${deposit.toFixed(2)}) to reserve install date. Balance due on completion.`,

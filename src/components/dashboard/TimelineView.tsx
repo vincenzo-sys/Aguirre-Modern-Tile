@@ -1,20 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import type { JobWithAssignee, JobStatus, Profile } from '@/lib/supabase/types'
-
-const statusColors: Record<JobStatus, string> = {
-  lead: 'bg-yellow-300',
-  quoted: 'bg-blue-300',
-  estimate_revised: 'bg-indigo-300',
-  accepted_not_scheduled: 'bg-teal-300',
-  scheduled: 'bg-purple-300',
-  in_progress: 'bg-orange-300',
-  waiting_for_materials: 'bg-amber-300',
-  completed: 'bg-green-300',
-  paid: 'bg-emerald-300',
-  cancelled: 'bg-gray-300',
-}
+import type { JobWithAssignee, Profile } from '@/lib/supabase/types'
+import { jobStatusMeta } from '@/lib/jobStatus'
 
 const PX_PER_DAY = 40
 
@@ -131,7 +119,7 @@ export default function TimelineView({ jobs, team }: { jobs: JobWithAssignee[]; 
                       key={job.id}
                       onClick={() => router.push(`/dashboard/leads/${job.id}`)}
                       title={`#${job.job_number} ${job.title}`}
-                      className={`absolute h-7 rounded ${statusColors[job.status]} hover:opacity-80 text-xs font-medium text-gray-900 px-2 truncate flex items-center`}
+                      className={`absolute h-7 rounded ${jobStatusMeta(job.status).bar} hover:opacity-80 text-xs font-medium text-gray-900 px-2 truncate flex items-center`}
                       style={{ left, width: Math.max(width, PX_PER_DAY), top: idx * 36 + 4 }}
                     >
                       #{job.job_number} {job.title}

@@ -196,7 +196,9 @@ export function generateEstimate(
     template_name: template.template_name,
     sqft: opts.sqft ?? null,
     sub_sqft: opts.sub_sqft,
-    customer_provides: opts.customer_provides ?? ['tile'],
+    // Empty = we supply the tile (default flipped 2026-08-24). A caller that
+    // wants the old behaviour passes customer_provides: ['tile'] explicitly.
+    customer_provides: opts.customer_provides ?? [],
   }
 
   return generateFromScopes(

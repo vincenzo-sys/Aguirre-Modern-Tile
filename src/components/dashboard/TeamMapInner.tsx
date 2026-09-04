@@ -2,20 +2,8 @@
 
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Profile, JobWithAssignee, JobStatus } from '@/lib/supabase/types'
-
-const statusColors: Record<JobStatus, string> = {
-  lead: '#eab308',
-  quoted: '#3b82f6',
-  estimate_revised: '#6366f1',
-  accepted_not_scheduled: '#14b8a6',
-  scheduled: '#a855f7',
-  in_progress: '#f97316',
-  waiting_for_materials: '#f59e0b',
-  completed: '#22c55e',
-  paid: '#10b981',
-  cancelled: '#9ca3af',
-}
+import type { Profile, JobWithAssignee } from '@/lib/supabase/types'
+import { jobStatusMeta } from '@/lib/jobStatus'
 
 interface TeamMapInnerProps {
   team: Profile[]
@@ -77,8 +65,8 @@ export default function TeamMapInner({ team, jobs, jobCoords }: TeamMapInnerProp
             center={coords}
             radius={7}
             pathOptions={{
-              color: statusColors[job.status] || '#9ca3af',
-              fillColor: statusColors[job.status] || '#9ca3af',
+              color: jobStatusMeta(job.status).dot,
+              fillColor: jobStatusMeta(job.status).dot,
               fillOpacity: 0.7,
               weight: 1,
             }}

@@ -1,23 +1,14 @@
-import type { JobStatus } from '@/lib/supabase/types'
+import { jobStatusMeta } from '@/lib/jobStatus'
 
-const statusConfig: Record<JobStatus, { label: string; className: string }> = {
-  lead: { label: 'Lead', className: 'bg-yellow-100 text-yellow-800' },
-  quoted: { label: 'Quoted', className: 'bg-blue-100 text-blue-800' },
-  estimate_revised: { label: 'Estimate Revised', className: 'bg-indigo-100 text-indigo-800' },
-  accepted_not_scheduled: { label: 'Accepted — Pick Date', className: 'bg-teal-100 text-teal-800' },
-  scheduled: { label: 'Scheduled', className: 'bg-purple-100 text-purple-800' },
-  in_progress: { label: 'In Progress', className: 'bg-orange-100 text-orange-800' },
-  waiting_for_materials: { label: 'Waiting for Materials', className: 'bg-amber-100 text-amber-800' },
-  completed: { label: 'Completed', className: 'bg-green-100 text-green-800' },
-  paid: { label: 'Paid', className: 'bg-emerald-100 text-emerald-800' },
-  cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-800' },
-}
-
-export default function JobStatusBadge({ status }: { status: JobStatus }) {
-  const config = statusConfig[status]
+// `status` is deliberately a plain string. It almost always arrives straight
+// off a Supabase row, and the job_status enum in Postgres is allowed to grow
+// past the TypeScript union (it already had, with awaiting_response). See
+// src/lib/jobStatus.ts — unmapped values render gray rather than throwing.
+export default function JobStatusBadge({ status }: { status: string }) {
+  const { label, badge } = jobStatusMeta(status)
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
-      {config.label}
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge}`}>
+      {label}
     </span>
   )
 }

@@ -1,19 +1,7 @@
 import Link from 'next/link'
 import { MapPin, User as UserIcon, Clock, Calendar as CalendarIcon, CalendarDays } from 'lucide-react'
 import type { JobStatus, JobWithAssignee } from '@/lib/supabase/types'
-
-const statusStyle: Record<JobStatus, string> = {
-  lead: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  quoted: 'bg-blue-100 text-blue-800 border-blue-200',
-  estimate_revised: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  accepted_not_scheduled: 'bg-teal-100 text-teal-800 border-teal-200',
-  scheduled: 'bg-purple-100 text-purple-800 border-purple-200',
-  in_progress: 'bg-orange-100 text-orange-800 border-orange-200',
-  waiting_for_materials: 'bg-amber-100 text-amber-800 border-amber-200',
-  completed: 'bg-green-100 text-green-800 border-green-200',
-  paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
-}
+import { jobStatusMeta } from '@/lib/jobStatus'
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -46,9 +34,9 @@ function JobCard({ job }: { job: JobWithAssignee }) {
           <p className="text-sm text-gray-500 truncate">{job.client_name}</p>
         </div>
         <span
-          className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border capitalize whitespace-nowrap ${statusStyle[job.status]}`}
+          className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${jobStatusMeta(job.status).badge} ${jobStatusMeta(job.status).border}`}
         >
-          {job.status.replace('_', ' ')}
+          {jobStatusMeta(job.status).label}
         </span>
       </div>
 
@@ -170,9 +158,9 @@ export default function TodayUpcomingJobs({ jobs }: { jobs: JobWithAssignee[] })
                       <p className="text-xs text-gray-500 truncate">{job.client_name}</p>
                     </div>
                     <span
-                      className={`text-xs font-medium px-2 py-0.5 rounded-full border capitalize whitespace-nowrap ${statusStyle[job.status]}`}
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${jobStatusMeta(job.status).badge} ${jobStatusMeta(job.status).border}`}
                     >
-                      {job.status.replace('_', ' ')}
+                      {jobStatusMeta(job.status).label}
                     </span>
                   </div>
                 </Link>

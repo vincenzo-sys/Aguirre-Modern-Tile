@@ -71,13 +71,15 @@ export const JOB_STATUS_META: Record<JobStatus, JobStatusMeta> = {
     bar: 'bg-rose-300',
     dot: '#f43f5e',
   },
+  // Sky, not teal/green: accepted means "said yes", not "paid". Green is
+  // reserved for money in (the calendar's deposit bar, completed, paid).
   accepted_not_scheduled: {
     label: 'Accepted — Pick Date',
-    badge: 'bg-teal-100 text-teal-800',
-    border: 'border-teal-200',
-    chip: 'bg-teal-200 text-teal-900 hover:bg-teal-300',
-    bar: 'bg-teal-300',
-    dot: '#14b8a6',
+    badge: 'bg-sky-100 text-sky-800',
+    border: 'border-sky-200',
+    chip: 'bg-sky-200 text-sky-900 hover:bg-sky-300',
+    bar: 'bg-sky-300',
+    dot: '#0ea5e9',
   },
   scheduled: {
     label: 'Scheduled',

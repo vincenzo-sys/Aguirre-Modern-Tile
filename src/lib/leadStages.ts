@@ -97,13 +97,17 @@ export const STAGE_META: Record<PipelineStage, StageMeta> = {
     iconSolid: 'bg-orange-500 text-white', spine: 'border-l-orange-500',
     icon: Clock,
   },
+  // Sky, not green. "Accepted" means the customer said yes to the price — no
+  // money has moved. Since 2026-09-04 the calendar paints a deposit-paid
+  // install solid green, and Vince read the old pale-emerald Accepted chip as
+  // "paid". Green now means money in, and only that.
   accepted_not_scheduled: {
     label: 'Accepted — waiting to schedule', shortLabel: 'Accepted',
-    chip: 'bg-emerald-100 text-emerald-800',
-    topBorder: 'border-t-emerald-400',
-    iconBg: 'bg-emerald-100 text-emerald-800',
-    headerBar: 'bg-emerald-50', headerText: 'text-emerald-900',
-    iconSolid: 'bg-emerald-500 text-white', spine: 'border-l-emerald-500',
+    chip: 'bg-sky-100 text-sky-800',
+    topBorder: 'border-t-sky-400',
+    iconBg: 'bg-sky-100 text-sky-800',
+    headerBar: 'bg-sky-50', headerText: 'text-sky-900',
+    iconSolid: 'bg-sky-500 text-white', spine: 'border-l-sky-500',
     icon: CheckCircle2,
   },
   scheduled: {

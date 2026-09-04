@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireApiAuth } from '@/lib/apiAuth'
+import { depositSatisfied } from '@/lib/depositGate'
 
 function getSupabase() {
   return createClient(
@@ -30,6 +31,9 @@ export type ScheduleEvent =
       address: string | null
       phone: string | null
       job_number: number
+      // Deposit in hand per the same rule the deposit gate uses. Drives the
+      // calendar's green bar: a dated install with no deposit is tentative.
+      deposit_ok: boolean
     }
   | {
       // Ad-hoc calendar entries from the calendar_events table (migration 033).
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest) {
     // start before the window but end inside it (multi-day installs).
     const jobsPromise = supabase
       .from('jobs')
-      .select('id, job_number, title, status, scheduled_start, scheduled_end, client_name, client_address, client_phone')
+      .select('id, job_number, title, status, scheduled_start, scheduled_end, client_name, client_address, client_phone, estimated_cost, deposit_paid, amount_paid')
       .not('scheduled_start', 'is', null)
       .lte('scheduled_start', to)
       .or(`scheduled_end.gte.${from},scheduled_end.is.null`)
@@ -147,6 +151,7 @@ export async function GET(req: NextRequest) {
         status: j.status,
         address: j.client_address,
         phone: j.client_phone,
+        deposit_ok: depositSatisfied(j),
       })
     }
 

@@ -6,6 +6,7 @@ import {
   recordedDeposit,
   requiredDeposit,
   type GateJob,
+  depositSatisfied,
 } from './depositGate'
 
 const job = (over: Partial<GateJob> = {}): GateJob => ({
@@ -220,5 +221,37 @@ describe('evaluateDepositGate', () => {
     expect(r.decision).toBe('block')
     expect(r.required).toBe(1940.92)
     expect(r.shortfall).toBe(582.7)
+  })
+})
+
+describe('depositSatisfied — the one definition the gate, the modal and the calendar share', () => {
+  it('is true when the recorded deposit meets the required amount', () => {
+    // #112 Maniaci: $7,661.76 quote, $766.18 reconciled from Stripe on 2026-09-02
+    expect(depositSatisfied(job({ estimated_cost: 7661.76, deposit_paid: 766.18 }))).toBe(true)
+  })
+
+  it('tolerates rounding slop of a dollar', () => {
+    expect(depositSatisfied(job({ estimated_cost: 1000, deposit_paid: 99.2 }))).toBe(true)
+  })
+
+  it('is false when the deposit is short', () => {
+    expect(depositSatisfied(job({ estimated_cost: 1000, deposit_paid: 50 }))).toBe(false)
+    expect(depositSatisfied(job({ estimated_cost: 1000, deposit_paid: 0 }))).toBe(false)
+  })
+
+  it('never paints an unpriced job as paid', () => {
+    // A $0 estimate has no required deposit; "0 >= 0" must not read as satisfied.
+    expect(depositSatisfied(job({ estimated_cost: null, deposit_paid: 0 }))).toBe(false)
+    expect(depositSatisfied(job({ estimated_cost: 0, deposit_paid: 500 }))).toBe(false)
+  })
+
+  it('counts money that arrived through another channel', () => {
+    // Paid by check, logged as a final payment: deposit_paid is 0 but amount_paid covers it.
+    expect(depositSatisfied(job({ estimated_cost: 1000, deposit_paid: 0, amount_paid: 1000 }))).toBe(true)
+  })
+
+  it('holds a GC to the 25% rule', () => {
+    expect(depositSatisfied(job({ is_gc: true, estimated_cost: 10000, deposit_paid: 1000 }))).toBe(false)
+    expect(depositSatisfied(job({ is_gc: true, estimated_cost: 10000, deposit_paid: 2500 }))).toBe(true)
   })
 })

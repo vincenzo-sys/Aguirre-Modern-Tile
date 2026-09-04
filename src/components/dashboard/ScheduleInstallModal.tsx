@@ -31,6 +31,7 @@ import {
   GC_DEPOSIT_PCT,
   RETAIL_DEPOSIT_PCT,
   depositRateLabel,
+  depositSatisfied,
   looksLikeGc,
   money,
   recordedDeposit,
@@ -356,7 +357,7 @@ function DepositStatus({ job }: { job: JobPickerOption }) {
   }
   const short = Math.max(0, Math.round((required - recorded) * 100) / 100)
 
-  if (short <= 1) {
+  if (depositSatisfied({ ...job, is_gc: isGc })) {
     return (
       <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-[11px] text-green-800">
         Deposit on file: {money(recorded)}. Good to schedule.

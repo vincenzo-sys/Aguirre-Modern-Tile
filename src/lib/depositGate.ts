@@ -203,6 +203,17 @@ export function requiredDeposit(job: GateJob): number {
   return Math.max(pct, Math.min(GC_DEPOSIT_MIN, total))
 }
 
+/**
+ * Is the deposit in? The single definition shared by the gate, the install
+ * modal's status panel, and the calendar's green bar. An unpriced job has no
+ * required deposit and therefore can never read as satisfied — the calendar
+ * should not paint a $0 estimate green.
+ */
+export function depositSatisfied(job: GateJob): boolean {
+  const required = requiredDeposit(job)
+  return required > 0 && recordedDeposit(job) >= required - SLOP
+}
+
 /** Dollars actually recorded against the job, deposit channel first. */
 export function recordedDeposit(job: GateJob): number {
   const dep = num(job.deposit_paid)
@@ -264,7 +275,7 @@ export function evaluateDepositGate(input: GateInput): GateResult {
     grandfatherBefore && existingStart && existingStart <= grandfatherBefore
   )
 
-  if (required > 0 && recorded >= required - SLOP) {
+  if (depositSatisfied(job)) {
     return {
       ...base,
       decision: 'allow',

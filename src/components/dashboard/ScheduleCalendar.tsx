@@ -33,6 +33,7 @@ type ScheduleEvent =
       status: string
       address: string | null
       phone: string | null
+      deposit_ok?: boolean
     }
   | {
       kind: 'custom'
@@ -56,6 +57,19 @@ const MAX_LANES = 4
 const LONG_PRESS_MS = 450
 /** Move further than this before arming and it was a scroll, not a drag. */
 const DRAG_SLOP_PX = 10
+
+/**
+ * Bar colour for an install. Deposit in hand wins over the status colour —
+ * Vince's call: a dated install with no deposit is tentative, and he wants
+ * money-in visible at a glance. Finished work keeps its own colour; by then
+ * the deposit is moot. Literal class strings — Tailwind scans this file.
+ */
+const DEPOSIT_IN_CHIP = 'bg-green-500 text-white hover:bg-green-600'
+const FINISHED_STATUSES = new Set(['completed', 'paid', 'cancelled'])
+function installTone(ev: Extract<ScheduleEvent, { kind: 'install' }>): string {
+  if (ev.deposit_ok && !FINISHED_STATUSES.has(ev.status)) return DEPOSIT_IN_CHIP
+  return jobStatusMeta(ev.status).chip
+}
 
 function ymd(date: Date): string {
   return ymdOf(date)
@@ -616,12 +630,16 @@ export default function ScheduleCalendar({
           Estimate visit
         </span>
         <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-4 h-2 rounded-sm bg-green-500" />
+          Deposit in
+        </span>
+        <span className="inline-flex items-center gap-1.5">
           <span className="inline-block w-4 h-2 rounded-sm bg-purple-300" />
-          Install (scheduled)
+          Scheduled · tentative
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block w-4 h-2 rounded-sm bg-orange-300" />
-          In progress
+          In progress · tentative
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block w-4 h-2 rounded-sm bg-white border-2 border-primary-400" />
@@ -963,7 +981,7 @@ function EventChip({
   if (bar && segment) {
     const tone =
       event.kind === 'install'
-        ? jobStatusMeta(event.status).chip
+        ? installTone(event)
         : event.kind === 'custom'
           ? 'bg-white border border-primary-400 text-primary-900 hover:bg-primary-50'
           : 'bg-yellow-50 border border-yellow-400 text-yellow-900 hover:bg-yellow-100'
@@ -1119,7 +1137,7 @@ function EventChip({
   }
 
   // Install
-  const colorClass = jobStatusMeta(event.status).chip
+  const colorClass = installTone(event)
   const continued = Boolean(segment && !segment.isStart)
   const agendaDays = agendaSpan ? spanDays(event.start.slice(0, 10), (event.end || event.start).slice(0, 10)) : 1
   return (

@@ -30,6 +30,29 @@ export async function requireApiAuth(req: NextRequest): Promise<NextResponse | n
 }
 
 /**
+ * Authorizes a scheduled (cron) invocation. Authorization: Bearer <CRON_SECRET>
+ * and nothing else.
+ *
+ * Vercel injects this header on scheduled runs when CRON_SECRET is set in the
+ * project env. The `x-vercel-cron` header is deliberately NOT accepted: any
+ * external caller can set it, and these routes send customer SMS, draft
+ * invoices, and move money. Fails closed when CRON_SECRET is unset, so a
+ * misconfigured deploy refuses rather than running unauthenticated.
+ *
+ * Synchronous, unlike its siblings above — there is one header and one env var
+ * to compare, and no session to await.
+ *
+ * Returns null on success, a 401 NextResponse otherwise.
+ */
+export function requireCronSecret(req: NextRequest): NextResponse | null {
+  const expected = process.env.CRON_SECRET
+  if (expected && req.headers.get('authorization') === `Bearer ${expected}`) {
+    return null
+  }
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+}
+
+/**
  * The profiles.id of the human behind this request, or null.
  *
  * requireApiAuth deliberately returns only a response-or-null, so it can't tell
